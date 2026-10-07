@@ -1,0 +1,11 @@
+{
+  "name": "convi",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter @convi/web dev",
+    "dev:api": "pnpm --filter @convi/api start:dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "packageManager": "pnpm@10.34.6"
+}
