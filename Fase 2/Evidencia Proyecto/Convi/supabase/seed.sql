@@ -1,0 +1,3 @@
+-- Datos de desarrollo de CONVI.
+-- Dejar vacio hasta acordar una base anonima/ficticia con el equipo.
+-- NUNCA poner datos reales de estudiantes, apoderados ni funcionarios.

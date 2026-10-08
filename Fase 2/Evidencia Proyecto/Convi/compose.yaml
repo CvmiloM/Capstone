@@ -1,0 +1,60 @@
+name: convi-dev
+
+# Solamente las aplicaciones. Supabase local se administra con su CLI.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["corepack", "pnpm", "--filter", "@convi/api", "start:dev"]
+    working_dir: /workspace
+    environment:
+      PORT: "3001"
+      CHOKIDAR_USEPOLLING: "true"
+      # Dentro del contenedor, localhost NO apunta al host Windows.
+      SUPABASE_URL: "http://host.docker.internal:54321"
+      SUPABASE_PUBLISHABLE_KEY: "${SUPABASE_PUBLISHABLE_KEY:-}"
+      SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
+      # Compatibilidad temporal con integraciones basadas en claves antiguas.
+      SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY:-}"
+      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:-}"
+    ports:
+      - "127.0.0.1:${API_PORT:-3001}:3001"
+    volumes:
+      - .:/workspace
+      - pnpm_root_modules:/workspace/node_modules
+      - web_modules:/workspace/apps/web/node_modules
+      - api_modules:/workspace/apps/api/node_modules
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["corepack", "pnpm", "--filter", "@convi/web", "dev", "--hostname", "0.0.0.0"]
+    working_dir: /workspace
+    environment:
+      PORT: "3000"
+      NEXT_TELEMETRY_DISABLED: "1"
+      CHOKIDAR_USEPOLLING: "true"
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:3001}"
+      NEXT_PUBLIC_SUPABASE_URL: "${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "${SUPABASE_PUBLISHABLE_KEY:-}"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY:-}"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    volumes:
+      - .:/workspace
+      - pnpm_root_modules:/workspace/node_modules
+      - web_modules:/workspace/apps/web/node_modules
+      - api_modules:/workspace/apps/api/node_modules
+      - web_next:/workspace/apps/web/.next
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pnpm_root_modules:
+  web_modules:
+  api_modules:
+  web_next:
