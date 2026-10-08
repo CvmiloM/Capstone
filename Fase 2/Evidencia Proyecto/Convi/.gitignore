@@ -1,10 +1,89 @@
-node_modules
-dist
-.next
-coverage
+
+# ==========================================
+# CONVI - Archivos generados por el proyecto
+# ==========================================
+
+# Node.js / Next.js / NestJS
+node_modules/
+dist/
+.next/
+coverage/
 *.log
+*.tsbuildinfo
+
+# Variables de entorno
 .env
 .env.*
 !.env.example
-supabase/.temp
-supabase/.branches
+
+# Supabase local
+**/supabase/.temp/
+**/supabase/.branches/
+
+# ==========================================
+# AGENTES DE IA - Claude y Codex
+# ==========================================
+
+# Claude Code
+.claude/
+.claude.json*
+CLAUDE.md
+CLAUDE.local.md
+
+# OpenAI Codex
+.codex/
+.agents/
+.agent/
+AGENTS.md
+AGENTS.override.md
+
+# Skills de agentes
+SKILL.md
+SKILLS.md
+Skills.md
+skills.md
+skill.md
+
+# ==========================================
+# OTROS ASISTENTES DE PROGRAMACION
+# ==========================================
+
+# Cursor
+.cursor/
+.cursorrules
+.cursorignore
+
+# Windsurf
+.windsurf/
+.windsurfrules
+
+# Gemini
+.gemini/
+GEMINI.md
+
+# GitHub Copilot
+.github/copilot-instructions.md
+.github/instructions/
+
+# Otros agentes
+.aider*
+.continue/
+.cline/
+.clinerules
+.roo/
+.roomodes
+.opencode/
+opencode.json
+opencode.jsonc
+
+# ==========================================
+# CONFIGURACIONES Y NOTAS LOCALES DE IA
+# ==========================================
+
+# Configuracion MCP local
+.mcp.json
+
+# Carpeta acordada para archivos temporales
+# generados por cualquier agente
+.ai-local/
+.agent-notes/
