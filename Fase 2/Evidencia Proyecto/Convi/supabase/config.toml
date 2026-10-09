@@ -29,6 +29,30 @@ enabled = true
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://127.0.0.1:3000", "http://localhost:3000"]
 jwt_expiry = 3600
+enable_signup = true
+# Igual a LARGO_MINIMO_CONTRASENA en apps/web/src/app/(publico)/limites.ts
+minimum_password_length = 8
+
+[auth.email]
+enable_signup = true
+# HU-001 CA2: la cuenta no queda verificada hasta abrir el enlace del correo
+enable_confirmations = true
+
+[auth.email.template.invite]
+subject = "Te invitaron a CONVI"
+content_path = "./supabase/templates/invitacion.html"
+
+[auth.email.template.confirmation]
+subject = "Confirma tu correo en CONVI"
+content_path = "./supabase/templates/confirmacion.html"
+
+# HU-008: segundo factor con app autenticadora para Administración y Convivencia
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
 
 [storage]
 enabled = true
