@@ -13,6 +13,8 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       # Dentro del contenedor, localhost NO apunta al host Windows.
       SUPABASE_URL: "http://host.docker.internal:54321"
+      # Credencial solo local; las consultas usan convi_backend.
+      SUPABASE_DB_URL: "${SUPABASE_DB_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}"
       SUPABASE_PUBLISHABLE_KEY: "${SUPABASE_PUBLISHABLE_KEY:-}"
       SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
       # Compatibilidad temporal con integraciones basadas en claves antiguas.
