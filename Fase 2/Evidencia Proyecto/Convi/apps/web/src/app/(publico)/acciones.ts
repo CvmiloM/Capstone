@@ -1,9 +1,11 @@
 "use server";
 
+import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { LARGO_MAXIMO, LARGO_MINIMO_CONTRASENA } from "./limites";
 
-// Acciones de los formularios públicos. Por ahora solo validan los datos en el
-// servidor: la conexión con Supabase Auth y con el backend está marcada con TODO.
+// Acciones de los formularios públicos. Todas validan los datos en el servidor.
+// El registro ya usa Supabase Auth; el login y la activación de cuenta siguen
+// marcados con TODO.
 
 export type EstadoFormulario = {
   /** Error general del formulario (credenciales, enlace vencido, etc.). */
@@ -98,14 +100,54 @@ export async function registrarAdministrador(
   validarNuevaContrasena(contrasena, confirmacion, errores);
   if (Object.keys(errores).length > 0) return { errores, valores };
 
-  // TODO(PB-001): crear la identidad con Supabase Auth (signUp) y enviar el
-  // correo de verificación. Antes de verificar no se crea nada en CONVI, así
-  // que nombres, apellidos y teléfono se guardan en los metadatos de la
-  // identidad (options.data) hasta que el backend llame a
-  // convi.registrar_primer_administrador junto con los datos de la escuela
-  // (HU-002). La contraseña queda solo en Supabase Auth y nunca en logs.
-  // Si todo sale bien, responder { exito: true, valores }.
-  return { mensaje: SIN_CONEXION, valores };
+  // Crea la identidad en Supabase Auth y envía el correo de verificación
+  // (supabase/templates/confirmacion.html). Antes de verificar no se crea nada
+  // en CONVI (HU-001 CA2): nombres, apellidos y teléfono quedan en los
+  // metadatos de la identidad hasta que el backend llame a
+  // convi.registrar_primer_administrador con los datos de la escuela (PB-002).
+  // La contraseña queda solo en Supabase Auth y nunca se escribe en logs.
+  const supabase = await crearClienteServidor();
+  const { error } = await supabase.auth.signUp({
+    email: valores.correo,
+    password: contrasena,
+    options: {
+      data: {
+        nombres: valores.nombres,
+        apellidos: valores.apellidos,
+        telefono: valores.telefono || null,
+      },
+    },
+  });
+
+  if (error) {
+    switch (error.code) {
+      case "weak_password":
+        return {
+          errores: { contrasena: "Elige una contraseña más segura." },
+          valores,
+        };
+      case "email_address_invalid":
+        return { errores: { correo: "Ingresa un correo válido." }, valores };
+      case "over_email_send_rate_limit":
+      case "over_request_rate_limit":
+        return {
+          mensaje:
+            "Hiciste varios intentos seguidos. Espera unos minutos y vuelve a intentarlo.",
+          valores,
+        };
+      default:
+        return {
+          mensaje:
+            "No pudimos crear tu cuenta. Inténtalo de nuevo en unos minutos.",
+          valores,
+        };
+    }
+  }
+
+  // Si el correo ya tenía cuenta, Supabase responde igual que con uno nuevo
+  // (y no envía otro correo si ya estaba verificado). Así nadie puede
+  // averiguar qué correos están registrados en CONVI.
+  return { exito: true, valores };
 }
 
 export async function activarCuenta(
