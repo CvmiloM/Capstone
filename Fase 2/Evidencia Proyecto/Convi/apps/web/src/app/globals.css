@@ -24,6 +24,18 @@
   --input: #d6d3cc; /* bordes de campos */
   --ring: #3b5b85; /* foco del teclado */
   --destructive: #b42318; /* errores */
+  
+  /* Paleta de la landing (marca Convi): bg-tinta, text-verde, bg-naranjo... */
+  --tinta: #13254a; /* azul tinta: textos y fondos oscuros */
+  --crema: #fbf7f0; /* fondo crema */
+  --verde: #2b8a62; /* acento principal */
+  --menta: #4fbf8b;
+  --naranjo: #f26b3a; /* botón principal */
+  --naranjo-sombra: #c24e22; /* borde inferior del botón principal */
+  --amarillo: #f7b815;
+  --pizarra: #3d4d6e; /* textos de apoyo sobre fondo claro */
+  --grafito: #5a6884; /* pie de página */
+  --niebla: #c9d1e3; /* textos de apoyo sobre fondo oscuro */
 }
 
 @theme inline {
@@ -42,6 +54,20 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
+  
+  --color-tinta: var(--tinta);
+  --color-crema: var(--crema);
+  --color-verde: var(--verde);
+  --color-menta: var(--menta);
+  --color-naranjo: var(--naranjo);
+  --color-amarillo: var(--amarillo);
+  --color-pizarra: var(--pizarra);
+  --color-grafito: var(--grafito);
+  --color-niebla: var(--niebla);
+
+  /* Fuentes de la landing: font-titulo (Outfit) y font-cuerpo (Figtree) */
+  --font-titulo: var(--font-outfit);
+  --font-cuerpo: var(--font-figtree);
 
   --font-sans: var(--font-geist-sans);
   --font-serif: var(--font-source-serif);

@@ -1,114 +1,211 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import {
-  claseBotonPrimario,
-  claseBotonSecundario,
-  claseEnlace,
-} from "@/app/components/formulario";
-import { MarcaCompacta } from "@/app/components/marca";
+import estudiante from "@/assets/convi-favicon.png";
+import logo from "@/assets/convi-logo-trim.png";
 
-// Textos basados en la descripción del proyecto (README): eje reactivo,
-// eje preventivo y separación por establecimiento.
-const caracteristicas: { titulo: string; texto: string; icono: ReactNode }[] = [
+export const metadata: Metadata = {
+  title: { absolute: "Convi · Convivencia escolar" },
+};
+
+// Textos de la landing. Las clases de color van completas (text-naranjo,
+// bg-verde...) porque Tailwind no reconoce nombres armados por partes.
+const pasos = [
   {
-    titulo: "Situaciones y casos",
+    numero: "01",
+    color: "text-naranjo",
+    titulo: "Reporta",
     texto:
-      "Profesores y Convivencia registran lo que ocurre. Cada caso reúne entrevistas, acuerdos, seguimientos y las evidencias de cada paso.",
-    icono: (
-      <>
-        <rect x="5.5" y="4" width="13" height="17" rx="2" />
-        <path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3.5" />
-      </>
-    ),
+      "Cualquier integrante de la comunidad puede informar una situación de forma segura, incluso de manera anónima.",
   },
   {
-    titulo: "Plan de Gestión",
+    numero: "02",
+    color: "text-amarillo",
+    titulo: "Acompaña",
     texto:
-      "El eje preventivo: el Plan de Gestión de Convivencia del establecimiento, ordenado en objetivos, acciones y actividades.",
-    icono: (
-      <>
-        <rect x="3.5" y="5" width="17" height="15" rx="2" />
-        <path d="M3.5 10h17M8 3v4M16 3v4" />
-      </>
-    ),
+      "El equipo de convivencia recibe el caso, aplica el protocolo correspondiente y registra cada acción.",
   },
   {
-    titulo: "Cada escuela, sus datos",
+    numero: "03",
+    color: "text-menta",
+    titulo: "Resuelve",
     texto:
-      "Cada establecimiento mantiene separados sus usuarios, estudiantes y registros, y cada perfil ve solo lo que le corresponde.",
-    icono: <path d="M12 3 19 6v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z" />,
+      "Se notifica a las familias, se cierra el caso y queda un historial para prevenir situaciones futuras.",
   },
 ];
 
+const perfiles = [
+  {
+    fondo: "bg-verde",
+    titulo: "Estudiantes",
+    texto:
+      "Un canal confiable para pedir ayuda y reportar lo que pasa en el colegio.",
+  },
+  {
+    fondo: "bg-naranjo",
+    titulo: "Docentes",
+    texto:
+      "Registro rápido de anotaciones y derivaciones desde la sala de clases.",
+  },
+  {
+    fondo: "bg-amarillo",
+    titulo: "Familias",
+    texto:
+      "Información clara y oportuna sobre los casos que involucran a sus hijos.",
+  },
+  {
+    fondo: "bg-tinta",
+    titulo: "Equipo directivo",
+    texto:
+      "Visión completa de la convivencia del colegio y reportes para la toma de decisiones.",
+  },
+];
+
+const claseEtiqueta = "text-sm font-semibold uppercase tracking-[.04em]";
+const claseTituloSeccion =
+  "font-titulo text-[clamp(34px,4.5vw,52px)] leading-[1.05] font-extrabold tracking-[-.01em]";
+
 export default function PaginaInicio() {
   return (
-    <div className="relative isolate flex flex-1 flex-col">
-      <div aria-hidden="true" className="fondo-cuaderno absolute inset-x-0 top-0 -z-10 h-[42rem]" />
-
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-5 sm:px-6">
-        <MarcaCompacta />
-        <Link href="/login" className={`text-sm ${claseEnlace}`}>
-          Iniciar sesión
-        </Link>
+    <div className="flex flex-1 flex-col bg-crema font-cuerpo text-tinta">
+      <header className="sticky top-0 z-10 border-b border-tinta/8 bg-crema/92 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-6 px-6 py-3.5">
+          <Link href="/" className="flex items-center">
+            <Image src={logo} alt="Convi" priority className="block h-10 w-auto" />
+          </Link>
+          <nav className="flex flex-wrap gap-7 text-[15px] font-medium">
+            <a href="#como" className="hover:text-verde">
+              Cómo funciona
+            </a>
+            <a href="#comunidad" className="hover:text-verde">
+              Para quién
+            </a>
+          </nav>
+          <div className="flex items-center gap-2.5 text-[15px] font-semibold">
+            <Link href="/login" className="px-3.5 py-2.5 hover:text-verde">
+              Iniciar sesión
+            </Link>
+            <Link
+              href="/registro"
+              className="rounded-full bg-tinta px-5 py-[11px] text-crema transition-colors hover:bg-verde hover:text-white"
+            >
+              Registrarse
+            </Link>
+          </div>
+        </div>
       </header>
 
       <main className="flex-1">
-        <section className="mx-auto max-w-3xl px-4 pt-16 pb-20 text-center sm:px-6 sm:pt-24">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Plataforma de convivencia escolar
-          </p>
-          <span aria-hidden="true" className="mx-auto mt-3 block h-0.5 w-8 rounded-full bg-highlight" />
-          <h1 className="mt-6 text-3xl font-semibold text-primary sm:text-5xl sm:leading-tight">
-            Cada situación de convivencia, registrada y con seguimiento.
-          </h1>
-          <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
-            CONVI reúne en un expediente digital lo que hoy queda repartido
-            entre el libro de clases, planillas, correos y actas: qué ocurrió,
-            qué se decidió y qué seguimiento se hizo.
-          </p>
-          <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/login" className={`${claseBotonPrimario} px-6`}>
-              Iniciar sesión
-            </Link>
-            <Link href="/registro" className={`${claseBotonSecundario} px-6`}>
-              Registrar establecimiento
-            </Link>
+        <section className="mx-auto grid max-w-[1200px] items-center gap-14 px-6 pt-18 pb-24 lg:grid-cols-2">
+          <div className="flex flex-col gap-7">
+            <p className={`flex items-center gap-2.5 text-verde ${claseEtiqueta}`}>
+              <span aria-hidden="true" className="h-[3px] w-7 rounded-sm bg-naranjo" />
+              Plataforma de convivencia escolar
+            </p>
+            <h1 className="font-titulo text-[clamp(44px,6vw,76px)] leading-none font-extrabold tracking-[-.02em]">
+              Un colegio donde todos <span className="text-verde">conviven</span> mejor.
+            </h1>
+            <p className="max-w-[520px] text-xl leading-[1.55] text-pretty text-pizarra">
+              Convi reúne reportes, seguimiento de casos y protocolos en un solo
+              lugar, para que estudiantes, familias y equipos de convivencia
+              actúen a tiempo.
+            </p>
+            <div className="flex flex-wrap gap-3 text-[17px] font-semibold">
+              <Link
+                href="/registro"
+                className="rounded-full bg-naranjo px-7 py-4 text-white shadow-[0_6px_0_var(--naranjo-sombra)] transition hover:translate-y-0.5 hover:shadow-[0_4px_0_var(--naranjo-sombra)]"
+              >
+                Registrarse
+              </Link>
+              <a
+                href="#como"
+                className="rounded-full border-2 border-tinta px-6 py-4 transition-colors hover:bg-tinta hover:text-crema"
+              >
+                Ver cómo funciona
+              </a>
+            </div>
+          </div>
+
+          {/* Ilustración: círculo amarillo con un anillo punteado detrás */}
+          <div className="relative flex min-h-[460px] items-center justify-center">
+            <div aria-hidden="true" className="absolute aspect-square w-[min(440px,90%)] rounded-full bg-amarillo" />
+            <div
+              aria-hidden="true"
+              className="absolute aspect-square w-[min(440px,90%)] scale-[1.12] rounded-full border-2 border-dashed border-verde"
+            />
+            <Image
+              src={estudiante}
+              alt="Estudiante Convi"
+              priority
+              className="relative block h-auto w-[min(420px,88%)]"
+            />
           </div>
         </section>
 
-        <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
-          <ul className="grid gap-4 sm:grid-cols-3">
-            {caracteristicas.map(({ titulo, texto, icono }) => (
-              <li
-                key={titulo}
-                className="rounded-2xl border border-border bg-card p-6 shadow-tarjeta"
+        <section id="como" className="scroll-mt-20 bg-tinta text-crema">
+          <div className="mx-auto flex max-w-[1200px] flex-col gap-14 px-6 py-24">
+            <div className="flex max-w-[640px] flex-col gap-4">
+              <p className={`text-amarillo ${claseEtiqueta}`}>Cómo funciona</p>
+              <h2 className={claseTituloSeccion}>
+                De la alerta a la solución, en tres pasos.
+              </h2>
+            </div>
+            <div className="grid gap-5 md:grid-cols-3">
+              {pasos.map((paso) => (
+                <div
+                  key={paso.numero}
+                  className="flex flex-col gap-4 rounded-3xl border border-crema/12 bg-crema/6 p-8"
+                >
+                  <span className={`font-titulo text-[56px] leading-none font-extrabold ${paso.color}`}>
+                    {paso.numero}
+                  </span>
+                  <h3 className="font-titulo text-2xl font-bold">{paso.titulo}</h3>
+                  <p className="text-[17px] leading-[1.55] text-pretty text-niebla">
+                    {paso.texto}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="comunidad"
+          className="mx-auto flex max-w-[1200px] scroll-mt-20 flex-col gap-12 px-6 py-24"
+        >
+          <div className="flex max-w-[640px] flex-col gap-4">
+            <p className={`text-verde ${claseEtiqueta}`}>Para toda la comunidad</p>
+            <h2 className={claseTituloSeccion}>Cada persona tiene su espacio.</h2>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {perfiles.map((perfil) => (
+              <div
+                key={perfil.titulo}
+                className="flex flex-col gap-3.5 rounded-3xl border border-tinta/8 bg-white p-7 transition hover:-translate-y-[3px] hover:shadow-[0_14px_36px_rgba(19,37,74,.1)]"
               >
-                <span className="flex size-10 items-center justify-center rounded-xl bg-accent text-primary">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="size-5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    {icono}
-                  </svg>
-                </span>
-                <h2 className="mt-4 text-lg font-semibold">{titulo}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">{texto}</p>
-              </li>
+                <span aria-hidden="true" className={`block size-12 rounded-[14px] ${perfil.fondo}`} />
+                <h3 className="font-titulo text-[22px] font-bold">{perfil.titulo}</h3>
+                <p className="leading-[1.55] text-pretty text-pizarra">{perfil.texto}</p>
+              </div>
             ))}
-          </ul>
+          </div>
         </section>
       </main>
 
-      <footer className="border-t border-border">
-        <p className="mx-auto max-w-5xl px-4 py-6 text-sm text-muted-foreground sm:px-6">
-          CONVI · Seguimiento y trazabilidad de la convivencia escolar
-        </p>
+      <footer className="border-t border-tinta/10">
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-5 px-6 py-8 text-sm text-grafito">
+          <Image src={logo} alt="Convi" className="block h-7 w-auto" />
+          <div className="flex flex-wrap gap-6">
+            {/* TODO: páginas de privacidad y términos */}
+            <a href="#" className="hover:text-tinta">
+              Privacidad
+            </a>
+            <a href="#" className="hover:text-tinta">
+              Términos
+            </a>
+            <span>© 2026 Convi</span>
+          </div>
+        </div>
       </footer>
     </div>
   );
