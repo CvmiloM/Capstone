@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../../"),
   cacheComponents: true,
   partialPrefetching: true,
+  logging: {
+    // Los formularios llevan contraseñas y los enlaces llevan tokens: no registrarlos.
+    serverFunctions: false,
+    incomingRequests: false,
+  },
   turbopack: {
     rules: {
       "*.css": {
