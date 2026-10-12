@@ -35,13 +35,17 @@ export type EstudianteDelCurso = {
 /** "sin-permiso": la API rechazó el registro (403) o no existe o no es válido (400 y 404). */
 type Respuesta<T> = { ok: true; datos: T } | { ok: false; motivo: "sin-permiso" };
 
-async function pedir<T>(ruta: string): Promise<Respuesta<T>> {
+async function tokenDeSesion() {
   const supabase = await crearClienteServidor();
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   // Sin sesión no se llama a la API. La API igual verifica el token en cada petición.
   if (!token) redirect("/login");
+  return token;
+}
 
+async function pedir<T>(ruta: string): Promise<Respuesta<T>> {
+  const token = await tokenDeSesion();
   const respuesta = await fetch(`${URL_API}${ruta}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
@@ -70,6 +74,83 @@ export const NOMBRE_ROL: Record<string, string> = {
   PROFESOR_JEFE: "Profesor jefe",
   PROFESOR: "Profesor de asignatura",
 };
+
+// --- Registro de situación (PB-042, HU-035) ---
+
+export type Categoria = {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+};
+
+export function obtenerCategorias() {
+  return pedir<Categoria[]>("/profesor/categorias");
+}
+
+export type ResultadoRegistro =
+  | { ok: true; id: string; codigo: string }
+  | { ok: false; mensaje: string; errores?: Record<string, string> };
+
+const SIN_CONEXION =
+  "No pudimos registrar la situación. Revisa tu conexión e inténtalo nuevamente; lo que escribiste sigue en el formulario.";
+
+/**
+ * Envía la situación a la API, que valida todo de nuevo y la guarda en una
+ * sola transacción. Los errores se devuelven en vez de lanzarse, para que el
+ * formulario no pierda lo que escribió el profesor.
+ */
+export async function enviarSituacion(
+  cuerpo: unknown,
+): Promise<ResultadoRegistro> {
+  const token = await tokenDeSesion();
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(`${URL_API}/profesor/situaciones`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(cuerpo),
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, mensaje: SIN_CONEXION };
+  }
+  if (respuesta.status === 401) redirect("/login");
+
+  const datos = (await respuesta.json().catch(() => null)) as {
+    id?: string;
+    codigo?: string;
+    mensaje?: string;
+    message?: string;
+    errores?: Record<string, string>;
+  } | null;
+  if (respuesta.status === 201 && datos?.id && datos.codigo) {
+    return { ok: true, id: datos.id, codigo: datos.codigo };
+  }
+  // HU-035 CA5: la API indica cada campo con problema y no guarda nada.
+  if (respuesta.status === 400 && datos?.errores) {
+    return {
+      ok: false,
+      mensaje: datos.mensaje ?? "Revisa los datos marcados.",
+      errores: datos.errores,
+    };
+  }
+  if (respuesta.status === 403) {
+    return {
+      ok: false,
+      mensaje:
+        "Ya no tienes una asignación vigente en este curso, así que no puedes registrar situaciones en él.",
+    };
+  }
+  // 409: otra situación se registró al mismo tiempo y la API ya reintentó.
+  if (respuesta.status === 409 && datos?.message) {
+    return { ok: false, mensaje: datos.message };
+  }
+  return { ok: false, mensaje: SIN_CONEXION };
+}
+
 
 // --- Mis registros (HU-034 CA2) ---
 

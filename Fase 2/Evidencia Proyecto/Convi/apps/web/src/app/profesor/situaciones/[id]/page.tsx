@@ -9,17 +9,21 @@ import {
   obtenerSituacion,
   URGENCIA,
 } from "../../datos";
+import { NOMBRE_ROL_EN_SITUACION } from "../../situacion-opciones";
 
 export const metadata: Metadata = { title: "Detalle del registro" };
 
 // HU-034 CA2 y CA3: detalle de una situación propia. Si es de otro profesor,
 // la API responde 403 y se muestra el aviso sin revelar su contenido.
+// PB-042: al llegar desde el formulario (?registrada=1) se confirma el registro.
 export default async function PaginaDetalleSituacion({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ registrada?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { registrada }] = await Promise.all([params, searchParams]);
   const respuesta = await obtenerSituacion(id);
   if (!respuesta.ok) return <AvisoSinPermiso volverA="/profesor/situaciones" />;
   const situacion = respuesta.datos;
@@ -30,6 +34,19 @@ export default async function PaginaDetalleSituacion({
       <Link href="/profesor/situaciones" className={`text-sm ${claseEnlace}`}>
         ← Mis registros
       </Link>
+
+      
+      {registrada === "1" && (
+        <div
+          role="status"
+          className="mt-4 rounded-lg border border-verde/30 bg-verde/10 px-4 py-3 text-sm"
+        >
+          Registraste la situación{" "}
+          <strong className="font-mono">{situacion.codigo}</strong>. Convivencia
+          ya la tiene como Nueva. Lo enviado no se puede editar: si necesitan
+          más información, te pedirán una aclaración.
+        </div>
+      )}
 
       <div className="mt-4 mb-6">
         <p className="font-mono text-sm text-muted-foreground">{situacion.codigo}</p>
@@ -76,7 +93,7 @@ export default async function PaginaDetalleSituacion({
                   )}
                 </span>
                 <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                  {p.rol}
+                  {NOMBRE_ROL_EN_SITUACION[p.rol] ?? p.rol}
                 </span>
               </li>
             ))}
