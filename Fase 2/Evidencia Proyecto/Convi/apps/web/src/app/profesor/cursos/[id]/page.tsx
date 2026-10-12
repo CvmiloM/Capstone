@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { claseEnlace, Encabezado } from "@/app/components/formulario";
+import {
+  claseBotonPrimario,
+  claseEnlace,
+  Encabezado,
+} from "@/app/components/formulario";
 import { AvisoSinPermiso } from "../../aviso-sin-permiso";
 import { NOMBRE_ROL, obtenerCursos, obtenerEstudiantes } from "../../datos";
 
@@ -26,13 +30,22 @@ export default async function PaginaCurso({
       <Link href="/profesor" className={`text-sm ${claseEnlace}`}>
         ← Mis cursos
       </Link>
-      <div className="mt-4">
+            <div className="mt-4 flex flex-wrap items-start justify-between gap-x-4">
         <Encabezado
           titulo={curso.nombre}
           descripcion={`${curso.nivel} · ${curso.anio} · ${curso.roles
             .map((rol) => NOMBRE_ROL[rol] ?? rol)
             .join(" y ")}`}
         />
+        {/* PB-042: registrar una situación de este curso. */}
+        {estudiantes.datos.length > 0 && (
+          <Link
+            href={`/profesor/cursos/${curso.id}/registrar`}
+            className={`mb-6 ${claseBotonPrimario}`}
+          >
+            Registrar situación
+          </Link>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-tarjeta">
