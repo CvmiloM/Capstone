@@ -1,6 +1,16 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import {
+  errorDeCampos,
+  type NuevaSituacion,
+  validarNuevaSituacion,
+} from './nueva-situacion.js';
 
 // PB-041 (HU-034): cursos y registros propios del profesor.
 // La seguridad por fila de la base solo separa por escuela. Que el profesor vea
@@ -64,6 +74,40 @@ export type DetalleSituacion = SituacionPropia & {
     respondido_en: Date | null;
   }[];
 };
+
+export type Categoria = {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+};
+
+export type SituacionRegistrada = {
+  id: string;
+  codigo: string;
+  estado: string;
+  reportado_en: Date;
+};
+
+// El código SIT-AAAA-00001 lo asigna la base con el siguiente número libre de la
+// escuela. Si dos registros llegan a la vez, el segundo puede chocar con el
+// código del primero: se reintenta en una transacción nueva, que ya ve ese código.
+// En cada vuelta al menos uno obtiene su código, así que cinco envíos
+// simultáneos necesitan como máximo cinco intentos.
+const INTENTOS_REGISTRO = 5;
+const REGISTRO_SIMULTANEO =
+  'Se registró otra situación al mismo tiempo. Envía el formulario nuevamente.';
+
+function esChoqueDeCodigo(error: unknown) {
+  const { code, constraint } = (error ?? {}) as {
+    code?: string;
+    constraint?: string;
+  };
+  return (
+    code === '40001' ||
+    (code === '23505' &&
+      constraint === 'situaciones_establecimiento_id_codigo_key')
+  );
+}
 
 // Columnas comunes del listado y del detalle. Nunca incluye caso_id ni quién
 // revisa la situación: esa información es de Convivencia (HU-034 CA3).
@@ -130,6 +174,158 @@ export class ProfesorService {
           [cursoId],
         );
         return resultado.rows;
+      },
+    );
+  }
+
+  // PB-042 (HU-035): categorías activas para el formulario. Las inactivas no se
+  // ofrecen en situaciones nuevas (HU-023).
+  categorias(sesion: Sesion): Promise<Categoria[]> {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const resultado = await db.query<Categoria>(
+          `SELECT id, nombre, descripcion
+           FROM convi.categorias_convivencia
+           WHERE estado = 'ACTIVO'
+           ORDER BY nombre`,
+        );
+        return resultado.rows;
+      },
+    );
+  }
+
+  // PB-042 (HU-035) y PB-138: registra la situación y a sus participantes en una
+  // sola transacción. Si algo falla no queda una situación sin estudiantes.
+  async registrar(
+    sesion: Sesion,
+    cuerpo: unknown,
+  ): Promise<SituacionRegistrada> {
+    const datos = validarNuevaSituacion(cuerpo);
+    for (let intento = 1; ; intento++) {
+      try {
+        return await this.guardarSituacion(sesion, datos);
+      } catch (error) {
+        const reintentar =
+          error instanceof ConflictException &&
+          error.message === REGISTRO_SIMULTANEO &&
+          intento < INTENTOS_REGISTRO;
+        if (!reintentar) throw error;
+        // Una espera corta y distinta en cada petición evita que vuelvan a chocar.
+        await new Promise((listo) =>
+          setTimeout(listo, 20 + Math.random() * 80),
+        );
+      }
+    }
+  }
+
+  // CA1: curso_reporte usa convi.puede_reportar_curso, que exige la asignación
+  // vigente; el trigger de convi.situaciones lo vuelve a comprobar al insertar.
+  private guardarSituacion(
+    sesion: Sesion,
+    datos: NuevaSituacion,
+  ): Promise<SituacionRegistrada> {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'curso_reporte', id: datos.curso_id, perfiles: PERFILES },
+      async (db) => {
+        const errores: Record<string, string> = {};
+
+        // El formulario envía la hora de la escuela; la base la convierte con
+        // la zona horaria del establecimiento (HU-021).
+        const fecha = await db.query<{ ocurrido_en: Date; futura: boolean }>(
+          `SELECT ($1::timestamp AT TIME ZONE e.zona_horaria) AS ocurrido_en,
+                  ($1::timestamp AT TIME ZONE e.zona_horaria) > now() AS futura
+           FROM convi.establecimientos e
+           WHERE e.id = convi.establecimiento_actual()`,
+          [datos.ocurrido_en],
+        );
+        const ocurrido = fecha.rows[0];
+        if (!ocurrido || ocurrido.futura)
+          errores.ocurrido_en = 'La fecha del hecho no puede ser futura.';
+
+        if (datos.categoria_id) {
+          const categoria = await db.query(
+            `SELECT 1 FROM convi.categorias_convivencia
+             WHERE id = $1 AND estado = 'ACTIVO'`,
+            [datos.categoria_id],
+          );
+          if (categoria.rowCount === 0)
+            errores.categoria_id = 'Elige una categoría de la lista.';
+        }
+
+        // CA4: la matrícula activa de cada estudiante en este curso se guarda en
+        // la participación, para conservar su curso histórico.
+        const matriculas = await db.query<{
+          estudiante_id: string;
+          persona_id: string;
+          matricula_id: string;
+        }>(
+          `SELECT e.id AS estudiante_id, e.persona_id, m.id AS matricula_id
+           FROM convi.matriculas m
+           JOIN convi.estudiantes e ON e.id = m.estudiante_id
+           WHERE m.curso_id = $1 AND m.estado = 'ACTIVO'
+             AND e.id = ANY($2::uuid[])`,
+          [datos.curso_id, datos.participantes.map((p) => p.estudiante_id)],
+        );
+        const matriculaDe = new Map(
+          matriculas.rows.map((fila) => [fila.estudiante_id, fila]),
+        );
+        if (matriculaDe.size !== datos.participantes.length)
+          errores.participantes =
+            'Hay estudiantes que no están matriculados en este curso.';
+
+        // CA5: si falta algo no se inserta nada.
+        if (!ocurrido || Object.keys(errores).length > 0)
+          throw errorDeCampos(errores);
+
+        // CA3: la base asigna el código, la fecha de registro del servidor y el
+        // estado NUEVA.
+        const insertada = await db
+          .query<SituacionRegistrada>(
+            `INSERT INTO convi.situaciones
+               (establecimiento_id, reportado_por_membresia_id, curso_contexto_id,
+                tipo_origen, ocurrido_en, lugar, descripcion, categoria_id, urgencia)
+             VALUES (convi.establecimiento_actual(), convi.membresia_actual(), $1,
+                     'PROFESOR', $2, $3, $4, $5, $6)
+             RETURNING id, codigo, estado, reportado_en`,
+            [
+              datos.curso_id,
+              ocurrido.ocurrido_en,
+              datos.lugar,
+              datos.descripcion,
+              datos.categoria_id,
+              datos.urgencia,
+            ],
+          )
+          .catch((error: unknown) => {
+            if (esChoqueDeCodigo(error))
+              throw new ConflictException(REGISTRO_SIMULTANEO);
+            throw error;
+          });
+        const situacion = insertada.rows[0];
+
+        const participantes = datos.participantes.map((p) => ({
+          rol: p.rol,
+          ...matriculaDe.get(p.estudiante_id)!,
+        }));
+        await db.query(
+          `INSERT INTO convi.participaciones
+             (establecimiento_id, persona_id, situacion_id, rol_contextual,
+              matricula_contexto_id)
+           SELECT convi.establecimiento_actual(), x.persona_id, $1, x.rol,
+                  x.matricula_id
+           FROM unnest($2::uuid[], $3::text[], $4::uuid[])
+             AS x(persona_id, rol, matricula_id)`,
+          [
+            situacion.id,
+            participantes.map((p) => p.persona_id),
+            participantes.map((p) => p.rol),
+            participantes.map((p) => p.matricula_id),
+          ],
+        );
+        return situacion;
       },
     );
   }
