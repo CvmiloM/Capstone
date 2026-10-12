@@ -4,11 +4,14 @@ import type { Perfil } from './sesion.js';
 export const ACCESO = Symbol('acceso');
 export type ReglaAcceso =
   | { tipo: 'publico' }
+  | { tipo: 'registro' }
   | { tipo: 'sesion' }
   | { tipo: 'operacion'; perfiles: Perfil[] };
 
 // Omite la comprobación de sesión: reservar para rutas que no entregan datos privados.
 export const Publica = () => SetMetadata(ACCESO, { tipo: 'publico' });
+// Registro inicial: exige identidad y correo confirmado, aunque aún no exista escuela.
+export const CorreoVerificado = () => SetMetadata(ACCESO, { tipo: 'registro' });
 // Solo para consultar la cuenta antes de completar el segundo factor.
 export const ConsultaSesion = () => SetMetadata(ACCESO, { tipo: 'sesion' });
 // Autoriza la entrada por perfil; el permiso sobre cada registro se comprueba con CuentaService.operar.
