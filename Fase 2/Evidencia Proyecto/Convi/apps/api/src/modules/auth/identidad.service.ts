@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
   ServiceUnavailableException,
@@ -16,7 +17,7 @@ export class IdentidadService {
     @Inject(SUPABASE_AUTH) private readonly supabase: SupabaseClient,
   ) {}
 
-  async verificar(token: string): Promise<Identidad> {
+  async verificar(token: string, correoVerificado = false): Promise<Identidad> {
     try {
       // Supabase comprueba la firma y vencimiento; no basta con leer el token.
       const { data, error } = await this.supabase.auth.getClaims(token);
@@ -53,13 +54,24 @@ export class IdentidadService {
       if (errorUsuario || usuario.user?.id !== claims.sub) {
         throw new UnauthorizedException('Sesión no válida.');
       }
+      // El correo se comprueba con Auth, nunca con un campo enviado por el formulario.
+      if (
+        correoVerificado &&
+        (!usuario.user?.email || !usuario.user.email_confirmed_at)
+      ) {
+        throw new ForbiddenException('Verifica tu correo para continuar.');
+      }
       // Supabase aporta la identidad; el perfil y la escuela se resolverán en la base.
       return {
         authUsuarioId: claims.sub,
         aal: claims.aal === 'aal2' ? 'aal2' : 'aal1',
       };
     } catch (error) {
-      if (error instanceof ServiceUnavailableException) throw error;
+      if (
+        error instanceof ServiceUnavailableException ||
+        error instanceof ForbiddenException
+      )
+        throw error;
       // No devolvemos errores internos que puedan contener el token o credenciales.
       throw new UnauthorizedException('Sesión no válida.');
     }

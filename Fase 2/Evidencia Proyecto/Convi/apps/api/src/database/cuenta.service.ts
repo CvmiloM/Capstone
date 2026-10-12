@@ -42,6 +42,49 @@ export class CuentaService implements OnModuleDestroy {
   }
 
   /**
+   * Para una ruta con @CorreoVerificado: crear la escuela antes de tener cuenta.
+   * Usar solo las funciones de registro del modelo y la identidad de peticion.identidad.
+   * No consulta tablas del portal ni acepta escuela o perfil elegidos por el navegador.
+   */
+  async operarRegistro<T>(
+    identidad: Identidad,
+    trabajo: (cliente: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    const cliente = await this.pool.connect().catch(() => {
+      throw new ServiceUnavailableException('No se pudo iniciar el registro.');
+    });
+    let descartarConexion = false;
+    try {
+      // READ COMMITTED deja que un reintento vea la escuela creada mientras esperaba el bloqueo.
+      await cliente.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+      await cliente.query('SET LOCAL ROLE convi_registro');
+      await cliente.query(
+        `SELECT set_config('app.auth_usuario_id', $1, true),
+                set_config('app.aal', $2, true),
+                set_config('app.membresia_id', '', true),
+                set_config('app.establecimiento_id', '', true)`,
+        [identidad.authUsuarioId, identidad.aal],
+      );
+      const respuesta = await trabajo(cliente);
+      await cliente.query('COMMIT');
+      return respuesta;
+    } catch (error) {
+      try {
+        await cliente.query('ROLLBACK');
+      } catch {
+        descartarConexion = true;
+      }
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException(
+        'No se pudo completar el registro.',
+      );
+    } finally {
+      // El rol y el contexto terminan con la transacción; no pasan al siguiente usuario.
+      cliente.release(descartarConexion);
+    }
+  }
+
+  /**
    * Usar la sesión creada por el servidor y los perfiles definidos para esta operación.
    * El trabajo consulta o cambia solo el registro autorizado, usando el cliente recibido.
    * Permitir leer no permite modificar: declarar los perfiles de cada acción.

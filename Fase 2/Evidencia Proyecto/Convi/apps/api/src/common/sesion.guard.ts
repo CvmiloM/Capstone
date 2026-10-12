@@ -11,9 +11,10 @@ import type { Request } from 'express';
 import { CuentaService } from '../database/cuenta.service.js';
 import { IdentidadService } from '../modules/auth/identidad.service.js';
 import { ACCESO, type ReglaAcceso } from './acceso.decorator.js';
-import type { Sesion } from './sesion.js';
+import type { Identidad, Sesion } from './sesion.js';
 
-export type PeticionConSesion = Request & { sesion: Sesion };
+export type PeticionConIdentidad = Request & { identidad: Identidad };
+export type PeticionConSesion = PeticionConIdentidad & { sesion: Sesion };
 
 // AuthModule aplica este control a todas las rutas de la API.
 // Aquí se autoriza la entrada; CuentaService.operar comprueba después el registro concreto.
@@ -41,14 +42,22 @@ export class SesionGuard implements CanActivate {
     if (!token)
       throw new UnauthorizedException('Inicia sesión para continuar.');
 
-    const identidad = await this.identidad.verificar(token);
-    // Consultamos cada vez para no conservar permisos de una cuenta suspendida.
-    const cuenta = await this.cuentas.resolver(identidad);
+    const identidad = await this.identidad.verificar(
+      token,
+      regla?.tipo === 'registro',
+    );
     // Olvidar declarar permisos en una ruta nueva debe impedir el acceso.
     if (!regla)
       throw new ForbiddenException(
         'Esta operación no tiene permisos definidos.',
       );
+    peticion.identidad = identidad;
+    // Esta entrada solo completa el registro: no concede acceso al portal ni a sus datos.
+    // También admite reintentar; la función de registro decide si esa identidad ya tiene escuela.
+    if (regla.tipo === 'registro') return true;
+
+    // Las demás rutas siguen exigiendo una cuenta activa de una escuela activa.
+    const cuenta = await this.cuentas.resolver(identidad);
     if (regla.tipo === 'operacion') {
       if (!regla.perfiles.includes(cuenta.codigo_perfil)) {
         throw new ForbiddenException('No tienes permiso para esta operación.');
