@@ -1,13 +1,13 @@
 "use server";
 
 import { crearClienteServidor } from "@/lib/supabase/servidor";
-import { consultarCuentaActiva } from "@/lib/supabase/cuenta";
+import { consultarCuentaActiva, destinoDelPerfil } from "@/lib/supabase/cuenta";
 
 export type EstadoVerificacion = {
   paso: "codigo" | "configurar" | "completado" | "bloqueado" | "sin-sesion";
   mensaje?: string;
   errorCodigo?: string;
-  destino?: "/admin" | "/profesor" | "/";
+  destino?: ReturnType<typeof destinoDelPerfil>;
 };
 
 const SIN_CONEXION =
@@ -39,12 +39,7 @@ async function comprobarVerificacion() {
         mensaje: cuenta.requiere_segundo_factor
           ? undefined
           : "Tu perfil no necesita segundo factor para acceder a sus funciones.",
-        destino:
-          cuenta.codigo_perfil === "ADMIN"
-            ? "/admin"
-            : cuenta.codigo_perfil === "PROFESOR"
-              ? "/profesor"
-              : "/",
+        destino: destinoDelPerfil(cuenta.codigo_perfil),
       } satisfies EstadoVerificacion,
     };
   }
