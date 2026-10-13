@@ -103,7 +103,7 @@ export function FormularioVerificacion({
           href={estado.destino || "/"}
           className={`w-full ${claseBotonPrimario}`}
         >
-          {estado.destino === "/" ? "Volver al inicio" : "Continuar al portal"}
+          {estado.destino ? "Continuar al portal" : "Volver al inicio"}
         </a>
       </div>
     );

@@ -1,11 +1,12 @@
 "use server";
 
 import { crearClienteServidor } from "@/lib/supabase/servidor";
+import { redirect } from "next/navigation";
+import { consultarCuentaActiva, destinoDelPerfil } from "@/lib/supabase/cuenta";
 import { LARGO_MAXIMO, LARGO_MINIMO_CONTRASENA } from "./limites";
 
 // Acciones de los formularios públicos. Todas validan los datos en el servidor.
-// El registro ya usa Supabase Auth; el login y la activación de cuenta siguen
-// marcados con TODO.
+// El registro y el login usan Supabase Auth; la activación conserva PB-003.
 
 export type EstadoFormulario = {
   /** Error general del formulario (credenciales, enlace vencido, etc.). */
@@ -19,8 +20,14 @@ export type EstadoFormulario = {
 
 // Mismo patrón que convi.correo_valido.
 const FORMATO_CORREO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SIN_CONEXION = "Este formulario todavía no está conectado con Supabase Auth.";
+const FORMATO_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SIN_CONEXION =
+  "Este formulario todavía no está conectado con Supabase Auth.";
+const LOGIN_SIN_CONEXION =
+  "No pudimos conectar. Inténtalo nuevamente en unos minutos.";
+const LOGIN_RECHAZADO =
+  "No pudimos iniciar sesión con esos datos. Comprueba tu correo y contraseña y que tu cuenta tenga acceso a CONVI.";
 const ENLACE_INVALIDO =
   "El enlace de invitación no es válido. Pide al administrador de tu establecimiento que te lo reenvíe.";
 
@@ -57,6 +64,7 @@ export async function iniciarSesion(
   _anterior: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  if (!(formData instanceof FormData)) return { mensaje: LOGIN_RECHAZADO };
   const correo = leerTexto(formData, "correo").toLowerCase();
   const contrasena = leerContrasena(formData, "contrasena");
   const valores = { correo };
@@ -66,13 +74,54 @@ export async function iniciarSesion(
   if (!contrasena) errores.contrasena = "Ingresa tu contraseña.";
   if (Object.keys(errores).length > 0) return { errores, valores };
 
-  // TODO(PB-004): iniciar sesión con Supabase Auth y pedir al backend la
-  // membresía de esa identidad (una identidad tiene una sola cuenta en CONVI).
-  // Solo entra una membresía ACTIVO de un establecimiento ACTIVO; PENDIENTE,
-  // SUSPENDIDO y REVOCADO reciben el mismo mensaje genérico. ADMIN y
-  // CONVIVENCIA pasan antes por el segundo factor (aal2, PB-009). Después,
-  // redirigir según codigo_perfil: /admin, /convivencia, /profesor o /apoderado.
-  return { mensaje: SIN_CONEXION, valores };
+  let destino: string;
+  try {
+    const supabase = await crearClienteServidor();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: correo,
+      password: contrasena,
+    });
+    if (error) {
+      if (error.code === "over_request_rate_limit") {
+        return {
+          mensaje:
+            "Hiciste varios intentos. Espera unos minutos antes de volver a intentarlo.",
+          valores,
+        };
+      }
+      return {
+        mensaje:
+          !error.status || error.status >= 500
+            ? LOGIN_SIN_CONEXION
+            : LOGIN_RECHAZADO,
+        valores,
+      };
+    }
+    if (!data.session || !data.user)
+      return { mensaje: LOGIN_RECHAZADO, valores };
+
+    // La contraseña confirma la identidad; la API decide si su cuenta y escuela permiten entrar.
+    const consulta = await consultarCuentaActiva(supabase);
+    if (consulta.estado !== "activa") {
+      // Cerrar solo este intento rechazado, sin cerrar las sesiones de otros dispositivos.
+      const salida = await supabase.auth.signOut({ scope: "local" });
+      return {
+        mensaje:
+          consulta.estado === "sin-conexion" || salida.error
+            ? LOGIN_SIN_CONEXION
+            : LOGIN_RECHAZADO,
+        valores,
+      };
+    }
+    destino = consulta.cuenta.segundo_factor_pendiente
+      ? "/verificar-segundo-factor"
+      : destinoDelPerfil(consulta.cuenta.codigo_perfil);
+  } catch {
+    // No devolver contraseñas, tokens ni mensajes internos del proveedor de autenticación.
+    return { mensaje: LOGIN_SIN_CONEXION, valores };
+  }
+  // redirect interrumpe la acción: debe quedar fuera del manejo de errores.
+  redirect(destino);
 }
 
 export async function registrarAdministrador(
