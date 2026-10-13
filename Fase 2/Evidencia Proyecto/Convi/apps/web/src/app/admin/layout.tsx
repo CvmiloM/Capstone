@@ -7,8 +7,7 @@ import { Navegacion } from "./navegacion";
 // Portal del perfil ADMIN. En pantallas grandes el menú queda fijo a la
 // izquierda; en pantallas chicas pasa a una franja de enlaces sobre el contenido.
 export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
-    // TODO(HU-004, HU-108): proteger todo /admin. Solo entra una membresía ADMIN
-    // en estado ACTIVO, de una escuela activa y con el segundo factor completado.
+    // PB-009 comprueba el acceso en proxy y al leer datos del portal.
     return (
         <div className="flex flex-1 flex-col lg:flex-row">
             <aside className="border-b border-border bg-card lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-b-0">

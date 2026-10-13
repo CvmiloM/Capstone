@@ -194,9 +194,13 @@ export function FormularioSegundoFactor({
             el acceso a tu cuenta.
           </p>
         </div>
-        <Link href="/" className={`w-full ${claseBotonSecundario}`}>
-          Volver al inicio
-        </Link>
+        {/* Pedir una página nueva evita reutilizar el estado anterior a vincular la aplicación. */}
+        <a
+          href="/verificar-segundo-factor"
+          className={`w-full ${claseBotonSecundario}`}
+        >
+          Continuar
+        </a>
       </div>
     );
   }
