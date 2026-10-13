@@ -1,4 +1,21 @@
 import { cache } from "react";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { crearClienteServidor } from "@/lib/supabase/servidor";
+import { consultarCuentaActiva } from "@/lib/supabase/cuenta";
+
+// Comprobar también donde se leen los datos: el menú o el proxy no son suficientes.
+const comprobarAdministrador = cache(async () => {
+  await connection();
+  const consulta = await consultarCuentaActiva(await crearClienteServidor());
+  if (consulta.estado === "sin-sesion") redirect("/login");
+  if (consulta.estado === "bloqueada") redirect("/verificar-segundo-factor");
+  if (consulta.estado === "sin-conexion")
+    throw new Error("No pudimos comprobar tu acceso.");
+  if (consulta.cuenta.codigo_perfil !== "ADMIN") redirect("/");
+  if (consulta.cuenta.segundo_factor_pendiente)
+    redirect("/verificar-segundo-factor");
+});
 
 // Datos del portal de administración. Mientras no exista la API, estas
 // funciones devuelven datos de ejemplo con la misma forma que tendrá la
@@ -24,9 +41,8 @@ export type ContextoAdmin = {
 // cache() hace que el layout y la página compartan la misma respuesta cuando
 // ambos piden el contexto durante una misma solicitud.
 export const obtenerContextoAdmin = cache(async (): Promise<ContextoAdmin> => {
-  // TODO(HU-004, HU-108): leer la sesión de Supabase Auth y pedir al backend
-  // la membresía. Si no hay sesión, si el perfil no es ADMIN, si la cuenta no
-  // está ACTIVO o si falta el segundo factor, redirigir a /login.
+  await comprobarAdministrador();
+  // TODO(HU-033): sustituir la escuela y persona de ejemplo por datos de la API.
   return {
     escuela: {
       nombre: "Liceo Bicentenario Los Aromos",
@@ -62,6 +78,7 @@ export type ResumenEscuela = {
 };
 
 export async function obtenerResumen(): Promise<ResumenEscuela> {
+  await comprobarAdministrador();
   // TODO(HU-033): pedir las cifras al backend (por ejemplo GET /admin/resumen).
   // El backend las calcula con la escuela de la sesión y nunca lee
   // situaciones, casos ni expedientes (HU-123).
