@@ -13,6 +13,17 @@ export type ConsultaCuenta =
   | { estado: "bloqueada" }
   | { estado: "sin-conexion" };
 
+// El login y la confirmación del segundo factor usan los mismos destinos.
+export function destinoDelPerfil(perfil: CuentaActiva["codigo_perfil"]) {
+  const destinos = {
+    ADMIN: "/admin",
+    CONVIVENCIA: "/convivencia",
+    PROFESOR: "/profesor",
+    APODERADO: "/apoderado",
+  } as const;
+  return destinos[perfil];
+}
+
 // El perfil y el segundo factor los confirma la API, nunca un campo del navegador.
 export async function consultarCuentaActiva(
   supabase: SupabaseClient,
