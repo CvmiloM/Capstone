@@ -1,4 +1,7 @@
-param([switch]$Build)
+param(
+    [switch]$Build,
+    [ValidateSet('Local', 'Cloud')][string]$Entorno = 'Local'
+)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
@@ -11,6 +14,49 @@ try {
     & docker info --format '{{.ServerVersion}}' 1>$null 2>$null
     if ($LASTEXITCODE -ne 0) {
         throw 'Docker Desktop no tiene el motor iniciado. Abre Docker Desktop e intentalo nuevamente.'
+    }
+    if ($Entorno -eq 'Cloud') {
+        # Las claves cloud se guardan aparte: no iniciar Supabase local ni reemplazarlas.
+        $cloudPath = Join-Path $projectRoot '.env.cloud'
+        if (-not (Test-Path -LiteralPath $cloudPath)) {
+            throw 'Falta .env.cloud. Completa la configuracion privada siguiendo SUPABASE-CLOUD.md.'
+        }
+        $cloud = @{}
+        foreach ($line in [System.IO.File]::ReadAllLines($cloudPath)) {
+            if ($line -match '^\s*([A-Z][A-Z0-9_]*)=(.*)$') {
+                $cloud[$Matches[1]] = $Matches[2].Trim().Trim('"').Trim("'")
+            }
+        }
+        if (-not $cloud['SUPABASE_URL'] -or -not $cloud['NEXT_PUBLIC_SUPABASE_URL'] -or -not $cloud['SUPABASE_DB_URL'] -or -not ($cloud['SUPABASE_PUBLISHABLE_KEY'] -or $cloud['SUPABASE_ANON_KEY'])) {
+            throw 'Faltan URL, clave publicable o conexion de base en .env.cloud. No se muestran sus valores.'
+        }
+        try {
+            $authUrl = [uri]$cloud['SUPABASE_URL']
+            $dbUrl = [uri]$cloud['SUPABASE_DB_URL']
+        } catch {
+            throw 'Una URL de .env.cloud no es valida. Revisa la guia sin compartir credenciales.'
+        }
+        if ($authUrl.Scheme -ne 'https' -or -not $authUrl.Host.EndsWith('.supabase.co') -or $cloud['SUPABASE_URL'].TrimEnd('/') -ne $cloud['NEXT_PUBLIC_SUPABASE_URL'].TrimEnd('/')) {
+            throw 'Cloud exige la misma URL HTTPS de Supabase para web y API.'
+        }
+        if ($dbUrl.Scheme -notin @('postgres', 'postgresql') -or $dbUrl.Host -notmatch '\.supabase\.(co|com)$' -or $dbUrl.Query -notmatch '(?:[?&])sslmode=verify-full(?:&|$)') {
+            throw 'La conexion cloud debe apuntar a Supabase y usar sslmode=verify-full.'
+        }
+        $cloudArguments = @('compose', '--env-file', '.env.cloud', 'up', '-d')
+        if ($Build) { $cloudArguments += '--build' }
+        & docker @cloudArguments
+        if ($LASTEXITCODE -ne 0) { throw 'Fallo el inicio de CONVI con Supabase cloud.' }
+        Write-Host 'CONVI con Supabase cloud iniciado. Las claves y los datos locales se conservan.'
+        return
+    }
+    # Evitar reemplazar claves cloud si alguien las puso en el archivo local por error.
+    $localPath = Join-Path $projectRoot '.env'
+    if (Test-Path -LiteralPath $localPath) {
+        foreach ($line in [System.IO.File]::ReadAllLines($localPath)) {
+            if ($line -match '^\s*(SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL|SUPABASE_DB_URL)=.*\.supabase\.(co|com)') {
+                throw '.env apunta a cloud. Usa .env.cloud para cloud y restaura .env local antes de continuar.'
+            }
+        }
     }
     if (-not (Get-Command node -ErrorAction SilentlyContinue) -or -not (Get-Command npx.cmd -ErrorAction SilentlyContinue)) {
         throw 'Para Supabase CLI local instala Node.js 20 o superior (incluye npx) en Windows.'

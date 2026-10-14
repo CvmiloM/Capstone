@@ -12,8 +12,8 @@ services:
       PORT: "3001"
       CHOKIDAR_USEPOLLING: "true"
       # Dentro del contenedor, localhost NO apunta al host Windows.
-      SUPABASE_URL: "http://host.docker.internal:54321"
-      # Credencial solo local; las consultas usan convi_backend.
+      SUPABASE_URL: "${SUPABASE_URL:-http://host.docker.internal:54321}"
+      # Conexion privada de la API; las consultas usan convi_backend.
       SUPABASE_DB_URL: "${SUPABASE_DB_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}"
       SUPABASE_PUBLISHABLE_KEY: "${SUPABASE_PUBLISHABLE_KEY:-}"
       SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
@@ -39,6 +39,7 @@ services:
       PORT: "3000"
       NEXT_TELEMETRY_DISABLED: "1"
       CHOKIDAR_USEPOLLING: "true"
+      SUPABASE_URL: "${SUPABASE_URL:-http://host.docker.internal:54321}"
       NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:3001}"
       NEXT_PUBLIC_SUPABASE_URL: "${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "${SUPABASE_PUBLISHABLE_KEY:-}"
