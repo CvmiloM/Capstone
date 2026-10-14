@@ -129,7 +129,6 @@ function esCambioSimultaneo(error: unknown) {
   return (error as { code?: string } | null)?.code === '40001';
 }
 
-
 // Columnas comunes del listado y del detalle. Nunca incluye caso_id ni quién
 // revisa la situación: esa información es de Convivencia (HU-034 CA3).
 const COLUMNAS_SITUACION = `
@@ -435,7 +434,7 @@ export class ProfesorService {
       },
     );
   }
-  
+
   // PB-049 (HU-042): el profesor responde una aclaración que le pidió
   // Convivencia. La base pone la fecha del servidor, impide modificar una
   // respuesta enviada y, si era la última pendiente, devuelve la situación a
