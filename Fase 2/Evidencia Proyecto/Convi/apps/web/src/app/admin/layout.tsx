@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { MarcaCompacta } from "@/app/components/marca";
+import { BotonCerrarSesion } from "@/app/components/boton-cerrar-sesion";
 import { obtenerContextoAdmin } from "./datos";
 import { Navegacion } from "./navegacion";
 
@@ -32,6 +33,9 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
                 <Suspense fallback={<Esqueleto className="mx-3 my-3 h-9 lg:h-96" />}>
                     <Navegacion />
                 </Suspense>
+                <div className="border-t border-border px-4 py-3">
+                    <BotonCerrarSesion />
+                </div>
             </aside>
 
             <div className="flex min-w-0 flex-1 flex-col">
@@ -71,7 +75,6 @@ async function UsuarioSesion() {
     const { usuario } = await obtenerContextoAdmin();
     const iniciales = `${usuario.nombres.charAt(0)}${usuario.apellidos.charAt(0)}`;
 
-    // TODO(HU-006): agregar "Cerrar sesión" cuando exista la sesión de Supabase.
     return (
         <div className="flex items-center gap-2.5">
             <span
