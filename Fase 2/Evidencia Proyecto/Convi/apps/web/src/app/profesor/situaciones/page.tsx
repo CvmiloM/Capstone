@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Encabezado } from "@/app/components/formulario";
+import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
 import { AvisoSinPermiso } from "../aviso-sin-permiso";
 import {
   formatearFecha,
@@ -19,14 +19,21 @@ export default async function PaginaMisRegistros() {
 
   return (
     <>
-      <Encabezado
-        titulo="Mis registros"
-        descripcion="Las situaciones que registraste y en qué estado están. Abre una para ver su detalle y las aclaraciones que te pidió Convivencia."
-      />
+            <div className="flex flex-wrap items-start justify-between gap-x-4">
+        <Encabezado
+          titulo="Mis registros"
+          descripcion="Las situaciones que registraste y en qué estado están. Abre una para ver su detalle y las aclaraciones que te pidió Convivencia."
+        />
+        {/* Una situación pertenece a un curso: primero se elige el curso. */}
+        <Link href="/profesor" className={`mb-6 ${claseBotonPrimario}`}>
+          Registrar situación
+        </Link>
+      </div>
 
       {situaciones.length === 0 ? (
         <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Todavía no has registrado situaciones.
+                    Todavía no has registrado situaciones. Para registrar una, elige
+          uno de tus cursos.
         </p>
       ) : (
         <ul className="space-y-3">
