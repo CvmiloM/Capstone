@@ -7,6 +7,8 @@ import { Icono, type NombreIcono } from "@/app/components/icono";
 const ENLACES: { href: string; texto: string; icono: NombreIcono }[] = [
   // La bandeja incluye el detalle de cada situación (/convivencia/situaciones/...)
   { href: "/convivencia", texto: "Bandeja de situaciones", icono: "documentos" },
+  // PB-043: situaciones que llegan por otros canales
+  { href: "/convivencia/registrar", texto: "Registrar situación", icono: "info" },
 ];
 
 function estaActivo(ruta: string, href: string) {

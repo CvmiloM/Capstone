@@ -63,20 +63,11 @@ function fechaHoraValida(valor: string) {
   );
 }
 
-/**
- * Revisa la forma de los datos sin consultar la base. Que el curso sea del
- * profesor, que la categoría esté activa y que cada estudiante esté
- * matriculado en el curso se comprueba después, dentro de la transacción.
- */
-export function validarNuevaSituacion(cuerpo: unknown): NuevaSituacion {
-  const datos = (
-    typeof cuerpo === 'object' && cuerpo !== null ? cuerpo : {}
-  ) as Record<string, unknown>;
-  const errores: Record<string, string> = {};
-
-  const cursoId = texto(datos.curso_id).toLowerCase();
-  if (!UUID.test(cursoId)) errores.curso_id = 'Elige uno de tus cursos.';
-
+// Reglas comunes al registro del profesor (PB-042) y de Convivencia (PB-043).
+function validarComun(
+  datos: Record<string, unknown>,
+  errores: Record<string, string>,
+) {
   const ocurridoEn = texto(datos.ocurrido_en);
   if (!fechaHoraValida(ocurridoEn))
     errores.ocurrido_en = 'Indica la fecha y la hora del hecho.';
@@ -130,16 +121,92 @@ export function validarNuevaSituacion(cuerpo: unknown): NuevaSituacion {
       errores.participantes = 'Cada estudiante se agrega una sola vez.';
   }
 
-  if (!urgencia || Object.keys(errores).length > 0)
-    throw errorDeCampos(errores);
-
   return {
-    curso_id: cursoId,
     ocurrido_en: ocurridoEn,
     lugar: lugar || null,
     urgencia,
     categoria_id: categoriaId || null,
     descripcion,
     participantes,
+  };
+}
+
+function comoObjeto(cuerpo: unknown) {
+  return (
+    typeof cuerpo === 'object' && cuerpo !== null ? cuerpo : {}
+  ) as Record<string, unknown>;
+}
+
+/**
+ * Revisa la forma de los datos sin consultar la base. Que el curso sea del
+ * profesor, que la categoría esté activa y que cada estudiante esté
+ * matriculado en el curso se comprueba después, dentro de la transacción.
+ */
+export function validarNuevaSituacion(cuerpo: unknown): NuevaSituacion {
+  const datos = comoObjeto(cuerpo);
+  const errores: Record<string, string> = {};
+
+  const cursoId = texto(datos.curso_id).toLowerCase();
+  if (!UUID.test(cursoId)) errores.curso_id = 'Elige uno de tus cursos.';
+
+  const comun = validarComun(datos, errores);
+  const urgencia = comun.urgencia;
+  if (!urgencia || Object.keys(errores).length > 0)
+    throw errorDeCampos(errores);
+
+  return { ...comun, curso_id: cursoId, urgencia };
+}
+
+// PB-043 (HU-036): quién informó la situación cuando no la registra un profesor.
+export const ORIGENES = [
+  'ESTUDIANTE',
+  'APODERADO',
+  'FUNCIONARIO',
+  'OTRO',
+] as const;
+
+export type SituacionConvivencia = Omit<NuevaSituacion, 'curso_id'> & {
+  /** Curso del hecho; opcional porque puede involucrar a varios cursos. */
+  curso_id: string | null;
+  tipo_origen: (typeof ORIGENES)[number];
+  /** Persona que informó (CA1), si se conoce; nunca con origen Otro. */
+  informante_persona_id: string | null;
+};
+
+/**
+ * Datos de una situación que registra Convivencia (HU-036). Exige lo mismo que
+ * el registro del profesor (CA3), más el origen; el curso es opcional y los
+ * estudiantes pueden ser de cualquier curso de la escuela.
+ */
+export function validarSituacionConvivencia(
+  cuerpo: unknown,
+): SituacionConvivencia {
+  const datos = comoObjeto(cuerpo);
+  const errores: Record<string, string> = {};
+
+  const cursoId = texto(datos.curso_id).toLowerCase();
+  if (cursoId && !UUID.test(cursoId))
+    errores.curso_id = 'Elige un curso de la lista.';
+
+  // CA1: el origen es obligatorio; el informante, cuando corresponde.
+  const origen = esUno(ORIGENES, datos.tipo_origen) ? datos.tipo_origen : null;
+  if (!origen)
+    errores.tipo_origen =
+      'Indica quién informó: estudiante, apoderado, funcionario u otro.';
+  const informanteId = texto(datos.informante_persona_id).toLowerCase();
+  if (informanteId && (!UUID.test(informanteId) || origen === 'OTRO'))
+    errores.informante_persona_id = 'Elige a la persona de la lista.';
+
+  const comun = validarComun(datos, errores);
+  const urgencia = comun.urgencia;
+  if (!origen || !urgencia || Object.keys(errores).length > 0)
+    throw errorDeCampos(errores);
+
+  return {
+    ...comun,
+    curso_id: cursoId || null,
+    urgencia,
+    tipo_origen: origen,
+    informante_persona_id: informanteId || null,
   };
 }

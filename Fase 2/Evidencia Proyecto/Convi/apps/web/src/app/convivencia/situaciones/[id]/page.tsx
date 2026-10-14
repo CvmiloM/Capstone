@@ -9,8 +9,8 @@ import { AvisoNoDisponible } from "../../aviso-no-disponible";
 import {
   ESTADOS_ABIERTOS,
   NOMBRE_ESTADO,
-  NOMBRE_ORIGEN,
   obtenerSituacion,
+  quienInformo,
 } from "../../datos";
 import {
   FormularioAclaracion,
@@ -21,6 +21,8 @@ import {
 export const metadata: Metadata = { title: "Revisión de la situación" };
 
 const AVISOS: Record<string, string> = {
+  registrada:
+    "Registraste la situación. Quedó Nueva en la bandeja, con su código.",
   revision:
     "Iniciaste la revisión. La situación quedó En revisión y su urgencia no cambió.",
   urgencia:
@@ -104,9 +106,13 @@ export default async function PaginaRevisionSituacion({
           <dl className="space-y-3 text-sm">
             <Dato nombre="Ocurrió">{formatearFecha(situacion.ocurrido_en)}</Dato>
             <Dato nombre="Registrada">{formatearFecha(situacion.reportado_en)}</Dato>
+            {/* HU-036 CA2: quién informó y quién registró, por separado. */}
+            {quienInformo(situacion) && (
+              <Dato nombre="Informó">{quienInformo(situacion)}</Dato>
+            )}
             <Dato nombre="Registró">
-              {situacion.reportado_por} (
-              {NOMBRE_ORIGEN[situacion.tipo_origen] ?? situacion.tipo_origen})
+              {situacion.reportado_por}
+              {situacion.tipo_origen === "PROFESOR" ? " (profesor)" : " (Convivencia)"}
             </Dato>
             <Dato nombre="Curso">{situacion.curso ?? "Sin curso"}</Dato>
             <Dato nombre="Lugar">{situacion.lugar ?? "No indicado"}</Dato>

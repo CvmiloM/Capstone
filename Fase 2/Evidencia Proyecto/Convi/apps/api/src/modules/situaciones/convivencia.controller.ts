@@ -15,7 +15,7 @@ import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 import { ConvivenciaService } from './convivencia.service.js';
 
-// PB-044 y PB-045: rutas del portal de Convivencia. El decorador de la clase aplica a
+// PB-043, PB-044 y PB-045: rutas del portal de Convivencia. El decorador de la clase aplica a
 // todas: solo entra una cuenta CONVIVENCIA activa con segundo factor (PB-009).
 @Controller('convivencia')
 @PerfilesPermitidos('CONVIVENCIA')
@@ -24,6 +24,19 @@ export class ConvivenciaController {
     @Inject(ConvivenciaService)
     private readonly convivencia: ConvivenciaService,
   ) {}
+
+  // PB-043: categorías, cursos con sus estudiantes, funcionarios y apoderados
+  // para el formulario de registro.
+  @Get('registro/opciones')
+  opcionesRegistro(@Req() peticion: PeticionConSesion) {
+    return this.convivencia.opcionesRegistro(peticion.sesion);
+  }
+
+  // PB-043: el cuerpo se valida en el servicio; responde 201 con el código.
+  @Post('situaciones')
+  registrar(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
+    return this.convivencia.registrar(peticion.sesion, cuerpo);
+  }
 
   // ?estado=NUEVA&urgencia=URGENTE; ambos opcionales.
   @Get('situaciones')

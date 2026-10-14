@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Encabezado } from "@/app/components/formulario";
+import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
 // Mismos estilos de urgencia y formato de fecha que el portal del profesor.
 import { formatearFecha, URGENCIA } from "@/app/profesor/datos";
 import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
@@ -8,8 +8,8 @@ import { AvisoNoDisponible } from "./aviso-no-disponible";
 import {
   ESTADOS,
   NOMBRE_ESTADO,
-  NOMBRE_ORIGEN,
   obtenerBandeja,
+  quienInformo,
   type Bandeja,
 } from "./datos";
 
@@ -60,10 +60,19 @@ export default async function PaginaBandeja({
 
   return (
     <>
-      <Encabezado
-        titulo="Bandeja de situaciones"
-        descripcion="Todas las situaciones registradas en tu escuela, la más urgente primero. Abre una para revisarla."
-      />
+      <div className="flex flex-wrap items-start justify-between gap-x-4">
+        <Encabezado
+          titulo="Bandeja de situaciones"
+          descripcion="Todas las situaciones registradas en tu escuela, la más urgente primero. Abre una para revisarla."
+        />
+        {/* PB-043: situaciones que llegan por otros canales. */}
+        <Link
+          href="/convivencia/registrar"
+          className={`mb-6 ${claseBotonPrimario}`}
+        >
+          Registrar situación
+        </Link>
+      </div>
 
       <div className="mb-6 space-y-3">
         <Filtro
@@ -126,7 +135,10 @@ export default async function PaginaBandeja({
                     <p className="mt-1 text-sm text-muted-foreground">
                       {[
                         situacion.curso,
-                        `Registró ${situacion.reportado_por} (${NOMBRE_ORIGEN[situacion.tipo_origen] ?? situacion.tipo_origen})`,
+                        quienInformo(situacion)
+                          ? `Informó: ${quienInformo(situacion)}`
+                          : null,
+                        `Registró ${situacion.reportado_por}`,
                         `Ocurrió el ${formatearFecha(situacion.ocurrido_en)}`,
                       ]
                         .filter(Boolean)

@@ -1,0 +1,151 @@
+import { ConflictException } from '@nestjs/common';
+import type { PoolClient } from 'pg';
+
+// Pasos comunes del registro de una situación, del profesor (PB-042) y de
+// Convivencia por otros canales (PB-043). Cada servicio decide quién puede
+// registrar y qué estudiantes acepta; aquí se guarda todo en la transacción
+// que ya abrió CuentaService.operar (PB-138).
+
+export type SituacionRegistrada = {
+  id: string;
+  codigo: string;
+  estado: string;
+  reportado_en: Date;
+};
+
+// El código SIT-AAAA-00001 lo asigna la base con el siguiente número libre de la
+// escuela. Si dos registros llegan a la vez, el segundo puede chocar con el
+// código del primero: se reintenta en una transacción nueva, que ya ve ese código.
+// En cada vuelta al menos uno obtiene su código, así que cinco envíos
+// simultáneos necesitan como máximo cinco intentos.
+const INTENTOS_REGISTRO = 5;
+const REGISTRO_SIMULTANEO =
+  'Se registró otra situación al mismo tiempo. Envía el formulario nuevamente.';
+
+function esChoqueDeCodigo(error: unknown) {
+  const { code, constraint } = (error ?? {}) as {
+    code?: string;
+    constraint?: string;
+  };
+  return (
+    code === '40001' ||
+    (code === '23505' &&
+      constraint === 'situaciones_establecimiento_id_codigo_key')
+  );
+}
+
+/** Ejecuta el registro y lo repite si chocó con el código de otro registro simultáneo. */
+export async function conReintentosDeCodigo<T>(
+  registrar: () => Promise<T>,
+): Promise<T> {
+  for (let intento = 1; ; intento++) {
+    try {
+      return await registrar();
+    } catch (error) {
+      const reintentar =
+        error instanceof ConflictException &&
+        error.message === REGISTRO_SIMULTANEO &&
+        intento < INTENTOS_REGISTRO;
+      if (!reintentar) throw error;
+      // Una espera corta y distinta en cada petición evita que vuelvan a chocar.
+      await new Promise((listo) => setTimeout(listo, 20 + Math.random() * 80));
+    }
+  }
+}
+
+/**
+ * Convierte la fecha del hecho (hora de la escuela, HU-021) y revisa que no
+ * sea futura y que la categoría esté activa. Anota los problemas en errores.
+ */
+export async function comprobarFechaYCategoria(
+  db: PoolClient,
+  datos: { ocurrido_en: string; categoria_id: string | null },
+  errores: Record<string, string>,
+): Promise<Date | null> {
+  const fecha = await db.query<{ ocurrido_en: Date; futura: boolean }>(
+    `SELECT ($1::timestamp AT TIME ZONE e.zona_horaria) AS ocurrido_en,
+            ($1::timestamp AT TIME ZONE e.zona_horaria) > now() AS futura
+     FROM convi.establecimientos e
+     WHERE e.id = convi.establecimiento_actual()`,
+    [datos.ocurrido_en],
+  );
+  const ocurrido = fecha.rows[0];
+  if (!ocurrido || ocurrido.futura)
+    errores.ocurrido_en = 'La fecha del hecho no puede ser futura.';
+
+  if (datos.categoria_id) {
+    const categoria = await db.query(
+      `SELECT 1 FROM convi.categorias_convivencia
+       WHERE id = $1 AND estado = 'ACTIVO'`,
+      [datos.categoria_id],
+    );
+    if (categoria.rowCount === 0)
+      errores.categoria_id = 'Elige una categoría de la lista.';
+  }
+  return ocurrido && !ocurrido.futura ? ocurrido.ocurrido_en : null;
+}
+
+/**
+ * Inserta la situación y sus participantes. La base asigna el código, la
+ * fecha de registro del servidor y el estado NUEVA (HU-035 CA3); el autor es
+ * siempre la cuenta de la sesión (HU-036 CA2).
+ */
+export async function insertarSituacion(
+  db: PoolClient,
+  situacion: {
+    curso_id: string | null;
+    tipo_origen: string;
+    persona_origen_id: string | null;
+    ocurrido_en: Date;
+    lugar: string | null;
+    descripcion: string;
+    categoria_id: string | null;
+    urgencia: string;
+  },
+  participantes: { persona_id: string; rol: string; matricula_id: string }[],
+): Promise<SituacionRegistrada> {
+  const insertada = await db
+    .query<SituacionRegistrada>(
+      `INSERT INTO convi.situaciones
+         (establecimiento_id, reportado_por_membresia_id, curso_contexto_id,
+          tipo_origen, persona_origen_id, ocurrido_en, lugar, descripcion,
+          categoria_id, urgencia)
+       VALUES (convi.establecimiento_actual(), convi.membresia_actual(), $1,
+               $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, codigo, estado, reportado_en`,
+      [
+        situacion.curso_id,
+        situacion.tipo_origen,
+        situacion.persona_origen_id,
+        situacion.ocurrido_en,
+        situacion.lugar,
+        situacion.descripcion,
+        situacion.categoria_id,
+        situacion.urgencia,
+      ],
+    )
+    .catch((error: unknown) => {
+      if (esChoqueDeCodigo(error))
+        throw new ConflictException(REGISTRO_SIMULTANEO);
+      throw error;
+    });
+  const registrada = insertada.rows[0];
+
+  // HU-035 CA4: cada estudiante queda con la matrícula que tenía al registrarse.
+  await db.query(
+    `INSERT INTO convi.participaciones
+       (establecimiento_id, persona_id, situacion_id, rol_contextual,
+        matricula_contexto_id)
+     SELECT convi.establecimiento_actual(), x.persona_id, $1, x.rol,
+            x.matricula_id
+     FROM unnest($2::uuid[], $3::text[], $4::uuid[])
+       AS x(persona_id, rol, matricula_id)`,
+    [
+      registrada.id,
+      participantes.map((p) => p.persona_id),
+      participantes.map((p) => p.rol),
+      participantes.map((p) => p.matricula_id),
+    ],
+  );
+  return registrada;
+}
