@@ -10,20 +10,25 @@ import {
   URGENCIA,
 } from "../../datos";
 import { NOMBRE_ROL_EN_SITUACION } from "../../situacion-opciones";
+import { FormularioRespuesta } from "./formulario-respuesta";
 
 export const metadata: Metadata = { title: "Detalle del registro" };
 
 // HU-034 CA2 y CA3: detalle de una situación propia. Si es de otro profesor,
 // la API responde 403 y se muestra el aviso sin revelar su contenido.
 // PB-042: al llegar desde el formulario (?registrada=1) se confirma el registro.
+// PB-049: cada aclaración pendiente se responde aquí (?respondida=1 al enviar).
 export default async function PaginaDetalleSituacion({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ registrada?: string }>;
+    searchParams: Promise<{ registrada?: string; respondida?: string }>;
 }) {
-  const [{ id }, { registrada }] = await Promise.all([params, searchParams]);
+  const [{ id }, { registrada, respondida }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   const respuesta = await obtenerSituacion(id);
   if (!respuesta.ok) return <AvisoSinPermiso volverA="/profesor/situaciones" />;
   const situacion = respuesta.datos;
@@ -44,7 +49,28 @@ export default async function PaginaDetalleSituacion({
           Registraste la situación{" "}
           <strong className="font-mono">{situacion.codigo}</strong>. Convivencia
           ya la tiene como Nueva. Lo enviado no se puede editar: si necesitan
-          más información, te pedirán una aclaración.
+                   más información, te pedirán una aclaración.
+          {situacion.curso_id && (
+            <>
+              {" "}
+              <Link
+                href={`/profesor/cursos/${situacion.curso_id}/registrar`}
+                className={claseEnlace}
+              >
+                Registrar otra situación
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+
+      {respondida === "1" && (
+        <div
+          role="status"
+          className="mt-4 rounded-lg border border-verde/30 bg-verde/10 px-4 py-3 text-sm"
+        >
+          Enviaste tu respuesta. Convivencia la verá junto a su pregunta y
+          continuará con la revisión.
         </div>
       )}
 
@@ -121,10 +147,15 @@ export default async function PaginaDetalleSituacion({
                       )}
                     </div>
                   ) : (
-                    // Responderla es PB-049; aquí solo se muestra que está pendiente.
-                    <p className="mt-3 inline-block rounded-full bg-naranjo px-2.5 py-0.5 text-xs font-semibold text-tinta">
-                      Pendiente de tu respuesta
-                    </p>
+                                        <>
+                      <p className="mt-3 inline-block rounded-full bg-naranjo px-2.5 py-0.5 text-xs font-semibold text-tinta">
+                        Pendiente de tu respuesta
+                      </p>
+                      <FormularioRespuesta
+                        aclaracionId={a.id}
+                        situacionId={situacion.id}
+                      />
+                    </>
                   )}
                 </li>
               ))}

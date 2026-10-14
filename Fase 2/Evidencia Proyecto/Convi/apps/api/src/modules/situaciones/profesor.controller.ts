@@ -12,9 +12,9 @@ import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 import { ProfesorService } from './profesor.service.js';
 
-// Rutas del portal del profesor: consulta (PB-041) y registro de situaciones
-// (PB-042). El decorador de la clase aplica a todas las rutas: solo entra una
-// cuenta PROFESOR activa.
+// Rutas del portal del profesor: consulta (PB-041), registro de situaciones
+// (PB-042) y respuesta a aclaraciones (PB-049). El decorador de la clase aplica
+// a todas las rutas: solo entra una cuenta PROFESOR activa.
 @Controller('profesor')
 @PerfilesPermitidos('PROFESOR')
 export class ProfesorController {
@@ -57,5 +57,19 @@ export class ProfesorController {
     @Param('id', ParseUUIDPipe) situacionId: string,
   ) {
     return this.profesor.situacion(peticion.sesion, situacionId);
+  }
+
+  // PB-049: el cuerpo trae { respuesta }; se valida en el servicio.
+  @Post('aclaraciones/:id/respuesta')
+  responderAclaracion(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) aclaracionId: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.profesor.responderAclaracion(
+      peticion.sesion,
+      aclaracionId,
+      cuerpo,
+    );
   }
 }
