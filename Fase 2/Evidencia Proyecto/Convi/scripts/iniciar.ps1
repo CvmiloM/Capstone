@@ -30,6 +30,10 @@ try {
         if (-not $cloud['SUPABASE_URL'] -or -not $cloud['NEXT_PUBLIC_SUPABASE_URL'] -or -not $cloud['SUPABASE_DB_URL'] -or -not ($cloud['SUPABASE_PUBLISHABLE_KEY'] -or $cloud['SUPABASE_ANON_KEY'])) {
             throw 'Faltan URL, clave publicable o conexion de base en .env.cloud. No se muestran sus valores.'
         }
+        # El modulo de cuentas necesita esta clave privada para enviar invitaciones.
+        if (-not ($cloud['SUPABASE_SECRET_KEY'] -or $cloud['SUPABASE_SERVICE_ROLE_KEY'])) {
+            throw 'Falta SUPABASE_SECRET_KEY en .env.cloud para la API de cuentas. Obtenla del mismo proyecto Supabase; nunca uses NEXT_PUBLIC para una clave privada.'
+        }
         try {
             $authUrl = [uri]$cloud['SUPABASE_URL']
             $dbUrl = [uri]$cloud['SUPABASE_DB_URL']
@@ -42,7 +46,8 @@ try {
         if ($dbUrl.Scheme -notin @('postgres', 'postgresql') -or $dbUrl.Host -notmatch '\.supabase\.(co|com)$' -or $dbUrl.Query -notmatch '(?:[?&])sslmode=verify-full(?:&|$)') {
             throw 'La conexion cloud debe apuntar a Supabase y usar sslmode=verify-full.'
         }
-        $cloudArguments = @('compose', '--env-file', '.env.cloud', 'up', '-d')
+        # Cargar tambien las rutas nuevas del pull, aunque no hayan cambiado las variables.
+        $cloudArguments = @('compose', '--env-file', '.env.cloud', 'up', '-d', '--force-recreate')
         if ($Build) { $cloudArguments += '--build' }
         & docker @cloudArguments
         if ($LASTEXITCODE -ne 0) { throw 'Fallo el inicio de CONVI con Supabase cloud.' }

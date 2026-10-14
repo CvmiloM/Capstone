@@ -14,6 +14,15 @@ type ErrorPostgres = { code?: string; constraint?: string; message?: string };
 export class RegistroService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
+  estadoRegistro(identidad: Identidad) {
+    return this.cuentas.operarRegistro(identidad, async (db) => {
+      const resultado = await db.query<{ puede_registrar: boolean }>(
+        'SELECT convi.puede_registrar_escuela() AS puede_registrar',
+      );
+      return { puede_registrar: resultado.rows[0]?.puede_registrar === true };
+    });
+  }
+
   /**
    * HU-002: crea en una sola operación la escuela, la ficha de la persona y su
    * cuenta ADMIN activa (convi.registrar_primer_administrador). El usuario sale

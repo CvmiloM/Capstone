@@ -2,7 +2,11 @@
 
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { redirect } from "next/navigation";
-import { consultarCuentaActiva, destinoDelPerfil } from "@/lib/supabase/cuenta";
+import {
+  consultarCuentaActiva,
+  consultarRegistroInicial,
+  destinoDelPerfil,
+} from "@/lib/supabase/cuenta";
 import { LARGO_MAXIMO, LARGO_MINIMO_CONTRASENA } from "./limites";
 
 // Acciones de los formularios públicos. Todas validan los datos en el servidor.
@@ -107,19 +111,30 @@ export async function iniciarSesion(
     // La contraseña confirma la identidad; la API decide si su cuenta y escuela permiten entrar.
     const consulta = await consultarCuentaActiva(supabase);
     if (consulta.estado !== "activa") {
-      // Cerrar solo este intento rechazado, sin cerrar las sesiones de otros dispositivos.
-      const salida = await supabase.auth.signOut({ scope: "local" });
-      return {
-        mensaje:
-          consulta.estado === "sin-conexion" || salida.error
-            ? LOGIN_SIN_CONEXION
-            : LOGIN_RECHAZADO,
-        valores,
-      };
+      const registro =
+        consulta.estado === "bloqueada"
+          ? await consultarRegistroInicial(supabase)
+          : "no-disponible";
+      if (registro === "pendiente") {
+        destino = "/registro/escuela";
+      } else {
+        // Cerrar solo este intento rechazado, sin cerrar las sesiones de otros dispositivos.
+        const salida = await supabase.auth.signOut({ scope: "local" });
+        return {
+          mensaje:
+            consulta.estado === "sin-conexion" ||
+            registro === "sin-conexion" ||
+            salida.error
+              ? LOGIN_SIN_CONEXION
+              : LOGIN_RECHAZADO,
+          valores,
+        };
+      }
+    } else {
+      destino = consulta.cuenta.segundo_factor_pendiente
+        ? "/verificar-segundo-factor"
+        : destinoDelPerfil(consulta.cuenta.codigo_perfil);
     }
-    destino = consulta.cuenta.segundo_factor_pendiente
-      ? "/verificar-segundo-factor"
-      : destinoDelPerfil(consulta.cuenta.codigo_perfil);
   } catch {
     // No devolver contraseñas, tokens ni mensajes internos del proveedor de autenticación.
     return { mensaje: LOGIN_SIN_CONEXION, valores };
