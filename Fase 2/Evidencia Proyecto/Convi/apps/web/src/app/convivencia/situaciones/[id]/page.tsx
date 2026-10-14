@@ -1,0 +1,208 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { claseEnlace } from "@/app/components/formulario";
+// Mismos estilos de urgencia, formato de fecha y nombres de rol que el portal del profesor.
+import { formatearFecha, URGENCIA } from "@/app/profesor/datos";
+import { NOMBRE_ROL_EN_SITUACION } from "@/app/profesor/situacion-opciones";
+import { AvisoNoDisponible } from "../../aviso-no-disponible";
+import {
+  ESTADOS_ABIERTOS,
+  NOMBRE_ESTADO,
+  NOMBRE_ORIGEN,
+  obtenerSituacion,
+} from "../../datos";
+import { FormularioRevision, FormularioUrgencia } from "./formularios";
+
+export const metadata: Metadata = { title: "Revisión de la situación" };
+
+const AVISOS: Record<string, string> = {
+  revision:
+    "Iniciaste la revisión. La situación quedó En revisión y su urgencia no cambió.",
+  urgencia:
+    "Cambiaste la urgencia. El cambio y su motivo quedaron registrados en la auditoría.",
+};
+
+// PB-044 (HU-037): detalle de una situación para revisarla. Abrirlo no cambia
+// su estado: la revisión empieza con el botón Iniciar revisión (CA2).
+export default async function PaginaRevisionSituacion({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ aviso?: string }>;
+}) {
+  const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
+  const respuesta = await obtenerSituacion(id);
+  if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia" />;
+  const situacion = respuesta.datos;
+  const urgencia = URGENCIA[situacion.urgencia] ?? URGENCIA.NORMAL;
+  const textoAviso = aviso ? AVISOS[aviso] : undefined;
+
+  return (
+    <>
+      <Link href="/convivencia" className={`text-sm ${claseEnlace}`}>
+        ← Bandeja de situaciones
+      </Link>
+
+      {textoAviso && (
+        <div
+          role="status"
+          className="mt-4 rounded-lg border border-verde/30 bg-verde/10 px-4 py-3 text-sm"
+        >
+          {textoAviso}
+        </div>
+      )}
+
+      <div className="mt-4 mb-6">
+        <p className="font-mono text-sm text-muted-foreground">{situacion.codigo}</p>
+        <h1 className="mt-1 text-2xl font-semibold">
+          {situacion.categoria ?? "Situación sin categoría"}
+        </h1>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+            Estado: {NOMBRE_ESTADO[situacion.estado] ?? situacion.estado}
+          </span>
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${urgencia.clase}`}>
+            Urgencia: {urgencia.texto}
+          </span>
+        </div>
+      </div>
+
+      {situacion.estado === "NUEVA" && (
+        <section className="mb-4 flex flex-col gap-4 rounded-2xl border border-primary/30 bg-accent p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Esta situación todavía no se revisa</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Al iniciar la revisión pasa a En revisión. Su urgencia se mantiene.
+            </p>
+          </div>
+          <FormularioRevision situacionId={situacion.id} />
+        </section>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Seccion titulo="Lo que se informó" className="lg:col-span-2">
+          <p className="whitespace-pre-line text-sm">{situacion.descripcion}</p>
+        </Seccion>
+
+        <Seccion titulo="Datos del registro">
+          <dl className="space-y-3 text-sm">
+            <Dato nombre="Ocurrió">{formatearFecha(situacion.ocurrido_en)}</Dato>
+            <Dato nombre="Registrada">{formatearFecha(situacion.reportado_en)}</Dato>
+            <Dato nombre="Registró">
+              {situacion.reportado_por} (
+              {NOMBRE_ORIGEN[situacion.tipo_origen] ?? situacion.tipo_origen})
+            </Dato>
+            <Dato nombre="Curso">{situacion.curso ?? "Sin curso"}</Dato>
+            <Dato nombre="Lugar">{situacion.lugar ?? "No indicado"}</Dato>
+          </dl>
+        </Seccion>
+
+        <Seccion titulo="Estudiantes participantes" className="lg:col-span-3">
+          <ul className="divide-y divide-border text-sm">
+            {situacion.participantes.map((p) => (
+              <li
+                key={`${p.codigo_estudiante ?? ""}-${p.apellidos}-${p.nombres}-${p.rol}`}
+                className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+              >
+                <span className="font-medium">
+                  {p.apellidos}, {p.nombres}
+                  {p.codigo_estudiante && (
+                    <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                      {p.codigo_estudiante}
+                    </span>
+                  )}
+                </span>
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {p.curso_matricula && (
+                    <span className="text-xs text-muted-foreground">
+                      {p.curso_matricula}
+                    </span>
+                  )}
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                    {NOMBRE_ROL_EN_SITUACION[p.rol] ?? p.rol}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Seccion>
+
+        <Seccion titulo="Aclaraciones pedidas" className="lg:col-span-2">
+          {situacion.aclaraciones.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Todavía no se han pedido aclaraciones.
+            </p>
+          ) : (
+            <ul className="space-y-4">
+              {situacion.aclaraciones.map((a) => (
+                <li key={a.id} className="rounded-xl border border-border p-4 text-sm">
+                  <p className="font-medium">{a.pregunta}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Pedida por {a.solicitado_por} el {formatearFecha(a.solicitado_en)}
+                  </p>
+                  {a.estado === "RESPONDIDA" && a.respuesta ? (
+                    <div className="mt-3 border-l-2 border-verde pl-3">
+                      <p className="whitespace-pre-line">{a.respuesta}</p>
+                      {a.respondido_en && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Respondida el {formatearFecha(a.respondido_en)}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-3 inline-block rounded-full bg-naranjo px-2.5 py-0.5 text-xs font-semibold text-tinta">
+                      Esperando respuesta del profesor
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Seccion>
+
+        <Seccion titulo="Urgencia">
+          {ESTADOS_ABIERTOS.includes(situacion.estado) ? (
+            <FormularioUrgencia
+              situacionId={situacion.id}
+              urgenciaActual={situacion.urgencia}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              La revisión de esta situación terminó; su urgencia ya no se cambia.
+            </p>
+          )}
+        </Seccion>
+      </div>
+    </>
+  );
+}
+
+function Seccion({
+  titulo,
+  className = "",
+  children,
+}: {
+  titulo: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={`rounded-2xl border border-border bg-card p-5 shadow-tarjeta ${className}`}
+    >
+      <h2 className="mb-3 text-base font-semibold">{titulo}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Dato({ nombre, children }: { nombre: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{nombre}</dt>
+      <dd className="mt-0.5 font-medium">{children}</dd>
+    </div>
+  );
+}
