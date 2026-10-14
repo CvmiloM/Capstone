@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 
-// Datos del portal de Convivencia (PB-044 y PB-045). Se piden a la API desde el
+// Datos del portal de Convivencia (PB-043, PB-044 y PB-045). Se piden a la API desde el
 // servidor de Next con el token de la sesión; la API exige el perfil
 // CONVIVENCIA con segundo factor en cada petición (PB-127 y PB-009).
 
@@ -25,6 +25,8 @@ export type SituacionBandeja = {
   curso: string | null;
   categoria: string | null;
   reportado_por: string;
+  /** Quién informó, cuando la registró Convivencia por otro canal (HU-036). */
+  informante: string | null;
   estudiantes: number;
   aclaraciones_pendientes: number;
 };
@@ -103,7 +105,7 @@ export function obtenerSituacion(id: string) {
 // --- Acciones sobre una situación ---
 
 export type ResultadoAccion =
-  | { ok: true }
+  | { ok: true; id?: string }
   | { ok: false; mensaje: string; errores?: Record<string, string> };
 
 const SIN_CONEXION =
@@ -134,13 +136,14 @@ async function enviar(
     return { ok: false, mensaje: SIN_CONEXION };
   }
   if (respuesta.status === 401) redirect("/login");
-  if (respuesta.ok) return { ok: true };
 
   const datos = (await respuesta.json().catch(() => null)) as {
+    id?: string;
     mensaje?: string;
     message?: string;
     errores?: Record<string, string>;
   } | null;
+  if (respuesta.ok) return { ok: true, id: datos?.id };
   if (respuesta.status === 400 && datos?.errores) {
     return {
       ok: false,
@@ -188,6 +191,45 @@ export function enviarAclaracion(id: string, pregunta: string) {
     `/convivencia/situaciones/${encodeURIComponent(id)}/aclaraciones`,
     { pregunta },
   );
+}
+
+// --- Registro por otros canales (PB-043, HU-036) ---
+
+/** Misma forma que devuelve GET /convivencia/registro/opciones. */
+export type OpcionesRegistro = {
+  categorias: { id: string; nombre: string }[];
+  cursos: {
+    id: string;
+    nombre: string;
+    estudiantes: {
+      id: string;
+      persona_id: string;
+      nombres: string;
+      apellidos: string;
+      codigo_estudiante: string;
+    }[];
+  }[];
+  funcionarios: { persona_id: string; nombre: string; perfil: string }[];
+  apoderados: { persona_id: string; nombre: string }[];
+};
+
+export function obtenerOpcionesRegistro() {
+  return pedir<OpcionesRegistro>("/convivencia/registro/opciones");
+}
+
+/** HU-036: la API valida todo de nuevo y responde con el id de la situación. */
+export function enviarSituacion(cuerpo: unknown) {
+  return enviar("POST", "/convivencia/situaciones", cuerpo);
+}
+
+/** HU-036 CA2: quién informó, separado de quién la registró. */
+export function quienInformo(situacion: {
+  tipo_origen: string;
+  informante: string | null;
+}) {
+  if (situacion.tipo_origen === "PROFESOR") return null;
+  const origen = NOMBRE_ORIGEN[situacion.tipo_origen] ?? situacion.tipo_origen;
+  return situacion.informante ? `${origen}, ${situacion.informante}` : origen;
 }
 
 /** HU-037 CA1: estados de la situación con el nombre que usa Convivencia. */
