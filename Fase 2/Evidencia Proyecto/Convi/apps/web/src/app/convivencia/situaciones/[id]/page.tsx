@@ -12,7 +12,11 @@ import {
   NOMBRE_ORIGEN,
   obtenerSituacion,
 } from "../../datos";
-import { FormularioRevision, FormularioUrgencia } from "./formularios";
+import {
+  FormularioAclaracion,
+  FormularioRevision,
+  FormularioUrgencia,
+} from "./formularios";
 
 export const metadata: Metadata = { title: "Revisión de la situación" };
 
@@ -21,10 +25,14 @@ const AVISOS: Record<string, string> = {
     "Iniciaste la revisión. La situación quedó En revisión y su urgencia no cambió.",
   urgencia:
     "Cambiaste la urgencia. El cambio y su motivo quedaron registrados en la auditoría.",
+  aclaracion:
+    "Enviaste la pregunta al profesor. La situación quedó en Información solicitada hasta que responda.",
 };
 
 // PB-044 (HU-037): detalle de una situación para revisarla. Abrirlo no cambia
 // su estado: la revisión empieza con el botón Iniciar revisión (CA2).
+// PB-045 (HU-038): durante la revisión se puede pedir una aclaración al
+// profesor que la registró.
 export default async function PaginaRevisionSituacion({
   params,
   searchParams,
@@ -38,6 +46,12 @@ export default async function PaginaRevisionSituacion({
   const situacion = respuesta.datos;
   const urgencia = URGENCIA[situacion.urgencia] ?? URGENCIA.NORMAL;
   const textoAviso = aviso ? AVISOS[aviso] : undefined;
+  // HU-038 CA2: solo se pregunta al profesor que registró la situación, y
+  // mientras la revisión sigue abierta.
+  const deProfesor = situacion.tipo_origen === "PROFESOR";
+  const puedePedirAclaracion =
+    deProfesor &&
+    ["EN_REVISION", "INFORMACION_SOLICITADA"].includes(situacion.estado);
 
   return (
     <>
@@ -159,6 +173,17 @@ export default async function PaginaRevisionSituacion({
                 </li>
               ))}
             </ul>
+          )}
+          {puedePedirAclaracion && (
+            <FormularioAclaracion
+              situacionId={situacion.id}
+              profesor={situacion.reportado_por}
+            />
+          )}
+          {deProfesor && situacion.estado === "NUEVA" && (
+            <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
+              Inicia la revisión para poder pedir una aclaración al profesor.
+            </p>
           )}
         </Seccion>
 
