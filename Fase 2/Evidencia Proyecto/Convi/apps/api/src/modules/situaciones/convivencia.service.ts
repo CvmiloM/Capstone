@@ -9,7 +9,17 @@ import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
 import { validarPregunta } from './nueva-aclaracion.js';
-import { URGENCIAS } from './nueva-situacion.js';
+import {
+  errorDeCampos,
+  URGENCIAS,
+  validarSituacionConvivencia,
+} from './nueva-situacion.js';
+import {
+  comprobarFechaYCategoria,
+  conReintentosDeCodigo,
+  insertarSituacion,
+  type SituacionRegistrada,
+} from './registro-situacion.js';
 
 // PB-044 (HU-037): bandeja y revisión inicial del equipo de Convivencia.
 // La seguridad por fila de la base separa por escuela y Convivencia ve todas
@@ -42,6 +52,8 @@ export type SituacionBandeja = {
   curso: string | null;
   categoria: string | null;
   reportado_por: string;
+  /** Quién informó, cuando la registró Convivencia por otro canal (HU-036). */
+  informante: string | null;
   estudiantes: number;
   aclaraciones_pendientes: number;
 };
@@ -75,9 +87,39 @@ export type DetalleConvivencia = SituacionBandeja & {
   }[];
 };
 
+// PB-043 (HU-036 CA1): cómo se comprueba que el informante sea del origen indicado.
+const CONSULTA_INFORMANTE = {
+  ESTUDIANTE: 'SELECT 1 FROM convi.estudiantes WHERE persona_id = $1',
+  FUNCIONARIO: `SELECT 1 FROM convi.membresias_establecimiento
+     WHERE persona_id = $1 AND estado = 'ACTIVO' AND codigo_perfil <> 'APODERADO'`,
+  APODERADO:
+    'SELECT 1 FROM convi.apoderados_estudiante WHERE persona_apoderado_id = $1',
+} as const;
+
 const NO_EXISTE = 'La situación no existe.';
 const CAMBIO_SIMULTANEO =
   'Otra persona cambió esta situación al mismo tiempo. Recarga la página para ver su estado actual.';
+
+/** Lo que necesita el formulario de registro de Convivencia (PB-043). */
+export type OpcionesRegistro = {
+  categorias: { id: string; nombre: string }[];
+  /** Cursos con matrículas activas y sus estudiantes. */
+  cursos: {
+    id: string;
+    nombre: string;
+    estudiantes: {
+      id: string;
+      persona_id: string;
+      nombres: string;
+      apellidos: string;
+      codigo_estudiante: string;
+    }[];
+  }[];
+  /** Personas con una cuenta activa del equipo de la escuela. */
+  funcionarios: { persona_id: string; nombre: string; perfil: string }[];
+  /** Apoderados con un vínculo vigente con algún estudiante. */
+  apoderados: { persona_id: string; nombre: string }[];
+};
 
 export type AclaracionPedida = {
   id: string;
@@ -110,6 +152,7 @@ const COLUMNAS_BANDEJA = `
   s.id, s.codigo, s.ocurrido_en, s.reportado_en, s.estado, s.urgencia,
   s.tipo_origen, c.nombre AS curso, cat.nombre AS categoria,
   p.nombres || ' ' || p.apellidos AS reportado_por,
+  po.nombres || ' ' || po.apellidos AS informante,
   (SELECT count(*) FROM convi.participaciones pa
     JOIN convi.estudiantes e ON e.persona_id = pa.persona_id
     WHERE pa.situacion_id = s.id AND pa.activo_hasta IS NULL)::int AS estudiantes,
@@ -120,6 +163,7 @@ const DESDE_BANDEJA = `
   FROM convi.situaciones s
   JOIN convi.membresias_establecimiento m ON m.id = s.reportado_por_membresia_id
   JOIN convi.personas p ON p.id = m.persona_id
+  LEFT JOIN convi.personas po ON po.id = s.persona_origen_id
   LEFT JOIN convi.cursos c ON c.id = s.curso_contexto_id
   LEFT JOIN convi.categorias_convivencia cat ON cat.id = s.categoria_id`;
 
@@ -423,6 +467,156 @@ export class ConvivenciaService {
           estado_situacion: 'INFORMACION_SOLICITADA',
         };
       },
+    );
+  }
+
+  // PB-043 (HU-036): datos para el formulario de registro de Convivencia.
+  opcionesRegistro(sesion: Sesion): Promise<OpcionesRegistro> {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const categorias = await db.query<
+          OpcionesRegistro['categorias'][number]
+        >(
+          `SELECT id, nombre FROM convi.categorias_convivencia
+           WHERE estado = 'ACTIVO' ORDER BY nombre`,
+        );
+        const estudiantes = await db.query<
+          OpcionesRegistro['cursos'][number]['estudiantes'][number] & {
+            curso_id: string;
+            curso: string;
+          }
+        >(
+          `SELECT e.id, e.persona_id, p.nombres, p.apellidos, e.codigo_estudiante,
+                  c.id AS curso_id, c.nombre AS curso
+           FROM convi.matriculas m
+           JOIN convi.estudiantes e ON e.id = m.estudiante_id
+           JOIN convi.personas p ON p.id = e.persona_id
+           JOIN convi.cursos c ON c.id = m.curso_id
+           JOIN convi.niveles_educativos n ON n.id = c.nivel_id
+           WHERE m.estado = 'ACTIVO'
+           ORDER BY n.orden, c.seccion NULLS FIRST, c.nombre, p.apellidos, p.nombres`,
+        );
+        const cursos = new Map<string, OpcionesRegistro['cursos'][number]>();
+        for (const { curso_id, curso, ...estudiante } of estudiantes.rows) {
+          const grupo = cursos.get(curso_id) ?? {
+            id: curso_id,
+            nombre: curso,
+            estudiantes: [],
+          };
+          grupo.estudiantes.push(estudiante);
+          cursos.set(curso_id, grupo);
+        }
+        const funcionarios = await db.query<
+          OpcionesRegistro['funcionarios'][number]
+        >(
+          `SELECT p.id AS persona_id, p.nombres || ' ' || p.apellidos AS nombre,
+                  m.codigo_perfil AS perfil
+           FROM convi.membresias_establecimiento m
+           JOIN convi.personas p ON p.id = m.persona_id
+           WHERE m.estado = 'ACTIVO' AND m.codigo_perfil <> 'APODERADO'
+           ORDER BY p.apellidos, p.nombres`,
+        );
+        const apoderados = await db.query<
+          OpcionesRegistro['apoderados'][number]
+        >(
+          `SELECT DISTINCT p.id AS persona_id,
+                  p.nombres || ' ' || p.apellidos AS nombre, p.apellidos, p.nombres
+           FROM convi.apoderados_estudiante ae
+           JOIN convi.personas p ON p.id = ae.persona_apoderado_id
+           WHERE ae.activo_hasta IS NULL OR ae.activo_hasta >= current_date
+           ORDER BY p.apellidos, p.nombres`,
+        );
+        return {
+          categorias: categorias.rows,
+          cursos: [...cursos.values()],
+          funcionarios: funcionarios.rows,
+          apoderados: apoderados.rows.map(({ persona_id, nombre }) => ({
+            persona_id,
+            nombre,
+          })),
+        };
+      },
+    );
+  }
+
+  // PB-043 (HU-036): Convivencia registra una situación que llegó por otro
+  // canal. Igual que el registro del profesor, todo se guarda en una sola
+  // transacción y llega Nueva con su código (CA3); el autor es la cuenta de
+  // la sesión y el informante queda aparte (CA2).
+  registrar(sesion: Sesion, cuerpo: unknown): Promise<SituacionRegistrada> {
+    const datos = validarSituacionConvivencia(cuerpo);
+    return conReintentosDeCodigo(() =>
+      this.cuentas.operar(
+        sesion,
+        { tipo: 'establecimiento', perfiles: PERFILES },
+        async (db) => {
+          const errores: Record<string, string> = {};
+          const ocurridoEn = await comprobarFechaYCategoria(db, datos, errores);
+
+          if (datos.curso_id) {
+            const curso = await db.query(
+              'SELECT 1 FROM convi.cursos WHERE id = $1',
+              [datos.curso_id],
+            );
+            if (curso.rowCount === 0)
+              errores.curso_id = 'Elige un curso de la lista.';
+          }
+
+          // CA1: el informante debe corresponder al origen indicado. Con
+          // origen Otro no hay informante: lo rechaza la validación.
+          if (datos.informante_persona_id && datos.tipo_origen !== 'OTRO') {
+            const informante = await db.query(
+              CONSULTA_INFORMANTE[datos.tipo_origen],
+              [datos.informante_persona_id],
+            );
+            if (informante.rowCount === 0)
+              errores.informante_persona_id =
+                'La persona elegida no corresponde a ese origen.';
+          }
+
+          // HU-035 CA4: la matrícula activa de cada estudiante, de cualquier curso.
+          const matriculas = await db.query<{
+            estudiante_id: string;
+            persona_id: string;
+            matricula_id: string;
+          }>(
+            `SELECT e.id AS estudiante_id, e.persona_id, m.id AS matricula_id
+             FROM convi.matriculas m
+             JOIN convi.estudiantes e ON e.id = m.estudiante_id
+             WHERE m.estado = 'ACTIVO' AND e.id = ANY($1::uuid[])`,
+            [datos.participantes.map((p) => p.estudiante_id)],
+          );
+          const matriculaDe = new Map(
+            matriculas.rows.map((fila) => [fila.estudiante_id, fila]),
+          );
+          if (matriculaDe.size !== datos.participantes.length)
+            errores.participantes =
+              'Hay estudiantes sin una matrícula activa en la escuela.';
+
+          if (!ocurridoEn || Object.keys(errores).length > 0)
+            throw errorDeCampos(errores);
+
+          return insertarSituacion(
+            db,
+            {
+              curso_id: datos.curso_id,
+              tipo_origen: datos.tipo_origen,
+              persona_origen_id: datos.informante_persona_id,
+              ocurrido_en: ocurridoEn,
+              lugar: datos.lugar,
+              descripcion: datos.descripcion,
+              categoria_id: datos.categoria_id,
+              urgencia: datos.urgencia,
+            },
+            datos.participantes.map((p) => ({
+              rol: p.rol,
+              ...matriculaDe.get(p.estudiante_id)!,
+            })),
+          );
+        },
+      ),
     );
   }
 }
