@@ -11,6 +11,7 @@ import {
   type NuevaSituacion,
   validarNuevaSituacion,
 } from './nueva-situacion.js';
+import { validarRespuesta } from './respuesta-aclaracion.js';
 
 // PB-041 (HU-034): cursos y registros propios del profesor.
 // La seguridad por fila de la base solo separa por escuela. Que el profesor vea
@@ -44,6 +45,7 @@ export type SituacionPropia = {
   reportado_en: Date;
   estado: string;
   urgencia: string;
+  curso_id: string | null;
   curso: string | null;
   categoria: string | null;
   aclaraciones_pendientes: number;
@@ -109,11 +111,30 @@ function esChoqueDeCodigo(error: unknown) {
   );
 }
 
+export type AclaracionRespondida = {
+  id: string;
+  situacion_id: string;
+  estado: string;
+  respondido_en: Date;
+  /** Estado de la situación después de responder (HU-042 CA4). */
+  estado_situacion: string;
+};
+
+const YA_RESPONDIDA =
+  'Esta aclaración ya fue respondida. La respuesta enviada se conserva y no se puede cambiar.';
+
+// PB-139: si otra petición cambió la misma fila después de que empezó esta
+// transacción, PostgreSQL rechaza el cambio (40001) en vez de sobrescribirlo.
+function esCambioSimultaneo(error: unknown) {
+  return (error as { code?: string } | null)?.code === '40001';
+}
+
+
 // Columnas comunes del listado y del detalle. Nunca incluye caso_id ni quién
 // revisa la situación: esa información es de Convivencia (HU-034 CA3).
 const COLUMNAS_SITUACION = `
   s.id, s.codigo, s.ocurrido_en, s.reportado_en, s.estado, s.urgencia,
-  c.nombre AS curso,
+  s.curso_contexto_id AS curso_id, c.nombre AS curso,
   cat.nombre AS categoria,
   (SELECT count(*) FROM convi.aclaraciones_situacion a
     WHERE a.situacion_id = s.id
@@ -411,6 +432,62 @@ export class ProfesorService {
           evidencias: evidencias.rows,
           aclaraciones: aclaraciones.rows,
         };
+      },
+    );
+  }
+  
+  // PB-049 (HU-042): el profesor responde una aclaración que le pidió
+  // Convivencia. La base pone la fecha del servidor, impide modificar una
+  // respuesta enviada y, si era la última pendiente, devuelve la situación a
+  // En revisión (CA4).
+  responderAclaracion(
+    sesion: Sesion,
+    aclaracionId: string,
+    cuerpo: unknown,
+  ): Promise<AclaracionRespondida> {
+    const respuesta = validarRespuesta(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        // FOR UPDATE bloquea la aclaración: si dos envíos llegan a la vez, el
+        // segundo espera y luego recibe 40001, que se informa como ya respondida.
+        const actual = await db
+          .query<{ estado: string }>(
+            `SELECT estado FROM convi.aclaraciones_situacion
+             WHERE id = $1 AND profesor_destinatario_id = convi.membresia_actual()
+             FOR UPDATE`,
+            [aclaracionId],
+          )
+          .catch((error: unknown) => {
+            if (esCambioSimultaneo(error))
+              throw new ConflictException(YA_RESPONDIDA);
+            throw error;
+          });
+        const aclaracion = actual.rows[0];
+        // CA3: si no es para este profesor se rechaza igual que si no existiera.
+        if (!aclaracion)
+          throw new ForbiddenException('No tienes permiso para este registro.');
+        if (aclaracion.estado !== 'PENDIENTE')
+          throw new ConflictException(YA_RESPONDIDA);
+
+        // CA1: guarda la respuesta y quién respondió; respondido_en lo pone la base.
+        const respondida = await db.query<
+          Omit<AclaracionRespondida, 'estado_situacion'>
+        >(
+          `UPDATE convi.aclaraciones_situacion
+           SET estado = 'RESPONDIDA', respuesta = $2,
+               respondido_por = convi.membresia_actual()
+           WHERE id = $1
+           RETURNING id, situacion_id, estado, respondido_en`,
+          [aclaracionId, respuesta],
+        );
+        const fila = respondida.rows[0];
+        const situacion = await db.query<{ estado: string }>(
+          'SELECT estado FROM convi.situaciones WHERE id = $1',
+          [fila.situacion_id],
+        );
+        return { ...fila, estado_situacion: situacion.rows[0].estado };
       },
     );
   }
