@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 
-// Datos del portal de Convivencia (PB-044). Se piden a la API desde el
+// Datos del portal de Convivencia (PB-044 y PB-045). Se piden a la API desde el
 // servidor de Next con el token de la sesión; la API exige el perfil
 // CONVIVENCIA con segundo factor en cada petición (PB-127 y PB-009).
 
@@ -178,6 +178,15 @@ export function enviarCambioUrgencia(
     "PATCH",
     `/convivencia/situaciones/${encodeURIComponent(id)}/urgencia`,
     cambio,
+  );
+}
+
+/** HU-038: pregunta al profesor que registró la situación. */
+export function enviarAclaracion(id: string, pregunta: string) {
+  return enviar(
+    "POST",
+    `/convivencia/situaciones/${encodeURIComponent(id)}/aclaraciones`,
+    { pregunta },
   );
 }
 

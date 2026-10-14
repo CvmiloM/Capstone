@@ -7,12 +7,18 @@ import {
   claseBotonSecundario,
 } from "@/app/components/formulario";
 import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
-import { cambiarUrgencia, iniciarRevision, type EstadoAccion } from "./acciones";
+import {
+  cambiarUrgencia,
+  iniciarRevision,
+  pedirAclaracion,
+  type EstadoAccion,
+} from "./acciones";
 
 const estadoInicial: EstadoAccion = {};
 
-// Mismo límite que valida la API (cambio-urgencia.ts).
+// Mismos límites que valida la API (cambio-urgencia.ts y nueva-aclaracion.ts).
 const LARGO_MAXIMO_MOTIVO = 500;
+const LARGO_MAXIMO_PREGUNTA = 2000;
 
 const claseControl =
   "mt-1.5 block w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/15";
@@ -113,6 +119,61 @@ export function FormularioUrgencia({
 
       <button type="submit" disabled={pendiente} className={claseBotonSecundario}>
         {pendiente ? "Guardando…" : "Cambiar urgencia"}
+      </button>
+    </form>
+  );
+}
+
+// HU-038: pregunta al profesor que registró la situación. Una vez enviada no
+// se modifica (CA3).
+export function FormularioAclaracion({
+  situacionId,
+  profesor,
+}: {
+  situacionId: string;
+  profesor: string;
+}) {
+  const [estado, accion, pendiente] = useActionState(
+    pedirAclaracion,
+    estadoInicial,
+  );
+  const error = estado.errores?.pregunta;
+
+  return (
+    <form
+      action={accion}
+      noValidate
+      className="mt-4 space-y-3 border-t border-border pt-4"
+    >
+      <input type="hidden" name="situacion_id" value={situacionId} />
+      {estado.mensaje && !error && <AvisoError>{estado.mensaje}</AvisoError>}
+      <div>
+        <label htmlFor="pregunta" className="block text-sm font-medium">
+          Pedir una aclaración a {profesor}
+        </label>
+        <textarea
+          id="pregunta"
+          name="pregunta"
+          rows={3}
+          maxLength={LARGO_MAXIMO_PREGUNTA}
+          defaultValue={estado.valores?.pregunta}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? "pregunta-error" : "pregunta-ayuda"}
+          className={`${claseControl} ${error ? "border-destructive" : "border-input"}`}
+        />
+        {error ? (
+          <p id="pregunta-error" className="mt-1.5 text-sm text-destructive">
+            {error}
+          </p>
+        ) : (
+          <p id="pregunta-ayuda" className="mt-1.5 text-sm text-muted-foreground">
+            La situación pasa a Información solicitada hasta que el profesor
+            responda. La pregunta no se puede cambiar después de enviarla.
+          </p>
+        )}
+      </div>
+      <button type="submit" disabled={pendiente} className={claseBotonSecundario}>
+        {pendiente ? "Enviando…" : "Pedir aclaración"}
       </button>
     </form>
   );

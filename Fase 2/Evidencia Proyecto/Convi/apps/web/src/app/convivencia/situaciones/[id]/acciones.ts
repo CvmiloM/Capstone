@@ -1,7 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { enviarCambioUrgencia, enviarInicioRevision } from "../../datos";
+import {
+  enviarAclaracion,
+  enviarCambioUrgencia,
+  enviarInicioRevision,
+} from "../../datos";
 
 export type EstadoAccion = {
   /** Error general del formulario. */
@@ -54,4 +58,21 @@ export async function cambiarUrgencia(
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
   redirect(`/convivencia/situaciones/${id}?aviso=urgencia`);
+}
+
+// PB-045 (HU-038): pide información al profesor que registró la situación.
+// La API guarda la pregunta y pasa la situación a Información solicitada en
+// la misma operación; el profesor la responde desde sus registros (PB-049).
+export async function pedirAclaracion(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const id = leerTexto(formData, "situacion_id");
+  const valores = { pregunta: leerTexto(formData, "pregunta") };
+  if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
+  const resultado = await enviarAclaracion(id, valores.pregunta);
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  redirect(`/convivencia/situaciones/${id}?aviso=aclaracion`);
 }
