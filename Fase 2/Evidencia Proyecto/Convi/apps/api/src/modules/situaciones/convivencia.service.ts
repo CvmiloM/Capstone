@@ -8,6 +8,7 @@ import {
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
+import { validarPregunta } from './nueva-aclaracion.js';
 import { URGENCIAS } from './nueva-situacion.js';
 
 // PB-044 (HU-037): bandeja y revisión inicial del equipo de Convivencia.
@@ -77,6 +78,14 @@ export type DetalleConvivencia = SituacionBandeja & {
 const NO_EXISTE = 'La situación no existe.';
 const CAMBIO_SIMULTANEO =
   'Otra persona cambió esta situación al mismo tiempo. Recarga la página para ver su estado actual.';
+
+export type AclaracionPedida = {
+  id: string;
+  estado: string;
+  solicitado_en: Date;
+  /** Estado de la situación después de pedirla (HU-038 CA1). */
+  estado_situacion: string;
+};
 
 // PB-139: si otra petición cambió la misma fila después de que empezó esta
 // transacción, PostgreSQL rechaza el cambio (40001) en vez de sobrescribirlo.
@@ -302,6 +311,117 @@ export class ConvivenciaService {
           [id, cambio.urgencia],
         );
         return resultado.rows[0];
+      },
+    );
+  }
+
+  // PB-045 (HU-038): Convivencia pide información al profesor que registró la
+  // situación. En la misma transacción se guarda la pregunta y, si la
+  // situación estaba En revisión, se registra la decisión que la pasa a
+  // Información solicitada (CA1). La base exige que el destinatario sea el
+  // profesor autor y que quien pide sea Convivencia activa (CA2), y que la
+  // solicitud no se modifique después (CA3). Si otra persona cambió la
+  // situación al mismo tiempo se reintenta una vez con el estado nuevo.
+  async pedirAclaracion(
+    sesion: Sesion,
+    id: string,
+    cuerpo: unknown,
+  ): Promise<AclaracionPedida> {
+    const pregunta = validarPregunta(cuerpo);
+    for (let intento = 1; ; intento++) {
+      try {
+        return await this.guardarAclaracion(sesion, id, pregunta);
+      } catch (error) {
+        const reintentar =
+          error instanceof ConflictException &&
+          error.message === CAMBIO_SIMULTANEO &&
+          intento < 2;
+        if (!reintentar) throw error;
+      }
+    }
+  }
+
+  private guardarAclaracion(
+    sesion: Sesion,
+    id: string,
+    pregunta: string,
+  ): Promise<AclaracionPedida> {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const actual = await db
+          .query<{
+            estado: string;
+            profesor: string;
+            perfil: string;
+            revision_anterior: string | null;
+          }>(
+            `SELECT s.estado, s.reportado_por_membresia_id AS profesor,
+                    m.codigo_perfil AS perfil,
+                    (SELECT r.id FROM convi.revisiones_convivencia r
+                      WHERE r.situacion_id = s.id
+                      ORDER BY r.revisado_en DESC, r.id DESC LIMIT 1) AS revision_anterior
+             FROM convi.situaciones s
+             JOIN convi.membresias_establecimiento m
+               ON m.id = s.reportado_por_membresia_id
+             WHERE s.id = $1
+             FOR UPDATE OF s`,
+            [id],
+          )
+          .catch((error: unknown) => {
+            if (esCambioSimultaneo(error))
+              throw new ConflictException(CAMBIO_SIMULTANEO);
+            throw error;
+          });
+        const fila = actual.rows[0];
+        if (!fila) throw new NotFoundException(NO_EXISTE);
+        // CA2: solo se pregunta al profesor que la registró.
+        if (fila.perfil !== 'PROFESOR')
+          throw new ConflictException(
+            'Esta situación no la registró un profesor: no hay a quién pedirle la aclaración.',
+          );
+        if (fila.estado === 'NUEVA')
+          throw new ConflictException(
+            'Inicia la revisión antes de pedir una aclaración.',
+          );
+        if (!['EN_REVISION', 'INFORMACION_SOLICITADA'].includes(fila.estado))
+          throw new ConflictException(
+            'La revisión de esta situación ya terminó; no se piden más aclaraciones.',
+          );
+
+        // CA1: la decisión pasa la situación a Información solicitada. Se
+        // indica la última revisión que se vio; si cambió, la base la rechaza.
+        if (fila.estado === 'EN_REVISION') {
+          await db.query(
+            `INSERT INTO convi.revisiones_convivencia
+               (establecimiento_id, situacion_id, tipo_revision, resultado,
+                fundamento, revisado_por, revision_anterior_id)
+             VALUES (convi.establecimiento_actual(), $1, 'DECISION',
+                     'INFORMACION_SOLICITADA', $2, convi.membresia_actual(), $3)`,
+            [
+              id,
+              `Se pidió una aclaración al profesor: ${pregunta}`,
+              fila.revision_anterior,
+            ],
+          );
+        }
+
+        const aclaracion = await db.query<
+          Omit<AclaracionPedida, 'estado_situacion'>
+        >(
+          `INSERT INTO convi.aclaraciones_situacion
+             (establecimiento_id, situacion_id, solicitado_por,
+              profesor_destinatario_id, pregunta)
+           VALUES (convi.establecimiento_actual(), $1, convi.membresia_actual(),
+                   $2, $3)
+           RETURNING id, estado, solicitado_en`,
+          [id, fila.profesor, pregunta],
+        );
+        return {
+          ...aclaracion.rows[0],
+          estado_situacion: 'INFORMACION_SOLICITADA',
+        };
       },
     );
   }
