@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { MarcaCompacta } from "@/app/components/marca";
+import { BotonCerrarSesion } from "@/app/components/boton-cerrar-sesion";
 import { Navegacion } from "./navegacion";
 
 // Portal del perfil PROFESOR (PB-041). El layout no lee la sesión: cada página
@@ -33,9 +34,14 @@ export default function LayoutProfesor({ children }: { children: ReactNode }) {
         >
           <Navegacion />
         </Suspense>
+        <div className="border-t border-border px-4 py-3">
+          <BotonCerrarSesion />
+        </div>
       </aside>
 
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8">
+        {children}
+      </main>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { consultarCuentaActiva } from "@/lib/supabase/cuenta";
 import { Encabezado, AvisoError, claseBotonSecundario } from "./formulario";
 import { MarcaCompacta } from "./marca";
+import { BotonCerrarSesion } from "./boton-cerrar-sesion";
 
 // Entrada mínima de estos perfiles; sus funciones se incorporan en sus propios backlogs.
 export async function EntradaPortal({
@@ -57,9 +58,12 @@ export async function EntradaPortal({
           <p className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
             Las secciones de este portal estarán disponibles próximamente.
           </p>
-          <Link href="/" className={`mt-6 ${claseBotonSecundario}`}>
-            Volver al inicio
-          </Link>
+          <div className="mt-6 flex flex-wrap items-start gap-3">
+            <Link href="/" className={claseBotonSecundario}>
+              Volver al inicio
+            </Link>
+            <BotonCerrarSesion />
+          </div>
         </div>
       </section>
     </main>
