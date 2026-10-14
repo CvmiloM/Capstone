@@ -6,7 +6,7 @@ import { consultarCuentaActiva, destinoDelPerfil } from "@/lib/supabase/cuenta";
 import { LARGO_MAXIMO, LARGO_MINIMO_CONTRASENA } from "./limites";
 
 // Acciones de los formularios públicos. Todas validan los datos en el servidor.
-// El registro y el login usan Supabase Auth; la activación conserva PB-003.
+// El registro, el login y la activación de invitaciones (PB-003) usan Supabase Auth.
 
 export type EstadoFormulario = {
   /** Error general del formulario (credenciales, enlace vencido, etc.). */
@@ -22,8 +22,12 @@ export type EstadoFormulario = {
 const FORMATO_CORREO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const FORMATO_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SIN_CONEXION =
-  "Este formulario todavía no está conectado con Supabase Auth.";
+// Dentro de Docker, localhost no es la API: el .env apunta NEXT_PUBLIC_API_URL
+// a http://host.docker.internal:3001.
+const URL_API =
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:3001";
 const LOGIN_SIN_CONEXION =
   "No pudimos conectar. Inténtalo nuevamente en unos minutos.";
 const LOGIN_RECHAZADO =
@@ -215,14 +219,75 @@ export async function activarCuenta(
   validarNuevaContrasena(contrasena, confirmacion, errores);
   if (Object.keys(errores).length > 0) return { errores };
 
-  // TODO(PB-003): verificar el enlace con Supabase Auth (verifyOtp, type
-  // "invite") y guardar la contraseña (updateUser). Luego el backend llama a
-  // convi.activar_invitacion(membresia, identidad) con el rol convi_registro.
-  // Sus errores se muestran así:
-  // - "La invitación no corresponde a este correo" o "ya fue usada o no está
-  //   vigente" → ENLACE_INVALIDO
-  // - "Esta identidad ya tiene una cuenta en CONVI" → avisar que use otro correo
-  // - "La escuela no está activa" → el establecimiento no está disponible
-  // Al terminar, redirigir al portal del perfil.
-  return { mensaje: SIN_CONEXION };
+  let destino: string;
+  try {
+    const supabase = await crearClienteServidor();
+    // HU-003 CA3: Supabase acepta el enlace una sola vez y solo mientras no
+    // venza. Si este navegador ya lo verificó (por ejemplo, la activación se
+    // cortó a medio camino), se continúa con esa misma sesión.
+    const verificacion = await supabase.auth.verifyOtp({
+      type: "invite",
+      token_hash: tokenHash,
+    });
+    if (verificacion.error) {
+      const actual = await supabase.auth.getUser();
+      if (actual.error || !actual.data.user?.email_confirmed_at) {
+        return { mensaje: ENLACE_INVALIDO };
+      }
+    }
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { mensaje: ENLACE_INVALIDO };
+
+    // CA1 y CA2: la API llama a convi.activar_invitacion con la identidad del
+    // token; la escuela, la persona y el perfil los asignó el administrador.
+    const respuesta = await fetch(`${URL_API}/cuentas/activacion`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ membresia_id: membresia }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (respuesta.status >= 500) {
+      // Se conserva la sesión para que reintentar funcione con el mismo enlace.
+      return { mensaje: LOGIN_SIN_CONEXION };
+    }
+    if (!respuesta.ok) {
+      const datos = (await respuesta.json().catch(() => null)) as {
+        message?: string;
+      } | null;
+      // Sin cuenta que activar, la sesión del enlace no sirve: se cierra aquí.
+      await supabase.auth.signOut({ scope: "local" });
+      return { mensaje: datos?.message ?? ENLACE_INVALIDO };
+    }
+
+    // La contraseña se guarda recién con la cuenta activa: un enlace que no
+    // corresponde no deja una contraseña en una identidad sin cuenta.
+    const cambio = await supabase.auth.updateUser({ password: contrasena });
+    if (cambio.error) {
+      return cambio.error.code === "weak_password"
+        ? {
+            errores: {
+              contrasena: `Usa una contraseña más segura, de al menos ${LARGO_MINIMO_CONTRASENA} caracteres.`,
+            },
+          }
+        : { mensaje: LOGIN_SIN_CONEXION };
+    }
+
+    // Mismo destino que el inicio de sesión (PB-004): Convivencia configura
+    // primero su segundo factor y cada perfil llega a su portal.
+    const consulta = await consultarCuentaActiva(supabase);
+    if (consulta.estado !== "activa") return { mensaje: LOGIN_SIN_CONEXION };
+    destino = consulta.cuenta.segundo_factor_pendiente
+      ? "/verificar-segundo-factor"
+      : destinoDelPerfil(consulta.cuenta.codigo_perfil);
+  } catch {
+    // No devolver contraseñas, tokens ni mensajes internos del proveedor de autenticación.
+    return { mensaje: LOGIN_SIN_CONEXION };
+  }
+  // redirect interrumpe la acción: debe quedar fuera del manejo de errores.
+  redirect(destino);
 }

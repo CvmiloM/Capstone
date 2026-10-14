@@ -1,16 +1,20 @@
 import { Module } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import { AuthModule } from '../auth/auth.module.js';
+import { ActivacionController } from './activacion.controller.js';
+import { ActivacionService } from './activacion.service.js';
 import { CuentasController } from './cuentas.controller.js';
 import { CuentasService, SUPABASE_ADMIN } from './cuentas.service.js';
 
-// Cuentas de la escuela e invitaciones (PB-010). Importa AuthModule para usar
-// CuentaService y el mismo control de sesión que el resto de la API (PB-127).
+// Cuentas de la escuela, invitaciones (PB-010) y su activación (PB-003).
+// Importa AuthModule para usar CuentaService y el mismo control de sesión que
+// el resto de la API (PB-127).
 @Module({
   imports: [AuthModule],
-  controllers: [CuentasController],
+  controllers: [CuentasController, ActivacionController],
   providers: [
     CuentasService,
+    ActivacionService,
     {
       provide: SUPABASE_ADMIN,
       useFactory: () => {
