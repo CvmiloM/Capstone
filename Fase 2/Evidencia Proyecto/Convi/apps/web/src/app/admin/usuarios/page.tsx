@@ -3,6 +3,7 @@ import { Encabezado } from "@/app/components/formulario";
 import { obtenerCuentas, type CuentaEscuela } from "./datos";
 import { FormularioInvitacion } from "./formulario-invitacion";
 import { NOMBRE_ESTADO, NOMBRE_PERFIL } from "./opciones";
+import { BotonReenvio } from "./boton-reenvio";
 
 export const metadata: Metadata = { title: "Usuarios" };
 
@@ -47,7 +48,10 @@ export default async function PaginaUsuarios() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section aria-labelledby="titulo-cuentas" className="lg:col-span-2">
-          <h2 id="titulo-cuentas" className="mb-3 text-sm text-muted-foreground">
+          <h2
+            id="titulo-cuentas"
+            className="mb-3 text-sm text-muted-foreground"
+          >
             {cuentas.length} {cuentas.length === 1 ? "cuenta" : "cuentas"}
             {pendientes > 0 &&
               ` · ${pendientes} ${pendientes === 1 ? "pendiente" : "pendientes"} de activar`}
@@ -68,7 +72,9 @@ export default async function PaginaUsuarios() {
                       {cuenta.correo}
                     </p>
                     {texto && (
-                      <p className="mt-1 text-xs text-muted-foreground">{texto}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {texto}
+                      </p>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
@@ -77,12 +83,16 @@ export default async function PaginaUsuarios() {
                     </span>
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        CLASE_ESTADO[cuenta.estado] ?? "bg-muted text-muted-foreground"
+                        CLASE_ESTADO[cuenta.estado] ??
+                        "bg-muted text-muted-foreground"
                       }`}
                     >
                       {NOMBRE_ESTADO[cuenta.estado] ?? cuenta.estado}
                     </span>
                   </div>
+                  {cuenta.estado === "PENDIENTE" && (
+                    <BotonReenvio cuentaId={cuenta.id} />
+                  )}
                 </li>
               );
             })}

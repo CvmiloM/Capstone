@@ -46,6 +46,10 @@ content_path = "./supabase/templates/invitacion.html"
 subject = "Confirma tu correo en CONVI"
 content_path = "./supabase/templates/confirmacion.html"
 
+[auth.email.template.magic_link]
+subject = "Continúa tu acceso a CONVI"
+content_path = "./supabase/templates/continuar-invitacion.html"
+
 # HU-008: segundo factor con app autenticadora para Administración y Convivencia
 [auth.mfa]
 max_enrolled_factors = 10

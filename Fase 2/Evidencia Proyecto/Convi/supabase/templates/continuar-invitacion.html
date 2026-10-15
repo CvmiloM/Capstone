@@ -1,0 +1,14 @@
+{{ if .Data.membresia_id }}
+<h2>Continúa tu activación en CONVI</h2>
+<p>Tu establecimiento reenvió el acceso para terminar de activar tu cuenta.</p>
+<p>
+  <a
+    href="{{ .SiteURL }}/activar-cuenta?token_hash={{ .TokenHash }}&amp;type=magiclink&amp;membresia={{ .Data.membresia_id }}"
+    >Continuar activación</a
+  >
+</p>
+{{ else }}
+<h2>Accede a CONVI</h2>
+<p><a href="{{ .ConfirmationURL }}">Continuar</a></p>
+{{ end }}
+<p>Si no esperabas este correo, puedes ignorarlo.</p>
