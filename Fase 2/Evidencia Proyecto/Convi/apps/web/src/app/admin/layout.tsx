@@ -1,6 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
-import { MarcaCompacta } from "@/app/components/marca";
+import logo from "@/assets/convi-logo-trim.png";
 import { BotonCerrarSesion } from "@/app/components/boton-cerrar-sesion";
 import { obtenerContextoAdmin } from "./datos";
 import { Navegacion } from "./navegacion";
@@ -17,9 +18,15 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
                         href="/admin"
                         className="rounded-lg focus-visible:outline-2 focus-visible:outline-ring"
                     >
-                        <MarcaCompacta />
+                        {/* La imagen trae margen transparente: los márgenes negativos lo recortan. */}
+                        <Image
+                            src={logo}
+                            alt="Convi, ir al inicio del portal"
+                            priority
+                            className="-my-3 -ml-2 block h-14 w-auto"
+                        />
                     </Link>
-                    <span className="rounded bg-accent px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-accent-foreground">
+                    <span className="translate-y-2.5 rounded bg-accent px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-accent-foreground">
                         Admin
                     </span>
                 </div>
