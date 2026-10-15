@@ -83,7 +83,19 @@ export default async function PaginaCurso({
       <div className="mt-4">
         <Encabezado
           titulo={curso.nombre}
-          descripcion={`${curso.codigo}${curso.seccion ? ` · Sección ${curso.seccion}` : ""} · ${curso.nivel_nombre} · Año ${curso.anio} · ${curso.estudiantes} ${curso.estudiantes === 1 ? "estudiante" : "estudiantes"}`}
+          descripcion={
+            <>
+              {`${curso.codigo}${curso.seccion ? ` · Sección ${curso.seccion}` : ""} · ${curso.nivel_nombre} · Año ${curso.anio} · `}
+              {/* PB-017: la nómina filtrada por este curso. */}
+              <Link
+                href={`/admin/estudiantes?curso=${curso.id}`}
+                className={claseEnlace}
+              >
+                {curso.estudiantes}{" "}
+                {curso.estudiantes === 1 ? "estudiante" : "estudiantes"}
+              </Link>
+            </>
+          }
         />
       </div>
 
