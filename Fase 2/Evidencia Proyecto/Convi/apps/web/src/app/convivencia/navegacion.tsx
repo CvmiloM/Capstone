@@ -9,6 +9,8 @@ const ENLACES: { href: string; texto: string; icono: NombreIcono }[] = [
   { href: "/convivencia", texto: "Bandeja de situaciones", icono: "documentos" },
   // PB-043: situaciones que llegan por otros canales
   { href: "/convivencia/registrar", texto: "Registrar situación", icono: "info" },
+    // PB-030 (Camilo): catálogo de categorías, el mismo del portal de administración
+  { href: "/convivencia/categorias", texto: "Categorías", icono: "categorias" },
 ];
 
 function estaActivo(ruta: string, href: string) {
