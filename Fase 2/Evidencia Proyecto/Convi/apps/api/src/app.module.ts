@@ -6,6 +6,7 @@ import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CategoriasModule } from './modules/categorias/categorias.module.js';
 import { CuentasModule } from './modules/cuentas/cuentas.module.js';
+import { ImportacionesModule } from './modules/importaciones/importaciones.module.js';
 import { RegistroModule } from './modules/registro/registro.module.js';
 import { SituacionesModule } from './modules/situaciones/situaciones.module.js';
 
@@ -16,6 +17,7 @@ import { SituacionesModule } from './modules/situaciones/situaciones.module.js';
     AuthModule,
     CategoriasModule,
     CuentasModule,
+    ImportacionesModule,
     RegistroModule,
     SituacionesModule,
   ],
