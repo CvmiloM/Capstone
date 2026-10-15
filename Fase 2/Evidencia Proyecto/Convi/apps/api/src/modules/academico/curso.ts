@@ -41,13 +41,13 @@ export function errorDeCampos(
   return new BadRequestException({ mensaje, errores });
 }
 
-function objeto(cuerpo: unknown) {
+export function objeto(cuerpo: unknown) {
   return (
     typeof cuerpo === 'object' && cuerpo !== null ? cuerpo : {}
   ) as Record<string, unknown>;
 }
 
-function texto(valor: unknown) {
+export function texto(valor: unknown) {
   return typeof valor === 'string' ? valor.trim() : '';
 }
 
@@ -56,7 +56,7 @@ export function esUuid(valor: string) {
 }
 
 // Rechaza fechas que no existen, como el 30 de febrero.
-function fechaValida(valor: string) {
+export function fechaValida(valor: string) {
   const partes = FECHA.exec(valor);
   if (!partes) return false;
   const [anio, mes, dia] = partes.slice(1).map(Number);

@@ -6,13 +6,17 @@ import { AsignacionesController } from './asignaciones.controller.js';
 import { AsignacionesService } from './asignaciones.service.js';
 import { CursosController } from './cursos.controller.js';
 import { CursosService } from './cursos.service.js';
+import { EstudiantesController } from './estudiantes.controller.js';
+import { EstudiantesService } from './estudiantes.service.js';
+import { MatriculasService } from './matriculas.service.js';
 import { NivelesController } from './niveles.controller.js';
 import { NivelesService } from './niveles.service.js';
 
 // Módulo de Camilo: configuración académica del administrador. Tiene los años
-// académicos (PB-013), los niveles educativos (PB-014) y los cursos con sus
-// profesores (PB-015). Importa AuthModule para usar CuentaService y el control
-// de sesión de PB-127.
+// académicos (PB-013), los niveles educativos (PB-014), los cursos con sus
+// profesores (PB-015 y PB-016) y los estudiantes con su matrícula (PB-017 y
+// PB-018). Importa AuthModule para usar CuentaService y el control de sesión
+// de PB-127.
 @Module({
   imports: [AuthModule],
   controllers: [
@@ -20,7 +24,15 @@ import { NivelesService } from './niveles.service.js';
     NivelesController,
     CursosController,
     AsignacionesController,
+    EstudiantesController,
   ],
-  providers: [AniosService, NivelesService, CursosService, AsignacionesService],
+  providers: [
+    AniosService,
+    NivelesService,
+    CursosService,
+    AsignacionesService,
+    EstudiantesService,
+    MatriculasService,
+  ],
 })
 export class AcademicoModule {}
