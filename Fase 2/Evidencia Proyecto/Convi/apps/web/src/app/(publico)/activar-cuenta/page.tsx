@@ -15,7 +15,9 @@ export default function PaginaActivarCuenta({
   // Con cacheComponents, leer searchParams tiene que ir dentro de <Suspense>.
   return (
     <Suspense
-      fallback={<p className="text-sm text-muted-foreground">Revisando el enlace…</p>}
+      fallback={
+        <p className="text-sm text-muted-foreground">Revisando el enlace…</p>
+      }
     >
       <ContenidoActivacion searchParams={searchParams} />
     </Suspense>
@@ -25,13 +27,14 @@ export default function PaginaActivarCuenta({
 async function ContenidoActivacion({
   searchParams,
 }: Pick<PageProps<"/activar-cuenta">, "searchParams">) {
-  const { token_hash, membresia } = await searchParams;
+  const { token_hash, membresia, type = "invite" } = await searchParams;
 
   if (
     typeof token_hash !== "string" ||
     !token_hash ||
     typeof membresia !== "string" ||
-    !membresia
+    !membresia ||
+    (type !== "invite" && type !== "magiclink")
   ) {
     return (
       <>
@@ -55,7 +58,11 @@ async function ContenidoActivacion({
         titulo="Activa tu cuenta"
         descripcion="Define la contraseña con la que vas a entrar a CONVI. Tu establecimiento y tu perfil ya los asignó el administrador."
       />
-      <FormularioActivacion tokenHash={token_hash} membresia={membresia} />
+      <FormularioActivacion
+        tokenHash={token_hash}
+        membresia={membresia}
+        tipoToken={type}
+      />
     </>
   );
 }

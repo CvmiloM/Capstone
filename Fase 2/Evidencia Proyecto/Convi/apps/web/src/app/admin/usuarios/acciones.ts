@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { enviarInvitacion } from "./datos";
+import { enviarInvitacion, reenviarInvitacion } from "./datos";
 
 export type EstadoInvitacion = {
   /** Error general del formulario. */
@@ -38,4 +38,13 @@ export async function invitarCuenta(
   }
   revalidatePath("/admin/usuarios");
   return { invitado: resultado.correo };
+}
+
+export type EstadoReenvio = { mensaje?: string; reenviado?: boolean };
+
+export async function reenviarCuenta(id: string): Promise<EstadoReenvio> {
+  const resultado = await reenviarInvitacion(id);
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  revalidatePath("/admin/usuarios");
+  return { reenviado: true };
 }

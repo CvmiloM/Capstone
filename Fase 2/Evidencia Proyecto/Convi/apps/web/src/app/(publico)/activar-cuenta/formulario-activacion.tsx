@@ -11,11 +11,16 @@ const estadoInicial: EstadoFormulario = {};
 export function FormularioActivacion({
   tokenHash,
   membresia,
+  tipoToken = "invite",
 }: {
   tokenHash: string;
   membresia: string;
+  tipoToken?: "invite" | "magiclink";
 }) {
-  const [estado, accion, pendiente] = useActionState(activarCuenta, estadoInicial);
+  const [estado, accion, pendiente] = useActionState(
+    activarCuenta,
+    estadoInicial,
+  );
 
   return (
     <form action={accion} noValidate className="space-y-5">
@@ -23,6 +28,7 @@ export function FormularioActivacion({
 
       <input type="hidden" name="token_hash" value={tokenHash} />
       <input type="hidden" name="membresia" value={membresia} />
+      <input type="hidden" name="tipo_token" value={tipoToken} />
       <CampoContrasena
         name="contrasena"
         etiqueta="Contraseña"

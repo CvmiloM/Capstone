@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Inject, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Req,
+} from '@nestjs/common';
 import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 import { CuentasService } from './cuentas.service.js';
@@ -20,5 +29,13 @@ export class CuentasController {
   @Post('invitaciones')
   invitar(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
     return this.cuentas.invitar(peticion.sesion, cuerpo);
+  }
+
+  @Post(':id/reenviar-invitacion')
+  reenviar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.cuentas.reenviar(peticion.sesion, id);
   }
 }

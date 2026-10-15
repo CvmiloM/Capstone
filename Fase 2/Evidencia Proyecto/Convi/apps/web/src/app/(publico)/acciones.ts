@@ -224,11 +224,16 @@ export async function activarCuenta(
 ): Promise<EstadoFormulario> {
   const tokenHash = leerTexto(formData, "token_hash");
   const membresia = leerTexto(formData, "membresia");
+  const tipoToken = leerTexto(formData, "tipo_token") || "invite";
   const contrasena = leerContrasena(formData, "contrasena");
   const confirmacion = leerContrasena(formData, "confirmacion");
   const errores: Record<string, string> = {};
 
-  if (!tokenHash || !FORMATO_UUID.test(membresia)) {
+  if (
+    !tokenHash ||
+    !FORMATO_UUID.test(membresia) ||
+    (tipoToken !== "invite" && tipoToken !== "magiclink")
+  ) {
     return { mensaje: ENLACE_INVALIDO };
   }
   validarNuevaContrasena(contrasena, confirmacion, errores);
@@ -241,7 +246,8 @@ export async function activarCuenta(
     // venza. Si este navegador ya lo verificó (por ejemplo, la activación se
     // cortó a medio camino), se continúa con esa misma sesión.
     const verificacion = await supabase.auth.verifyOtp({
-      type: "invite",
+      // PB-011 también permite continuar una invitación cuyo correo ya se confirmó.
+      type: tipoToken,
       token_hash: tokenHash,
     });
     if (verificacion.error) {

@@ -70,10 +70,24 @@ export async function enviarInvitacion(cuerpo: {
   correo: string;
   perfil: string;
 }): Promise<ResultadoInvitacion> {
+  return enviar("/admin/cuentas/invitaciones", cuerpo);
+}
+
+export async function reenviarInvitacion(
+  id: string,
+): Promise<ResultadoInvitacion> {
+  return enviar(`/admin/cuentas/${encodeURIComponent(id)}/reenviar-invitacion`);
+}
+
+// Ambos envíos conservan el mismo manejo de sesión, conexión y errores de la API.
+async function enviar(
+  ruta: string,
+  cuerpo?: unknown,
+): Promise<ResultadoInvitacion> {
   const token = await tokenDeSesion();
   let respuesta: Response;
   try {
-    respuesta = await fetch(`${URL_API}/admin/cuentas/invitaciones`, {
+    respuesta = await fetch(`${URL_API}${ruta}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -106,7 +120,7 @@ export async function enviarInvitacion(cuerpo: {
     };
   }
   // 403 o 503 (por ejemplo, demasiados correos seguidos): la API explica qué pasó.
-  if ([403, 503].includes(respuesta.status) && datos?.message) {
+  if ([403, 404, 409, 503].includes(respuesta.status) && datos?.message) {
     return { ok: false, mensaje: datos.message };
   }
   return { ok: false, mensaje: SIN_CONEXION };

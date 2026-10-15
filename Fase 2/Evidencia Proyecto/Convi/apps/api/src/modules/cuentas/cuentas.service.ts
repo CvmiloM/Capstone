@@ -2,6 +2,8 @@ import {
   Inject,
   Injectable,
   Logger,
+  ConflictException,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -67,6 +69,57 @@ export class CuentasService {
            ORDER BY m.estado = 'PENDIENTE' DESC, p.apellidos, p.nombres`,
         );
         return resultado.rows;
+      },
+    );
+  }
+
+  // PB-011: el correo sale de la cuenta guardada, nunca de lo que manda el navegador.
+  reenviar(sesion: Sesion, id: string): Promise<InvitacionEnviada> {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        // La escuela queda limitada por la sesión y el bloqueo evita activar o reenviar a la vez.
+        const resultado = await db.query<
+          InvitacionEnviada & { auth_usuario_id: string | null }
+        >(
+          `SELECT id, correo_invitacion AS correo, codigo_perfil AS perfil,
+                  estado, auth_usuario_id
+           FROM convi.membresias_establecimiento WHERE id = $1 FOR UPDATE`,
+          [id],
+        );
+        const cuenta = resultado.rows[0];
+        if (!cuenta) throw new NotFoundException('La cuenta no existe.');
+        if (cuenta.estado !== 'PENDIENTE' || cuenta.auth_usuario_id)
+          throw new ConflictException(
+            'Solo puedes reenviar una invitación pendiente.',
+          );
+
+        let { error } = await this.supabase.auth.admin.inviteUserByEmail(
+          cuenta.correo,
+          { data: { membresia_id: cuenta.id } },
+        );
+        // Si ya confirmó el correo pero no terminó, recibe un enlace para la misma identidad.
+        if (error?.code === 'email_exists') {
+          ({ error } = await this.supabase.auth.signInWithOtp({
+            email: cuenta.correo,
+            options: { shouldCreateUser: false },
+          }));
+        }
+        if (error) {
+          throw new ServiceUnavailableException(
+            error.status === 429 || error.code === 'over_email_send_rate_limit'
+              ? 'Espera un minuto antes de reenviar la invitación nuevamente.'
+              : 'No se pudo reenviar la invitación. Inténtalo nuevamente.',
+          );
+        }
+        // Se conservan persona, escuela, perfil y quién hizo la invitación original.
+        return {
+          id: cuenta.id,
+          correo: cuenta.correo,
+          perfil: cuenta.perfil,
+          estado: cuenta.estado,
+        };
       },
     );
   }

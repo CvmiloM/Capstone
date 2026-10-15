@@ -228,3 +228,22 @@ para esa identidad; no se creó otra escuela para completar esta prueba.
 Integración validada, lista para un único commit de Sebastian. Las cuentas
 usadas en las pruebas manuales se conservan, no se borraron datos del equipo.
 Los apoderados y el reenvío siguen fuera de las funciones actuales de PB-010.
+
+## PB-011: correo para continuar una invitación
+
+El reenvío de una cuenta Pendiente conserva la invitación normal,
+si el correo ya se confirmó pero la activación se interrumpió, Supabase envía
+un Magic Link para la misma identidad, sin crear otra.
+
+En el panel del proyecto cloud, abrir **Authentication → Email Templates →
+Magic Link**, poner el asunto **Continúa tu acceso a CONVI** y guardar como
+contenido el archivo `supabase/templates/continuar-invitacion.html`.
+No cambiar el proveedor SMTP ni las claves.
+La plantilla toma la membresía de los datos de la invitación original,
+sin ese cambio el correo usaría la plantilla predeterminada y no volvería
+directamente al formulario de activación de CONVI.
+Esta configuración se hace una sola vez en el proyecto compartido,
+los demás integrantes solo necesitan traer el código actualizado.
+
+En local la plantilla se aplica desde `supabase/config.toml` al reiniciar
+Supabase local, no requiere migraciones ni cambia las tablas.
