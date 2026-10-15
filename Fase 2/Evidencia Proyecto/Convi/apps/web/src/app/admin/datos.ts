@@ -17,9 +17,15 @@ const comprobarAdministrador = cache(async () => {
     redirect("/verificar-segundo-factor");
 });
 
-// Datos del portal de administración. Mientras no exista la API, estas
-// funciones devuelven datos de ejemplo con la misma forma que tendrá la
-// respuesta real; la conexión con el backend está marcada con TODO.
+// Dentro de Docker, localhost no es la API: el .env apunta NEXT_PUBLIC_API_URL
+// a http://host.docker.internal:3001.
+const URL_API =
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:3001";
+
+// Datos del portal de administración. El contexto ya viene de la API; el
+// resumen todavía devuelve datos de ejemplo (marcado con TODO).
 // Los comentarios indican de qué tablas del modelo de datos sale cada campo.
 
 /** Lo que todas las pantallas del portal necesitan saber de la sesión. */
@@ -42,16 +48,39 @@ export type ContextoAdmin = {
 // ambos piden el contexto durante una misma solicitud.
 export const obtenerContextoAdmin = cache(async (): Promise<ContextoAdmin> => {
   await comprobarAdministrador();
-  // TODO(HU-033): sustituir la escuela y persona de ejemplo por datos de la API.
+  const supabase = await crearClienteServidor();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) redirect("/login");
+  // La API toma la escuela y la persona de la sesión, nunca del navegador.
+  const respuesta = await fetch(`${URL_API}/admin/contexto`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(10000),
+  });
+  if (respuesta.status === 401) redirect("/login");
+  if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
+  // Misma forma que devuelve apps/api/src/modules/admin/contexto.service.ts.
+  const contexto = (await respuesta.json()) as {
+    escuela: {
+      nombre: string;
+      codigo: string | null;
+      comuna: string | null;
+      zona_horaria: string;
+    };
+    anio_activo: number | null;
+    usuario: { nombres: string; apellidos: string };
+  };
   return {
     escuela: {
-      nombre: "Liceo Bicentenario Los Aromos",
-      codigo: "12847-1",
-      comuna: "Cabrero",
-      zonaHoraria: "America/Santiago",
+      nombre: contexto.escuela.nombre,
+      codigo: contexto.escuela.codigo,
+      comuna: contexto.escuela.comuna,
+      zonaHoraria: contexto.escuela.zona_horaria,
     },
-    anioActivo: { anio: 2026 },
-    usuario: { nombres: "Manuel", apellidos: "Reyes Olivares" },
+    anioActivo:
+      contexto.anio_activo === null ? null : { anio: contexto.anio_activo },
+    usuario: contexto.usuario,
   };
 });
 
