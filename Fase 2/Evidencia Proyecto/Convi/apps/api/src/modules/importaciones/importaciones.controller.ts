@@ -22,10 +22,10 @@ import {
   validarFiltro,
 } from './importaciones.service.js';
 
-// PB-019 y PB-020 (HU-015): importaciones del portal de administración. El
-// decorador de la clase aplica a todas las rutas: solo entra una cuenta ADMIN
-// activa con el segundo factor completo, y se comprueba antes de recibir el
-// archivo.
+// PB-019, PB-020 y PB-026 (HU-015 y HU-020): importaciones del portal de
+// administración. El decorador de la clase aplica a todas las rutas: solo
+// entra una cuenta ADMIN activa con el segundo factor completo, y se comprueba
+// antes de recibir el archivo.
 @Controller('admin/importaciones')
 @PerfilesPermitidos('ADMIN')
 export class ImportacionesController {
@@ -95,5 +95,28 @@ export class ImportacionesController {
     @Body() cuerpo: unknown,
   ) {
     return this.importaciones.revisar(peticion.sesion, id, cuerpo);
+  }
+
+    // PB-026: { incluir_advertencias: boolean }. Confirma las filas Válidas (y
+  // las Con advertencia, si se pide) y responde con la importación y cuántas
+  // se confirmaron.
+  @Post(':id/confirmacion')
+  @HttpCode(200)
+  confirmar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.importaciones.confirmar(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-026: marca Omitidas las filas Con error.
+  @Post(':id/omision')
+  @HttpCode(200)
+  omitir(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.importaciones.omitir(peticion.sesion, id);
   }
 }

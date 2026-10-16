@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { claseEnlace, Encabezado } from "@/app/components/formulario";
 import { obtenerContextoAdmin } from "../../datos";
+import { AccionesConfirmacion } from "../acciones-confirmacion";
 import { obtenerImportacion } from "../datos";
 import { FormularioRevision } from "../formulario-revision";
 import {
@@ -24,10 +25,11 @@ function leer(valor: string | undefined) {
   return typeof valor === "string" ? valor.trim() : "";
 }
 
-// PB-019 y PB-020 (HU-015): la importación cargada. Primero se relaciona cada
-// columna con un campo de CONVI (CA3); después, la vista previa muestra cada
-// fila Válida, Con advertencia o Con error (CA4), filtrable por estado
-// (?estado=ERROR&pagina=2). CA5: nada se guarda en las fichas.
+// PB-019, PB-020 y PB-026 (HU-015 y HU-020): la importación cargada. Primero
+// se relaciona cada columna con un campo de CONVI (CA3); después, la vista
+// previa muestra cada fila Válida, Con advertencia o Con error (CA4),
+// filtrable por estado (?estado=ERROR&pagina=2). Recién al confirmar se
+// guardan en las fichas.
 export default async function PaginaImportacion({
   params,
   searchParams,
@@ -70,8 +72,18 @@ export default async function PaginaImportacion({
     NOMBRE_TIPO[importacion.tipo_importacion] ?? importacion.tipo_importacion;
   const nombreEstado = NOMBRE_ESTADO[importacion.estado] ?? importacion.estado;
   const revisada = importacion.estado === "REVISION";
-  // Solo se relacionan columnas antes de confirmar (la API también lo exige).
-  const editable = ["CARGADO", "REVISION"].includes(importacion.estado);
+  const confirmada = importacion.estado === "CONFIRMADO";
+  const conConfirmadas = importacion.resumen.CONFIRMADO > 0;
+  // Solo se relacionan columnas antes de confirmar filas (la API también lo exige).
+  const editable =
+    ["CARGADO", "REVISION"].includes(importacion.estado) && !conConfirmadas;
+  const confirmadaEl = importacion.confirmado_en
+    ? new Intl.DateTimeFormat("es-CL", {
+        dateStyle: "long",
+        timeStyle: "short",
+        timeZone: escuela.zonaHoraria,
+      }).format(new Date(importacion.confirmado_en))
+    : null;
   const primera = importacion.muestra[0];
 
   const formulario = editable && (
@@ -129,17 +141,45 @@ export default async function PaginaImportacion({
         role="note"
         className="mb-6 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground"
       >
-        {revisada
-          ? "Esta es la vista previa de la importación. Todavía no se guardó nada en las fichas: eso pasa solo al confirmar la importación."
-          : "El archivo quedó guardado en el espacio privado de la escuela y sus filas se conservan tal como venían. Todavía no se guardó nada en las fichas."}
+        {confirmada
+          ? "La importación quedó Confirmada: sus filas confirmadas ya están en las fichas de la escuela."
+          : revisada && conConfirmadas
+            ? "Las filas Confirmadas ya están en las fichas de la escuela. Las demás se pueden confirmar u omitir."
+            : revisada
+              ? "Esta es la vista previa de la importación. Todavía no se guardó nada en las fichas: eso pasa solo al confirmar la importación."
+              : "El archivo quedó guardado en el espacio privado de la escuela y sus filas se conservan tal como venían. Todavía no se guardó nada en las fichas."}
       </p>
 
       <div className="space-y-8">
         {!revisada && formulario}
 
+        {(revisada || confirmada) && (
+          <section
+            aria-labelledby="titulo-confirmar"
+            className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
+          >
+            <h2 id="titulo-confirmar" className="mb-3 text-lg font-semibold">
+              {confirmada
+                ? "Importación confirmada"
+                : "Confirmar la importación"}
+            </h2>
+            <AccionesConfirmacion
+              id={importacion.id}
+              tipo={importacion.tipo_importacion}
+              estado={importacion.estado}
+              resumen={importacion.resumen}
+              confirmadaEl={confirmadaEl}
+            />
+          </section>
+        )}
+
         <section aria-labelledby="titulo-filas">
           <h2 id="titulo-filas" className="mb-3 text-lg font-semibold">
-            {revisada ? "Vista previa" : "Filas del archivo"}
+            {confirmada
+              ? "Filas de la importación"
+              : revisada
+                ? "Vista previa"
+                : "Filas del archivo"}
           </h2>
           <VistaPrevia importacion={importacion} />
         </section>

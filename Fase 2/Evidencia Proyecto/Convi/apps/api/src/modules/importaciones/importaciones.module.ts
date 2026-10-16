@@ -7,10 +7,11 @@ import {
   SUPABASE_STORAGE,
 } from './importaciones.service.js';
 
-// Módulo de Camilo: importaciones administrativas (PB-019, HU-015). Importa
-// AuthModule para usar CuentaService y el control de sesión de PB-127. Usa la
-// clave de servicio de Supabase solo para guardar archivos en el espacio
-// privado; los datos pasan siempre por CuentaService.operar.
+// Módulo de Camilo: importaciones administrativas (PB-019, PB-020 y PB-026).
+// Importa AuthModule para usar CuentaService y el control de sesión de
+// PB-127. Usa la clave de servicio de Supabase para guardar archivos en el
+// espacio privado y para invitar a los profesores importados; los datos pasan
+// siempre por CuentaService.operar.
 @Module({
   imports: [AuthModule],
   controllers: [ImportacionesController],

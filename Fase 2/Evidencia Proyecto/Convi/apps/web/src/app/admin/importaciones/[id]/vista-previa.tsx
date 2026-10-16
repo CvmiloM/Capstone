@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { claseBotonSecundario } from "@/app/components/formulario";
+import { claseBotonSecundario, claseEnlace } from "@/app/components/formulario";
 import type { DetalleImportacion } from "../datos";
 import { type EstadoFila, NOMBRE_ESTADO_FILA, NOMBRE_ROL } from "../opciones";
 
-// PB-020 (HU-015 CA4): la vista previa de una importación. Antes de revisar
-// muestra las filas tal como venían; después, cada fila con su estado, sus
-// datos ya normalizados y cada problema junto a su campo.
+// PB-020 y PB-026 (HU-015 CA4 y HU-020 CA1): la vista previa de una
+// importación. Antes de revisar muestra las filas tal como venían; después,
+// cada fila con su estado, sus datos ya normalizados y cada problema junto a su
+// campo; una fila confirmada muestra qué creó o reutilizó, con su enlace.
 
 // Igual que FILAS_POR_PAGINA de la API.
 const POR_PAGINA = 50;
@@ -15,13 +16,34 @@ const FILTROS: { estado: EstadoFila | null; nombre: string }[] = [
   { estado: "VALIDO", nombre: "Válidas" },
   { estado: "ADVERTENCIA", nombre: "Con advertencia" },
   { estado: "ERROR", nombre: "Con error" },
+  { estado: "CONFIRMADO", nombre: "Confirmadas" },
+  { estado: "OMITIDO", nombre: "Omitidas" },
 ];
 
 const ESTILO_ESTADO: Partial<Record<EstadoFila, string>> = {
   VALIDO: "border-verde/40 bg-verde/10",
   ADVERTENCIA: "border-amarillo/60 bg-amarillo/15",
   ERROR: "border-destructive/30 bg-destructive/10 text-destructive",
+  CONFIRMADO: "border-verde bg-verde/20",
 };
+
+// Lo que guardó cada fila confirmada (PB-026) y dónde verlo.
+const NOMBRE_ENTIDAD: Record<string, string> = {
+  persona: "Persona",
+  estudiante: "Ficha del estudiante",
+  curso: "Curso",
+  matricula: "Matrícula",
+  vinculo: "Vínculo de apoderado",
+  cuenta: "Cuenta de profesor",
+  asignacion: "Asignación",
+};
+
+function enlaceDe(entidad: string, id: string) {
+  if (entidad === "estudiante") return `/admin/estudiantes/${id}`;
+  if (entidad === "curso") return `/admin/cursos/${id}`;
+  if (entidad === "cuenta") return "/admin/usuarios";
+  return null;
+}
 
 // Sí/No, fechas como día-mes-año y el rol con su nombre.
 function mostrar(campo: string, valor: string | boolean | null | undefined) {
@@ -67,6 +89,13 @@ export function VistaPrevia({
         >
           {FILTROS.map(({ estado, nombre }) => {
             const actual = pagina.estado === estado;
+            // Confirmadas y Omitidas aparecen cuando hay alguna.
+            if (
+              (estado === "CONFIRMADO" || estado === "OMITIDO") &&
+              !resumen[estado] &&
+              !actual
+            )
+              return null;
             return (
               <Link
                 key={nombre}
@@ -122,7 +151,7 @@ export function VistaPrevia({
                 ))}
                 {revisada && (
                   <th scope="col" className="px-4 py-3 font-semibold">
-                    Problemas
+                    Detalle
                   </th>
                 )}
               </tr>
@@ -192,8 +221,38 @@ export function VistaPrevia({
                             </li>
                           ))}
                         </ul>
-                      ) : (
+                      ) : fila.estado !== "CONFIRMADO" ? (
                         <span className="text-muted-foreground">—</span>
+                      ) : null}
+                      {fila.estado === "CONFIRMADO" && (
+                        <ul className="mt-1 space-y-1 first:mt-0">
+                          {Object.entries(fila.entidades_confirmadas).map(
+                            ([entidad, { id: entidadId, accion }]) => {
+                              const enlace = enlaceDe(entidad, entidadId);
+                              return (
+                                <li key={entidad}>
+                                  <span className="font-medium">
+                                    {NOMBRE_ENTIDAD[entidad] ?? entidad}:
+                                  </span>{" "}
+                                  {accion === "CREADO"
+                                    ? "se creó"
+                                    : "ya existía"}
+                                  {enlace && (
+                                    <>
+                                      {" · "}
+                                      <Link
+                                        href={enlace}
+                                        className={claseEnlace}
+                                      >
+                                        Ver
+                                      </Link>
+                                    </>
+                                  )}
+                                </li>
+                              );
+                            },
+                          )}
+                        </ul>
                       )}
                     </td>
                   )}

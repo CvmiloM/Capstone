@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { enviarArchivo, enviarRevision } from "./datos";
+import {
+  enviarArchivo,
+  enviarConfirmacion,
+  enviarOmision,
+  enviarRevision,
+} from "./datos";
 
 export type EstadoFormulario = {
   /** Error general del formulario. */
@@ -11,7 +16,13 @@ export type EstadoFormulario = {
   errores?: Record<string, string>;
   /** Lo elegido, para no perderlo si hay errores. El archivo hay que volver a elegirlo. */
   valores?: Record<string, string>;
+  /** Lo que se hizo, cuando salió bien. */
+  exito?: string;
 };
+
+function filas(cantidad: number) {
+  return `${cantidad.toLocaleString("es-CL")} ${cantidad === 1 ? "fila" : "filas"}`;
+}
 
 // PB-019 (HU-015 CA1 y CA2): sube el archivo y abre la importación Cargada.
 export async function cargarImportacion(
@@ -66,4 +77,51 @@ export async function revisarImportacion(
   }
   revalidatePath("/admin/importaciones");
   redirect(`/admin/importaciones/${id}`);
+}
+
+// PB-026 (HU-020): guarda en las fichas las filas Válidas y, si se marcó la
+// casilla, las Con advertencia. Los estudiantes, cursos y demás aparecen
+// después en sus pantallas.
+export async function confirmarImportacion(
+  id: string,
+  _anterior: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const resultado = await enviarConfirmacion(
+    id,
+    formData.get("incluir_advertencias") === "si",
+  );
+  revalidatePath("/admin", "layout");
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  const { confirmadas, con_error, sin_enviar } = resultado.confirmacion;
+  const partes = [
+    confirmadas > 0
+      ? `Se guardaron en las fichas ${filas(confirmadas)}.`
+      : "No se confirmó ninguna fila.",
+  ];
+  if (con_error > 0)
+    partes.push(
+      `${filas(con_error)} no se pudieron confirmar y quedaron Con error: revisa su detalle.`,
+    );
+  if (sin_enviar > 0)
+    partes.push(
+      `${filas(sin_enviar)} de profesores quedaron sin invitar porque se alcanzó el límite de correos: vuelve a confirmar en unos minutos.`,
+    );
+  if (resultado.estado === "CONFIRMADO")
+    partes.push("La importación quedó Confirmada.");
+  return { exito: partes.join(" ") };
+}
+
+// PB-026 (HU-020 CA5): las filas Con error no se importan. No necesita
+// nada del formulario: solo el id de la importación.
+export async function omitirFilas(id: string): Promise<EstadoFormulario> {
+  const resultado = await enviarOmision(id);
+  revalidatePath("/admin", "layout");
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  return {
+    exito:
+      resultado.estado === "CONFIRMADO"
+        ? "Se omitieron las filas con error y la importación quedó Confirmada."
+        : "Se omitieron las filas con error. Quedan filas por confirmar.",
+  };
 }
