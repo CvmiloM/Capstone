@@ -2,7 +2,6 @@ targetScope = 'resourceGroup'
 
 // Brazil South es la intersección de las políticas de Duoc y Azure for Students.
 param location string = 'brazilsouth'
-param githubRepository string = 'CvmiloM/Capstone'
 
 var tags = { proyecto: 'CONVI', entorno: 'pruebas' }
 
@@ -49,7 +48,8 @@ resource federation 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedI
   name: 'github-convi-pruebas'
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:${githubRepository}:ref:refs/heads/main'
+    // GitHub incorpora IDs inmutables; deben coincidir exactamente con su token.
+    subject: 'repo:CvmiloM@135039204/Capstone@1349101566:ref:refs/heads/main'
     audiences: ['api://AzureADTokenExchange']
   }
 }

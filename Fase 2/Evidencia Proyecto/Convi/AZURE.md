@@ -1,8 +1,10 @@
 # PB-145: CONVI en Azure con HTTPS
 
-Estado: publicado con HTTPS y dominio propio, cierre en curso en
-`sebastian/pb-145`. Faltan las comprobaciones finales y el primer workflow real
-antes de marcar el backlog terminado. Git lo ejecuta Sebastian.
+Estado: publicado con HTTPS y dominio propio. PB-145 se fusionó en PR32,
+commit original `2897f73`, merge `8853de3`. Validación y publicación automáticas
+aprobadas en el segundo intento de Actions38871008073. Corrección persistente
+de OIDC en `sebastian/pb-145-oidc`; cierre de sesión explícito aún pendiente.
+Git lo ejecuta Sebastian.
 
 Base Azure creada y comprobada. Sebastian autorizó explícitamente transferir
 `SUPABASE_SECRET_KEY` y `SUPABASE_DB_URL` desde `.env.cloud` a los secretos de
@@ -49,8 +51,18 @@ desde web. SDK real dentro de la API comprobado: auth.admin.listUsers con una
 lectura mínima respondió200, sin imprimir cuentas. Sebastian repitió la invitación:
 correo recibido, enlace de activación aceptado, contraseña definida y entrada
 correcta en `https://convi.tech/profesor`. No se expusieron tokens ni contraseñas.
-Faltan logout publicado y primer workflow real después del commit/merge;
-no declarar terminado.
+Falta confirmar logout explícito publicado y fusionar la corrección persistente
+de OIDC antes de declarar el backlog terminado.
+
+La primera publicación automática pasó validación pero falló en azure/login con
+AADSTS700213: Azure esperaba el subject antiguo basado solo en nombres. GitHub
+envió `repo:CvmiloM@135039204/Capstone@1349101566:ref:refs/heads/main`, verificado
+contra los identificadores públicos del propietario y repositorio. Se actualizó
+la credencial federada existente, conservando issuer, audience, roles y restricción
+a main. El reintento de los jobs fallidos terminó success, sin repetir el merge.
+`infra/azure/base.bicep` conserva ahora ese subject exacto para evitar que una
+futura instalación restaure la configuración anterior. No cambiar a comodines
+ni añadir credenciales privadas en GitHub para resolver este error.
 
 El ingreso de ambas apps Express se deshabilitó, pero la API siguió atendiendo401
 y Azure devolvió InternalServerError al desactivar su revisión. La revisión
