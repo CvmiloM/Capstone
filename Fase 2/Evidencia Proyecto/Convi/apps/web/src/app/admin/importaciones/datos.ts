@@ -3,9 +3,10 @@ import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { obtenerContextoAdmin } from "../datos";
 import type { EstadoFila, TipoImportacion } from "./opciones";
 
-// PB-019 y PB-020 (HU-015): importaciones del portal de administración. Se
-// piden a la API desde el servidor de Next con el token de la sesión; la API
-// vuelve a comprobar el perfil ADMIN, el segundo factor y la escuela.
+// PB-019, PB-020 y PB-026 (HU-015 y HU-020): importaciones del portal de
+// administración. Se piden a la API desde el servidor de Next con el token de
+// la sesión; la API vuelve a comprobar el perfil ADMIN, el segundo factor y la
+// escuela.
 
 // Dentro de Docker, localhost no es la API: el .env apunta NEXT_PUBLIC_API_URL
 // a http://host.docker.internal:3001.
@@ -25,6 +26,8 @@ export type Importacion = {
   /** Fecha y hora ISO. */
   creado_en: string;
   creado_por: string;
+  /** Fecha y hora ISO; null mientras no esté Confirmada. */
+  confirmado_en: string | null;
   filas: number;
 };
 
@@ -42,6 +45,11 @@ export type FilaImportacion = {
   /** null mientras la fila no se haya revisado. */
   datos_normalizados: Record<string, string | boolean | null> | null;
   problemas: Problema[] | null;
+  /** Lo que creó o reutilizó la fila al confirmarla (HU-020 CA1). */
+  entidades_confirmadas: Record<
+    string,
+    { id: string; accion: "CREADO" | "REUTILIZADO" }
+  >;
 };
 
 export type CampoImportacion = {
@@ -93,10 +101,26 @@ export type Resultado =
   | { ok: true; id: string }
   | { ok: false; mensaje: string; errores?: Record<string, string> };
 
+/** Cuántas filas se confirmaron y cuántas no (PB-026). */
+export type ResumenConfirmacion = {
+  confirmadas: number;
+  con_error: number;
+  /** Profesores que quedaron sin invitar por el límite de correos. */
+  sin_enviar: number;
+};
+
+type Respuesta =
+  | { ok: true; datos: Record<string, unknown> }
+  | { ok: false; mensaje: string; errores?: Record<string, string> };
+
 const SIN_CONEXION =
   "No pudimos cargar el archivo. Inténtalo de nuevo en unos minutos.";
 const SIN_REVISION =
   "No pudimos revisar las filas. Inténtalo de nuevo en unos minutos.";
+const SIN_CONFIRMACION =
+  "No pudimos terminar de confirmar. Las filas que alcanzaron a guardarse quedan Confirmadas: recarga la página y vuelve a confirmar las que falten.";
+const SIN_OMISION =
+  "No pudimos omitir las filas. Inténtalo de nuevo en unos minutos.";
 
 async function tokenDeSesion() {
   const supabase = await crearClienteServidor();
@@ -164,55 +188,114 @@ export async function pedirPlantilla(tipo: string) {
 }
 
 /**
+ * Envía una acción a la API con JSON. Los errores se devuelven en vez de
+ * lanzarse, para mostrarlos en el formulario.
+ */
+async function enviarAccion(
+  ruta: string,
+  cuerpo: unknown,
+  sinConexion: string,
+  segundos: number,
+): Promise<Respuesta> {
+  const token = await tokenDeSesion();
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(`${URL_API}${ruta}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(cuerpo),
+      cache: "no-store",
+      signal: AbortSignal.timeout(segundos * 1000),
+    });
+  } catch {
+    return { ok: false, mensaje: sinConexion };
+  }
+  if (respuesta.status === 401) redirect("/login");
+
+  const datos = (await respuesta.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null;
+  if (respuesta.ok && datos) return { ok: true, datos };
+  if (respuesta.status === 400 && datos?.errores) {
+    return {
+      ok: false,
+      mensaje:
+        typeof datos.mensaje === "string"
+          ? datos.mensaje
+          : "Revisa los datos marcados.",
+      errores: datos.errores as Record<string, string>,
+    };
+  }
+  // 403, 404 y 409 (por ejemplo, otra persona cambió la importación al mismo
+  // tiempo): la API explica qué pasó.
+  if (
+    [403, 404, 409].includes(respuesta.status) &&
+    typeof datos?.message === "string"
+  ) {
+    return { ok: false, mensaje: datos.message };
+  }
+  return { ok: false, mensaje: sinConexion };
+}
+
+/**
  * PB-020 (HU-015 CA3 y CA4): guarda qué campo trae cada columna y las
- * opciones, y la API revisa todas las filas. Los errores se devuelven en vez
- * de lanzarse, para mostrarlos en el formulario.
+ * opciones, y la API revisa todas las filas.
  */
 export async function enviarRevision(
   id: string,
   revision: NuevaRevision,
 ): Promise<Resultado> {
-  const token = await tokenDeSesion();
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(
-      `${URL_API}/admin/importaciones/${encodeURIComponent(id)}/revision`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(revision),
-        cache: "no-store",
-        signal: AbortSignal.timeout(60000),
-      },
-    );
-  } catch {
-    return { ok: false, mensaje: SIN_REVISION };
-  }
-  if (respuesta.status === 401) redirect("/login");
+  const resultado = await enviarAccion(
+    `/admin/importaciones/${encodeURIComponent(id)}/revision`,
+    revision,
+    SIN_REVISION,
+    60,
+  );
+  return resultado.ok ? { ok: true, id } : resultado;
+}
 
-  const datos = (await respuesta.json().catch(() => null)) as {
-    id?: string;
-    mensaje?: string;
-    message?: string;
-    errores?: Record<string, string>;
-  } | null;
-  if (respuesta.ok && datos?.id) return { ok: true, id: datos.id };
-  if (respuesta.status === 400 && datos?.errores) {
-    return {
-      ok: false,
-      mensaje: datos.mensaje ?? "Revisa los datos marcados.",
-      errores: datos.errores,
-    };
-  }
-  // 403, 404 y 409 (por ejemplo, otra persona la revisó al mismo tiempo): la
-  // API explica qué pasó.
-  if ([403, 404, 409].includes(respuesta.status) && datos?.message) {
-    return { ok: false, mensaje: datos.message };
-  }
-  return { ok: false, mensaje: SIN_REVISION };
+/**
+ * PB-026 (HU-020): confirma las filas Válidas y, si se pide, las Con
+ * advertencia. Un archivo grande puede tardar cerca de un minuto.
+ */
+export async function enviarConfirmacion(
+  id: string,
+  incluirAdvertencias: boolean,
+): Promise<
+  | { ok: true; estado: string; confirmacion: ResumenConfirmacion }
+  | { ok: false; mensaje: string }
+> {
+  const resultado = await enviarAccion(
+    `/admin/importaciones/${encodeURIComponent(id)}/confirmacion`,
+    { incluir_advertencias: incluirAdvertencias },
+    SIN_CONFIRMACION,
+    180,
+  );
+  if (!resultado.ok) return resultado;
+  return {
+    ok: true,
+    estado: String(resultado.datos.estado),
+    confirmacion: resultado.datos.confirmacion as ResumenConfirmacion,
+  };
+}
+
+/** PB-026 (HU-020 CA5): marca Omitidas las filas Con error. */
+export async function enviarOmision(
+  id: string,
+): Promise<{ ok: true; estado: string } | { ok: false; mensaje: string }> {
+  const resultado = await enviarAccion(
+    `/admin/importaciones/${encodeURIComponent(id)}/omision`,
+    {},
+    SIN_OMISION,
+    60,
+  );
+  return resultado.ok
+    ? { ok: true, estado: String(resultado.datos.estado) }
+    : resultado;
 }
 
 /**

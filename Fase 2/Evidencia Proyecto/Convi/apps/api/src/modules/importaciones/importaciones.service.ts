@@ -11,13 +11,21 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
-import { texto } from '../academico/curso.js';
+import { objeto, texto } from '../academico/curso.js';
 import {
   CAMPOS,
   sugerirMapeo,
   USO_DEL_ANIO,
   type UsoDelAnio,
 } from './campos.js';
+import {
+  CONFIRMAR,
+  type Confirmacion,
+  type Entidades,
+  LimiteDeCorreos,
+  PRINCIPAL,
+  problemaDeError,
+} from './confirmacion.js';
 import { cargarContexto } from './contexto.js';
 import {
   type ArchivoSubido,
@@ -30,17 +38,20 @@ import {
 import { ArchivoNoValido, leerArchivo } from './lector.js';
 import { validarRevision } from './mapeo.js';
 import { crearPlantilla, nombreDePlantilla } from './plantilla.js';
-import { type Problema, revisarFilas } from './revision.js';
+import { type FilaRevisada, type Problema, revisarFilas } from './revision.js';
 import type { FormatoFecha, TratamientoDuplicado } from './valores.js';
 
-// PB-019 y PB-020 (HU-015): importaciones administrativas. Cargar guarda el
-// archivo en el espacio privado de Storage y cada fila, sin cambios, en
-// convi.filas_importacion; revisar relaciona las columnas con los campos de
-// CONVI y deja cada fila Válida, Con advertencia o Con error. CA5: nada se
-// guarda en las fichas hasta confirmar (PB-026).
+// PB-019, PB-020 y PB-026 (HU-015 y HU-020): importaciones administrativas.
+// Cargar guarda el archivo en el espacio privado de Storage y cada fila, sin
+// cambios, en convi.filas_importacion; revisar relaciona las columnas con los
+// campos de CONVI y deja cada fila Válida, Con advertencia o Con error; recién
+// confirmar guarda en las fichas las filas que se pueden confirmar.
 const PERFILES: Perfil[] = ['ADMIN'];
 const ESPACIO = 'convi-privado';
 const FILAS_POR_PAGINA = 50;
+// Cada tramo de la confirmación es una transacción; los profesores van de a
+// uno porque cada uno recibe su invitación por correo.
+const FILAS_POR_TRAMO = 200;
 const ESTADOS_FILA = [
   'PENDIENTE',
   'VALIDO',
@@ -51,7 +62,7 @@ const ESTADOS_FILA = [
 ] as const;
 type EstadoFila = (typeof ESTADOS_FILA)[number];
 
-/** Cliente de Supabase con la clave de servicio, solo para Storage. */
+/** Cliente de Supabase con la clave de servicio: Storage e invitaciones de profesores (PB-026). */
 export const SUPABASE_STORAGE = Symbol('SUPABASE_STORAGE');
 
 export type Importacion = {
@@ -64,6 +75,8 @@ export type Importacion = {
   /** Fecha y hora ISO. */
   creado_en: string;
   creado_por: string;
+  /** Fecha y hora ISO; null mientras no esté Confirmada. */
+  confirmado_en: string | null;
   filas: number;
 };
 
@@ -74,6 +87,8 @@ export type FilaImportacion = {
   /** null mientras la fila no se haya revisado. */
   datos_normalizados: Record<string, string | boolean | null> | null;
   problemas: Problema[] | null;
+  /** Lo que creó o reutilizó la fila al confirmarla (HU-020 CA1). */
+  entidades_confirmadas: Entidades;
 };
 
 export type DetalleImportacion = Importacion & {
@@ -111,10 +126,21 @@ export type DetalleImportacion = Importacion & {
 
 export type FiltroFilas = { estado: EstadoFila | null; pagina: number };
 
+export type ResultadoConfirmacion = DetalleImportacion & {
+  confirmacion: {
+    confirmadas: number;
+    /** Filas que no se pudieron confirmar: al volver a revisarlas o al guardarlas. */
+    con_error: number;
+    /** Profesores que quedaron sin invitar por el límite de correos. */
+    sin_enviar: number;
+  };
+};
+
 const COLUMNAS = `
   p.id, p.tipo_importacion, p.estado,
   a.nombre_original AS archivo_nombre, a.tamano_bytes::int AS archivo_bytes,
   p.creado_en, pe.nombres || ' ' || pe.apellidos AS creado_por,
+  p.confirmado_en,
   (SELECT count(*) FROM convi.filas_importacion f
     WHERE f.proceso_importacion_id = p.id)::int AS filas`;
 
@@ -355,16 +381,7 @@ export class ImportacionesService {
         contexto,
       );
 
-      // Todas las filas en una sola sentencia; los datos originales no cambian.
-      await db.query(
-        `UPDATE convi.filas_importacion f
-         SET estado = r.estado, datos_normalizados = r.datos,
-             problemas = r.problemas
-         FROM jsonb_to_recordset($2::jsonb)
-              AS r(numero int, estado text, datos jsonb, problemas jsonb)
-         WHERE f.proceso_importacion_id = $1 AND f.numero_fila = r.numero`,
-        [id, JSON.stringify(revisadas)],
-      );
+      await actualizarFilas(db, id, revisadas);
       // El cambio queda en la auditoría (convi.auditar_cambio).
       await db.query(
         `UPDATE convi.procesos_importacion
@@ -382,6 +399,144 @@ export class ImportacionesService {
           }),
         ],
       );
+      return buscar(db, id, { estado: null, pagina: 1 });
+    });
+  }
+
+  // PB-026 (HU-020): guarda en las fichas las filas Válidas y, si se pide, las
+  // Con advertencia. Primero las revisa de nuevo con lo que hay hoy en la
+  // escuela (CA4) y después las confirma por tramos, cada uno en su propia
+  // transacción: una fila que falla queda Con error y las demás siguen. Una
+  // fila Confirmada no se vuelve a procesar (CA2) y la importación queda
+  // Confirmada cuando ya no quedan filas por confirmar u omitir.
+  async confirmar(
+    sesion: Sesion,
+    id: string,
+    cuerpo: unknown,
+  ): Promise<ResultadoConfirmacion> {
+    const incluirAdvertencias = objeto(cuerpo).incluir_advertencias === true;
+
+    const { tipo, revision, confirmables, nuevosErrores } = await this.operar(
+      sesion,
+      async (db) => {
+        const proceso = await bloquear(db, id);
+        exigirRevision(proceso.estado, 'confirmar');
+        const tipo = proceso.tipo_importacion;
+        // Las mismas opciones de la última revisión.
+        const revision = validarRevision(
+          {
+            mapeo: proceso.mapeo,
+            anio_academico_id: proceso.opciones.anio_academico_id,
+            formato_fecha: proceso.opciones.formato_fecha,
+            duplicados: proceso.opciones.duplicados,
+          },
+          tipo,
+          proceso.columnas,
+        );
+        const contexto = await cargarContexto(
+          db,
+          tipo,
+          revision.anio_academico_id,
+        );
+        const filas = await db.query<{
+          numero_fila: number;
+          datos_originales: Record<string, string>;
+          estado: EstadoFila;
+        }>(
+          `SELECT numero_fila, datos_originales, estado
+           FROM convi.filas_importacion
+           WHERE proceso_importacion_id = $1
+           ORDER BY numero_fila`,
+          [id],
+        );
+        const antes = new Map(filas.rows.map((f) => [f.numero_fila, f.estado]));
+        // Las confirmadas y las omitidas ya no cambian.
+        const abiertas = revisarFilas(
+          tipo,
+          filas.rows,
+          proceso.columnas,
+          revision,
+          contexto,
+        ).filter(
+          (f) => !['CONFIRMADO', 'OMITIDO'].includes(antes.get(f.numero) ?? ''),
+        );
+        await actualizarFilas(db, id, abiertas);
+        return {
+          tipo,
+          revision,
+          confirmables: abiertas
+            .filter(
+              (f) =>
+                f.estado === 'VALIDO' ||
+                (incluirAdvertencias && f.estado === 'ADVERTENCIA'),
+            )
+            .map((f) => f.numero),
+          nuevosErrores: abiertas.filter(
+            (f) => f.estado === 'ERROR' && antes.get(f.numero) !== 'ERROR',
+          ).length,
+        };
+      },
+    );
+
+    let confirmadas = 0;
+    let fallidas = 0;
+    let sinEnviar = 0;
+    const tamano = tipo === 'PROFESORES' ? 1 : FILAS_POR_TRAMO;
+    for (let i = 0; i < confirmables.length; i += tamano) {
+      const tramo = confirmables.slice(i, i + tamano);
+      const resultado = await this.operar(sesion, (db) =>
+        confirmarTramo(
+          {
+            db,
+            supabase: this.supabase,
+            anioId: revision.anio_academico_id,
+            duplicados: revision.duplicados,
+            memoria: new Map(),
+          },
+          id,
+          tipo,
+          tramo,
+        ),
+      );
+      confirmadas += resultado.confirmadas;
+      fallidas += resultado.fallidas;
+      if (resultado.limite) {
+        sinEnviar =
+          confirmables.length -
+          (i + resultado.confirmadas + resultado.fallidas);
+        break;
+      }
+    }
+
+    const detalle = await this.operar(sesion, async (db) => {
+      await bloquear(db, id);
+      await cerrarSiCorresponde(db, id);
+      return buscar(db, id, { estado: null, pagina: 1 });
+    });
+    return {
+      ...detalle,
+      confirmacion: {
+        confirmadas,
+        con_error: nuevosErrores + fallidas,
+        sin_enviar: sinEnviar,
+      },
+    };
+  }
+
+  // PB-026 (HU-020 CA5): las filas Con error se marcan Omitidas y no se
+  // importan. Si ya no quedan filas abiertas, la importación queda Confirmada.
+  omitir(sesion: Sesion, id: string): Promise<DetalleImportacion> {
+    return this.operar(sesion, async (db) => {
+      const proceso = await bloquear(db, id);
+      exigirRevision(proceso.estado, 'omitir filas');
+      const omitidas = await db.query(
+        `UPDATE convi.filas_importacion SET estado = 'OMITIDO'
+         WHERE proceso_importacion_id = $1 AND estado = 'ERROR'`,
+        [id],
+      );
+      if (!omitidas.rowCount)
+        throw new ConflictException('No hay filas con error para omitir.');
+      await cerrarSiCorresponde(db, id);
       return buscar(db, id, { estado: null, pagina: 1 });
     });
   }
@@ -452,7 +607,7 @@ async function buscar(
   const numero = Math.min(filtro.pagina, paginas);
   const muestra = await db.query<FilaImportacion>(
     `SELECT numero_fila, estado, datos_originales, datos_normalizados,
-            problemas
+            problemas, entidades_confirmadas
      FROM convi.filas_importacion
      WHERE proceso_importacion_id = $1
        AND ($2::text IS NULL OR estado = $2)
@@ -491,4 +646,140 @@ async function buscar(
     pagina: { estado: filtro.estado, numero, filas, paginas },
     muestra: muestra.rows,
   };
+}
+
+/** Todas las filas revisadas en una sola sentencia; los datos originales no cambian. */
+async function actualizarFilas(
+  db: PoolClient,
+  id: string,
+  revisadas: FilaRevisada[],
+) {
+  await db.query(
+    `UPDATE convi.filas_importacion f
+     SET estado = r.estado, datos_normalizados = r.datos,
+         problemas = r.problemas
+     FROM jsonb_to_recordset($2::jsonb)
+          AS r(numero int, estado text, datos jsonb, problemas jsonb)
+     WHERE f.proceso_importacion_id = $1 AND f.numero_fila = r.numero`,
+    [id, JSON.stringify(revisadas)],
+  );
+}
+
+/**
+ * "Toca" la importación: si otra persona la revisa, confirma u omite al
+ * mismo tiempo, una de las dos operaciones recibe 40001 en vez de mezclarlas.
+ * No cambia nada ni deja auditoría.
+ */
+async function bloquear(db: PoolClient, id: string) {
+  const proceso = await db.query<{
+    tipo_importacion: TipoImportacion;
+    estado: string;
+    columnas: string[];
+    mapeo: Record<string, string>;
+    opciones: Record<string, unknown>;
+  }>(
+    `UPDATE convi.procesos_importacion SET estado = estado
+     WHERE id = $1
+     RETURNING tipo_importacion, estado,
+               coalesce(opciones_importacion->'columnas', '[]'::jsonb) AS columnas,
+               mapeo_columnas AS mapeo, opciones_importacion AS opciones`,
+    [id],
+  );
+  if (proceso.rows.length === 0)
+    throw new NotFoundException('No encontramos esa importación.');
+  return proceso.rows[0];
+}
+
+function exigirRevision(estado: string, accion: string) {
+  if (estado === 'CARGADO')
+    throw new ConflictException(`Revisa las filas antes de ${accion}.`);
+  if (estado !== 'REVISION')
+    throw new ConflictException(
+      `La importación está ${NOMBRE_ESTADO[estado] ?? estado.toLowerCase()}: ya no se puede ${accion}.`,
+    );
+}
+
+/** HU-020 CA5: Confirmada, con su fecha, solo si todas sus filas están confirmadas u omitidas. */
+async function cerrarSiCorresponde(db: PoolClient, id: string) {
+  await db.query(
+    `UPDATE convi.procesos_importacion
+     SET estado = 'CONFIRMADO', confirmado_en = now()
+     WHERE id = $1 AND estado = 'REVISION'
+       AND NOT EXISTS (SELECT 1 FROM convi.filas_importacion
+                       WHERE proceso_importacion_id = $1
+                         AND estado NOT IN ('CONFIRMADO', 'OMITIDO'))`,
+    [id],
+  );
+}
+
+/**
+ * Un tramo de filas en una transacción. Cada fila tiene su punto de guardado:
+ * si no se puede confirmar, se deshace solo lo suyo y queda Con error.
+ */
+async function confirmarTramo(
+  c: Confirmacion,
+  id: string,
+  tipo: TipoImportacion,
+  numeros: number[],
+) {
+  const { db } = c;
+  // CA4: si la importación cambió de estado mientras tanto, no se crea nada.
+  const proceso = await bloquear(db, id);
+  exigirRevision(proceso.estado, 'confirmar');
+  const filas = await db.query<{
+    id: string;
+    estado: EstadoFila;
+    datos_normalizados: Record<string, string | boolean | null> | null;
+  }>(
+    `SELECT id, estado, datos_normalizados
+     FROM convi.filas_importacion
+     WHERE proceso_importacion_id = $1 AND numero_fila = ANY($2::int[])
+     ORDER BY numero_fila
+     FOR UPDATE`,
+    [id, numeros],
+  );
+  const resultado = { confirmadas: 0, fallidas: 0, limite: false };
+  const confirmadas: { id: string; entidades: Entidades; principal: string }[] =
+    [];
+  for (const fila of filas.rows) {
+    // Otra persona pudo confirmarla u omitirla entre la revisión y este tramo.
+    if (fila.estado !== 'VALIDO' && fila.estado !== 'ADVERTENCIA') continue;
+    await db.query('SAVEPOINT fila');
+    try {
+      const entidades = await CONFIRMAR[tipo](c, fila.datos_normalizados ?? {});
+      await db.query('RELEASE SAVEPOINT fila');
+      confirmadas.push({
+        id: fila.id,
+        entidades,
+        principal: entidades[PRINCIPAL[tipo]].id,
+      });
+    } catch (error) {
+      await db.query('ROLLBACK TO SAVEPOINT fila');
+      if (error instanceof LimiteDeCorreos) {
+        resultado.limite = true;
+        break;
+      }
+      const problema = problemaDeError(error);
+      if (!problema) throw error;
+      await db.query(
+        `UPDATE convi.filas_importacion
+         SET estado = 'ERROR',
+             problemas = coalesce(problemas, '[]'::jsonb) || $2::jsonb
+         WHERE id = $1`,
+        [fila.id, JSON.stringify([problema])],
+      );
+      resultado.fallidas++;
+    }
+  }
+  // Las confirmadas del tramo, en una sola sentencia (CA1: qué creó o reutilizó).
+  await db.query(
+    `UPDATE convi.filas_importacion f
+     SET estado = 'CONFIRMADO', entidades_confirmadas = r.entidades,
+         entidad_confirmada_id = r.principal
+     FROM jsonb_to_recordset($1::jsonb) AS r(id uuid, entidades jsonb, principal uuid)
+     WHERE f.id = r.id`,
+    [JSON.stringify(confirmadas)],
+  );
+  resultado.confirmadas = confirmadas.length;
+  return resultado;
 }
