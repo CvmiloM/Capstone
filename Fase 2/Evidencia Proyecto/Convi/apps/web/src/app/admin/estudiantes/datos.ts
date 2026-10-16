@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
-import { obtenerContextoAdmin } from "../datos";
+import { pedirAdmin } from "../datos";
 
 // PB-017 y PB-018 (HU-014): estudiantes y matrículas del portal de
 // administración. Se piden a la API desde el servidor de Next con el token de
@@ -86,14 +86,7 @@ async function tokenDeSesion() {
 // Lecturas: 400 y 404 se devuelven como null (un id que no es de la escuela no
 // aparece); cualquier otro error lo muestra error.tsx con su botón de reintentar.
 async function pedir<T>(ruta: string): Promise<T | null> {
-  // Misma comprobación de acceso que el resto del portal.
-  await obtenerContextoAdmin();
-  const token = await tokenDeSesion();
-  const respuesta = await fetch(`${URL_API}${ruta}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (respuesta.status === 401) redirect("/login");
+  const respuesta = await pedirAdmin(ruta);
   if (respuesta.status === 400 || respuesta.status === 404) return null;
   if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
   return (await respuesta.json()) as T;

@@ -24,6 +24,24 @@ const URL_API =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:3001";
 
+// Cada endpoint ADMIN comprueba cuenta, escuela y MFA antes de entregar datos.
+// Consultar el encabezado primero solo encadenaría dos operaciones independientes.
+export async function pedirAdmin(ruta: string, espera = 10000) {
+  const supabase = await crearClienteServidor();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) redirect("/login");
+  const respuesta = await fetch(`${URL_API}${ruta}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(espera),
+  });
+  if (respuesta.status === 401) redirect("/login");
+  // Solo si se rechazó el acceso necesitamos distinguir perfil, suspensión y MFA.
+  if (respuesta.status === 403) await comprobarAdministrador();
+  return respuesta;
+}
+
 // Datos del portal de administración. El contexto ya viene de la API; el
 // resumen todavía devuelve datos de ejemplo (marcado con TODO).
 // Los comentarios indican de qué tablas del modelo de datos sale cada campo.
@@ -47,18 +65,8 @@ export type ContextoAdmin = {
 // cache() hace que el layout y la página compartan la misma respuesta cuando
 // ambos piden el contexto durante una misma solicitud.
 export const obtenerContextoAdmin = cache(async (): Promise<ContextoAdmin> => {
-  await comprobarAdministrador();
-  const supabase = await crearClienteServidor();
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) redirect("/login");
   // La API toma la escuela y la persona de la sesión, nunca del navegador.
-  const respuesta = await fetch(`${URL_API}/admin/contexto`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-    signal: AbortSignal.timeout(10000),
-  });
-  if (respuesta.status === 401) redirect("/login");
+  const respuesta = await pedirAdmin("/admin/contexto");
   if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
   // Misma forma que devuelve apps/api/src/modules/admin/contexto.service.ts.
   const contexto = (await respuesta.json()) as {

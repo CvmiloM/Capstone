@@ -43,18 +43,21 @@ const COLUMNAS = `
   (SELECT count(*) FROM convi.cursos c
     WHERE c.nivel_id = n.id)::int AS cursos`;
 
+// Reutilizable dentro de una operación autorizada, sin abrir otra transacción.
+export async function consultarNiveles(db: PoolClient) {
+  const resultado = await db.query<NivelEducativo>(
+    `SELECT ${COLUMNAS} FROM convi.niveles_educativos n ORDER BY n.orden`,
+  );
+  return resultado.rows;
+}
+
 @Injectable()
 export class NivelesService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
   // En el orden que definió la escuela.
   listar(sesion: Sesion): Promise<NivelEducativo[]> {
-    return this.operar(sesion, async (db) => {
-      const resultado = await db.query<NivelEducativo>(
-        `SELECT ${COLUMNAS} FROM convi.niveles_educativos n ORDER BY n.orden`,
-      );
-      return resultado.rows;
-    });
+    return this.operar(sesion, consultarNiveles);
   }
 
   // Un nivel nuevo queda activo y se puede usar de inmediato en cursos nuevos.

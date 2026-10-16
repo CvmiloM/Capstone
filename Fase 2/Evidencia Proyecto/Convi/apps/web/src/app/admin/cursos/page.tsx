@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { claseEnlace, Encabezado } from "@/app/components/formulario";
-import { NOMBRE_ESTADO, obtenerAnios } from "../anios/datos";
-import { obtenerNiveles } from "../niveles/datos";
-import { obtenerCursos } from "./datos";
+import { NOMBRE_ESTADO } from "../anios/datos";
+import { obtenerVistaCursos } from "./datos";
 import { FormularioCurso } from "./formulario-curso";
 import { ANIOS_EDITABLES } from "./opciones";
 
@@ -16,13 +15,10 @@ export default async function PaginaCursos({
 }: {
   searchParams: Promise<{ anio?: string }>;
 }) {
-  const [{ anio: anioPedido }, anios, niveles] = await Promise.all([
-    searchParams,
-    obtenerAnios(),
-    obtenerNiveles(),
-  ]);
+  const { anio: anioPedido } = await searchParams;
+  const { anios, niveles, anio, cursos } = await obtenerVistaCursos(anioPedido);
 
-  if (anios.length === 0) {
+  if (!anio) {
     return (
       <>
         <Encabezado titulo="Cursos" />
@@ -37,11 +33,6 @@ export default async function PaginaCursos({
     );
   }
 
-  const anio =
-    anios.find((a) => a.id === anioPedido) ??
-    anios.find((a) => a.estado === "ACTIVO") ??
-    anios[0];
-  const cursos = await obtenerCursos(anio.id);
   const editable = ANIOS_EDITABLES.includes(anio.estado);
   const nivelesActivos = niveles.filter((nivel) => nivel.activo);
 

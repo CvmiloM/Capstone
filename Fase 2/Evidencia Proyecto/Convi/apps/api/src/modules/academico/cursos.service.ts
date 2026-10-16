@@ -7,6 +7,8 @@ import {
 import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import { consultarAnios } from './anios.service.js';
+import { consultarNiveles } from './niveles.service.js';
 import {
   type Asignacion,
   COLUMNAS_ASIGNACION,
@@ -80,9 +82,34 @@ const DESDE = `
   JOIN convi.anios_academicos an ON an.id = c.anio_academico_id
   JOIN convi.niveles_educativos n ON n.id = c.nivel_id`;
 
+async function consultarCursos(db: PoolClient, anioId: string) {
+  const resultado = await db.query<Curso>(
+    `SELECT ${COLUMNAS} ${DESDE}
+     WHERE c.anio_academico_id = $1
+     ORDER BY n.orden, c.codigo`,
+    [anioId],
+  );
+  return resultado.rows;
+}
+
 @Injectable()
 export class CursosService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
+
+  // Una carga de pantalla: misma autorización, conexión y fotografía de la escuela.
+  vista(sesion: Sesion, anioPedido: unknown) {
+    return this.operar(sesion, async (db) => {
+      const anios = await consultarAnios(db);
+      const anio =
+        anios.find((a) => a.id === anioPedido) ??
+        anios.find((a) => a.estado === 'ACTIVO') ??
+        anios[0] ??
+        null;
+      const niveles = anio ? await consultarNiveles(db) : [];
+      const cursos = anio ? await consultarCursos(db, anio.id) : [];
+      return { anios, anio, niveles, cursos };
+    });
+  }
 
   // Cursos de un año, en el orden de sus niveles y por código.
   listar(sesion: Sesion, anioId: unknown): Promise<Curso[]> {
@@ -92,15 +119,7 @@ export class CursosService {
         { anio: 'Elige un año académico.' },
         'Indica de qué año quieres ver los cursos.',
       );
-    return this.operar(sesion, async (db) => {
-      const resultado = await db.query<Curso>(
-        `SELECT ${COLUMNAS} ${DESDE}
-         WHERE c.anio_academico_id = $1
-         ORDER BY n.orden, c.codigo`,
-        [anio],
-      );
-      return resultado.rows;
-    });
+    return this.operar(sesion, (db) => consultarCursos(db, anio));
   }
 
   // El curso con todas sus asignaciones, primero las vigentes.

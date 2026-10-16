@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
-import { obtenerContextoAdmin } from "../datos";
+import { pedirAdmin } from "../datos";
 
 // PB-013 (HU-011): años académicos del portal de administración. Se piden a la
 // API desde el servidor de Next con el token de la sesión; la API vuelve a
@@ -51,15 +51,7 @@ async function tokenDeSesion() {
 
 /** Años de la escuela de la sesión, del más reciente al más antiguo. */
 export async function obtenerAnios(): Promise<AnioAcademico[]> {
-  // Misma comprobación de acceso que el resto del portal: sin sesión, sin
-  // perfil ADMIN o sin segundo factor, redirige antes de pedir los datos.
-  await obtenerContextoAdmin();
-  const token = await tokenDeSesion();
-  const respuesta = await fetch(`${URL_API}/admin/anios`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (respuesta.status === 401) redirect("/login");
+  const respuesta = await pedirAdmin("/admin/anios");
   // Cualquier otro error lo muestra error.tsx con su botón de reintentar.
   if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
   return (await respuesta.json()) as AnioAcademico[];

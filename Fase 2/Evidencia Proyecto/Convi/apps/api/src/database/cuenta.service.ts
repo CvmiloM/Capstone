@@ -56,8 +56,9 @@ export class CuentaService implements OnModuleDestroy {
     let descartarConexion = false;
     try {
       // READ COMMITTED deja que un reintento vea la escuela creada mientras esperaba el bloqueo.
-      await cliente.query('BEGIN ISOLATION LEVEL READ COMMITTED');
-      await cliente.query('SET LOCAL ROLE convi_registro');
+      await cliente.query(
+        'BEGIN ISOLATION LEVEL READ COMMITTED; SET LOCAL ROLE convi_registro',
+      );
       await cliente.query(
         `SELECT set_config('app.auth_usuario_id', $1, true),
                 set_config('app.aal', $2, true),
@@ -177,12 +178,12 @@ export class CuentaService implements OnModuleDestroy {
     let descartarConexion = false;
     try {
       // El permiso y el trabajo deben ver los mismos datos durante toda la operación.
+      // Las instrucciones fijas comparten un viaje; los datos siguen parametrizados.
       await cliente.query(
         soloLectura
-          ? 'BEGIN READ ONLY'
-          : 'BEGIN ISOLATION LEVEL REPEATABLE READ',
+          ? 'BEGIN READ ONLY; SET LOCAL ROLE convi_backend'
+          : 'BEGIN ISOLATION LEVEL REPEATABLE READ; SET LOCAL ROLE convi_backend',
       );
-      await cliente.query('SET LOCAL ROLE convi_backend');
       await cliente.query(
         `SELECT set_config('app.auth_usuario_id', $1, true),
                 set_config('app.aal', $2, true),

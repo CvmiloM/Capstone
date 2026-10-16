@@ -50,6 +50,14 @@ const COLUMNAS = `
   (SELECT count(*) FROM convi.cursos c
     WHERE c.anio_academico_id = a.id)::int AS cursos`;
 
+// El cliente recibido ya debe tener la escuela y los permisos de la operación.
+export async function consultarAnios(db: PoolClient) {
+  const resultado = await db.query<AnioAcademico>(
+    `SELECT ${COLUMNAS} FROM convi.anios_academicos a ORDER BY a.anio DESC`,
+  );
+  return resultado.rows;
+}
+
 function yaHayActivo(anio?: number) {
   return new ConflictException(
     `Ya hay un año activo${anio ? ` (${anio})` : ''}. Ciérralo antes de activar otro.`,
@@ -62,12 +70,7 @@ export class AniosService {
 
   // Del más reciente al más antiguo.
   listar(sesion: Sesion): Promise<AnioAcademico[]> {
-    return this.operar(sesion, async (db) => {
-      const resultado = await db.query<AnioAcademico>(
-        `SELECT ${COLUMNAS} FROM convi.anios_academicos a ORDER BY a.anio DESC`,
-      );
-      return resultado.rows;
-    });
+    return this.operar(sesion, consultarAnios);
   }
 
   // CA3: un año nuevo siempre parte Planificado, aunque el cuerpo diga otra cosa.

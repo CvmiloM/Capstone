@@ -33,6 +33,12 @@ export class CursosController {
     return this.cursos.listar(peticion.sesion, anio);
   }
 
+  // Antes de :id para que "vista" no se interprete como un UUID de curso.
+  @Get('vista')
+  vista(@Req() peticion: PeticionConSesion, @Query('anio') anio: unknown) {
+    return this.cursos.vista(peticion.sesion, anio);
+  }
+
   // El cuerpo se valida en el servicio; la respuesta 201 trae el curso creado.
   @Post()
   crear(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
