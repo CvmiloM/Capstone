@@ -119,6 +119,13 @@ export class CuentaService implements OnModuleDestroy {
                 set_config('app.establecimiento_id', $2, true)`,
         [cuenta.membresia_id, cuenta.establecimiento_id],
       );
+      // current_date y los permisos del modelo usan el día de esta escuela, no UTC.
+      // LOCAL evita que su zona horaria pase al siguiente usuario del pool.
+      await cliente.query(
+        `SELECT set_config('TimeZone', e.zona_horaria, true)
+         FROM convi.establecimientos e WHERE e.id = $1`,
+        [cuenta.establecimiento_id],
+      );
       // Una suspensión de la cuenta o escuela espera a que termine esta operación.
       const vigente = await cliente.query(
         `SELECT m.id FROM convi.membresias_establecimiento m

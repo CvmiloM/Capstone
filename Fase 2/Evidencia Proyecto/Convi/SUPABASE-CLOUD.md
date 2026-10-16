@@ -27,11 +27,14 @@ Para arrancar con cloud, después de completar `.env.cloud`:
 .\scripts\iniciar.ps1 -Entorno Cloud
 ```
 
-Se usan los mismos contenedores de web y API: el arranque Cloud siempre los
-recrea para cargar el código recibido y su configuración, sin borrar volúmenes.
-No permite trabajar
-con ambas bases a la vez desde esos mismos contenedores. `-Build` solo hace
-falta si cambian la imagen o sus dependencias, no por cambiar las URL.
+Se usan los mismos contenedores de web y API: el arranque detiene ambas
+aplicaciones, sincroniza las dependencias con `pnpm-lock.yaml` y las recrea
+para cargar el código recibido y su configuración, sin borrar volúmenes.
+Esto también se hace en Local, usando el almacén pnpm que ya tiene Docker.
+Si falla la instalación, el script se detiene e indica que hay que reintentarlo.
+No permite trabajar con ambas bases a la vez desde esos mismos contenedores.
+`-Build` reconstruye la imagen cuando cambia `Dockerfile.dev` o sus herramientas,
+no hace falta solo por recibir dependencias nuevas o cambiar las URL.
 
 ## Configuración privada
 
@@ -91,6 +94,11 @@ La CLI se vincula al proyecto con `supabase link --project-ref`; comprobar
 `db push --dry-run` antes de `db push`. Mantener la versión 2.117.0 del equipo.
 Las migraciones no copian cuentas ni datos locales y no configuran correos.
 No usar `db reset` sobre el proyecto cloud ni modificar su historial a mano.
+
+La migración `20261015205734_espacio_privado_archivos.sql` crea el bucket
+`convi-privado` de Storage, privado y con límite de 25 MB. Ya está aplicada en
+el proyecto cloud compartido, sus archivos no quedan públicos ni se copian
+desde la base local. La carga administrativa conserva su límite de 5 MB.
 
 En Auth comprobar correo obligatorio, contraseña mínima de ocho caracteres,
 TOTP habilitado y las plantillas del repositorio. La confirmación debe llevar
@@ -182,9 +190,10 @@ otro QR. Una consulta de solo lectura confirmó correo verificado, membresía
 ADMIN activa, escuela activa, ficha vinculada a la misma escuela y un TOTP
 verificado. La cuenta creada se conserva; no se eliminó ni se cambió su clave.
 
-El panel Admin todavía muestra "Liceo Bicentenario Los Aromos" y "Manuel Reyes"
-como datos de ejemplo en `apps/web/src/app/admin/datos.ts`. Eso no cambia la
-escuela real de la cuenta. Conectar esos textos conserva su tarea de HU-033.
+En la preparación inicial, el encabezado Admin usaba una escuela y persona de
+ejemplo. Fernando ya conectó ese encabezado a la cuenta y escuela reales.
+Las cifras del resumen administrativo todavía conservan datos de ejemplo y
+su integración continúa en HU-033.
 
 La preparación cloud quedó validada y lista para el commit de Sebastian.
 La integración siguiente completa el ajuste de PB-004/PB-002. El cierre de
@@ -247,3 +256,55 @@ los demás integrantes solo necesitan traer el código actualizado.
 
 En local la plantilla se aplica desde `supabase/config.toml` al reiniciar
 Supabase local, no requiere migraciones ni cambia las tablas.
+
+## Correcciones de integración: PB-135, avance 4
+
+El arranque sincroniza las dependencias de los volúmenes antes de iniciar web
+y API, con versiones del lockfile y sin borrar datos. La migración de Storage
+ya está aplicada en cloud, los integrantes no deben crear otro bucket público.
+
+Las operaciones de `CuentaService.operar` fijan la zona horaria de la escuela
+en su propia transacción. Así, `current_date` en permisos, cursos y asignaciones
+usa el día escolar aunque PostgreSQL esté configurado en UTC. Al confirmar o
+revertir, esa zona termina con la transacción, no cambia el servidor ni el pool.
+Las tareas futuras que consulten la base fuera de este servicio deben fijar
+también el contexto de escuela y su zona, nunca asumir el día UTC.
+
+Asignar un profesor también actualiza la versión de la fila del curso sin
+cambiar sus datos, siguiendo el mecanismo de matrículas. En REPEATABLE READ,
+una petición concurrente con una lectura anterior recibe conflicto y debe
+reintentarse, en vez de guardar dos profesores jefe en las mismas fechas.
+El año cerrado conserva su rechazo y una fila sin cambios no genera auditoría.
+
+La lectura CSV/XLSX conserva todas las columnas aunque se repitan títulos,
+aparezcan sufijos como `A (2)` o nombres como `__proto__`. Los archivos con
+títulos distintos conservan sus nombres y las filas siguen siendo datos
+originales, no fichas creadas.
+
+Si Storage acepta un archivo pero falla una operación SQL posterior, la API
+consulta en otra transacción si el archivo quedó registrado antes de borrarlo.
+Un COMMIT confirmado en la base conserva el archivo aunque se pierda su respuesta
+de red. Si la consulta o la limpieza no están disponibles, conserva el archivo
+y registra un aviso sin datos personales ni credenciales, requiere conciliación
+posterior. No hay una transacción distribuida entre PostgreSQL y Storage.
+
+Verificación: compilación y lint de API, 32 pruebas existentes, 21 comprobaciones
+aisladas de archivos, errores de Storage/SQL, contexto y asignaciones, más ocho
+comprobaciones del script con Docker simulado. La concurrencia se reprodujo en
+PostgreSQL local con tablas de prueba aisladas y retiradas al terminar, también
+se comprobó el cambio de día y la restauración de la zona horaria. El arranque
+Cloud se ejecutó con los contenedores reales y el lockfile ya sincronizado.
+Las pruebas auxiliares se guardan fuera del repositorio, este avance no añade
+archivos de prueba, dependencias, pantallas ni migraciones nuevas.
+
+La integración con PB-020 conserva sus campos, plantillas, mapeo, revisión,
+filtros, paginación y traducción de conflictos, junto con la compensación de
+Storage en la carga. La respuesta de carga usa también la página inicial de
+PB-020. Los títulos repetidos mantienen un solo sufijo numérico, como
+`Apellidos (2)`, para conservar el reconocimiento automático de sus campos.
+Tras combinar ambos trabajos pasaron 22 comprobaciones de las correcciones
+y 15 de PB-020: las seis plantillas XLSX, carga y revisión reales en PostgreSQL
+local, filtro de errores, segunda revisión, conservación de datos originales
+y ausencia de fichas creadas, con reversión de toda la importación de prueba.
+La descarga desde el navegador no quedó confirmada por el tiempo de espera
+de la herramienta, no se considera una prueba de descarga manual aprobada.

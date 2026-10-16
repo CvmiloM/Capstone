@@ -5,6 +5,23 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Reconstruir la imagen no actualiza node_modules en los volúmenes existentes.
+# Sincronizar siempre el lockfile, con ambas aplicaciones detenidas para que
+# no lean dependencias mientras pnpm las reemplaza. No se borran volúmenes.
+function Iniciar-Aplicaciones {
+    param([string[]]$ComposeArguments = @())
+    if ($Build) {
+        & docker compose @ComposeArguments build
+        if ($LASTEXITCODE -ne 0) { throw 'Fallo la construccion de las imagenes de CONVI.' }
+    }
+    & docker compose @ComposeArguments stop api web
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudieron detener las aplicaciones para sincronizar sus dependencias.' }
+    & docker compose @ComposeArguments run --rm --no-deps -T -e CI=true api corepack pnpm install --frozen-lockfile --store-dir /root/.local/share/pnpm/store
+    if ($LASTEXITCODE -ne 0) { throw 'Fallo la instalacion de dependencias del lockfile. Revisa la conexion y vuelve a ejecutar el arranque.' }
+    & docker compose @ComposeArguments up -d --force-recreate
+    if ($LASTEXITCODE -ne 0) { throw 'Fallo el inicio de las aplicaciones de CONVI.' }
+}
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $projectRoot
 try {
@@ -46,11 +63,7 @@ try {
         if ($dbUrl.Scheme -notin @('postgres', 'postgresql') -or $dbUrl.Host -notmatch '\.supabase\.(co|com)$' -or $dbUrl.Query -notmatch '(?:[?&])sslmode=verify-full(?:&|$)') {
             throw 'La conexion cloud debe apuntar a Supabase y usar sslmode=verify-full.'
         }
-        # Cargar tambien las rutas nuevas del pull, aunque no hayan cambiado las variables.
-        $cloudArguments = @('compose', '--env-file', '.env.cloud', 'up', '-d', '--force-recreate')
-        if ($Build) { $cloudArguments += '--build' }
-        & docker @cloudArguments
-        if ($LASTEXITCODE -ne 0) { throw 'Fallo el inicio de CONVI con Supabase cloud.' }
+        Iniciar-Aplicaciones -ComposeArguments @('--env-file', '.env.cloud')
         Write-Host 'CONVI con Supabase cloud iniciado. Las claves y los datos locales se conservan.'
         return
     }
@@ -122,12 +135,7 @@ try {
     [System.IO.File]::WriteAllText($envPath, ($envLines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
 
     Write-Host '[4/4] Iniciando frontend y API...'
-    if ($Build) {
-        & docker compose up --build -d
-    } else {
-        & docker compose up -d
-    }
-    if ($LASTEXITCODE -ne 0) { throw 'Fallo Docker Compose. Revisa la salida anterior.' }
+    Iniciar-Aplicaciones
     Write-Host ''
     Write-Host 'CONVI: http://localhost:3000 | API: http://localhost:3001 | Studio: http://localhost:54323'
     Write-Host 'Para revisar los contenedores: docker compose ps'

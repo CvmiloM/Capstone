@@ -62,8 +62,10 @@ export async function leerArchivo(
       columnas = titulos(valores);
       return;
     }
-    const datos: Record<string, string> = {};
-    columnas.forEach((columna, i) => (datos[columna] = valores[i] ?? ''));
+    // fromEntries conserva incluso un título como __proto__ como dato propio.
+    const datos = Object.fromEntries(
+      columnas.map((columna, i) => [columna, valores[i] ?? '']),
+    );
     filas.push({ numero, datos });
   });
 
@@ -103,12 +105,17 @@ function separador(texto: string) {
 
 // Títulos sin repetir y sin vacíos, para usarlos como claves de cada fila.
 function titulos(valores: string[]) {
-  const usados = new Map<string, number>();
+  const usados = new Set<string>();
   return valores.map((valor, i) => {
     const base = valor.slice(0, 100) || `Columna ${i + 1}`;
-    const veces = (usados.get(base) ?? 0) + 1;
-    usados.set(base, veces);
-    return veces === 1 ? base : `${base} (${veces})`;
+    let titulo = base;
+    let veces = 1;
+    // El sufijo también puede venir en el archivo: A, A, A (2) no debe perder una celda.
+    // Mantener un solo sufijo numérico para que PB-020 reconozca el campo.
+    const raiz = base.replace(/ \(\d+\)$/, '');
+    while (usados.has(titulo)) titulo = `${raiz} (${++veces})`;
+    usados.add(titulo);
+    return titulo;
   });
 }
 
