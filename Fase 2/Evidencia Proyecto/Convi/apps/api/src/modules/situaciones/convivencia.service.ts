@@ -116,7 +116,7 @@ export type OpcionesRegistro = {
     }[];
   }[];
   /** Personas con una cuenta activa del equipo de la escuela. */
-  funcionarios: { persona_id: string; nombre: string; perfil: string }[];
+  funcionarios: { persona_id: string; nombre: string }[];
   /** Apoderados con un vínculo vigente con algún estudiante. */
   apoderados: { persona_id: string; nombre: string }[];
 };
@@ -511,8 +511,8 @@ export class ConvivenciaService {
         const funcionarios = await db.query<
           OpcionesRegistro['funcionarios'][number]
         >(
-          `SELECT p.id AS persona_id, p.nombres || ' ' || p.apellidos AS nombre,
-                  m.codigo_perfil AS perfil
+          // PB-144: el selector identifica al informante por ID y nombre, no muestra su perfil.
+          `SELECT p.id AS persona_id, p.nombres || ' ' || p.apellidos AS nombre
            FROM convi.membresias_establecimiento m
            JOIN convi.personas p ON p.id = m.persona_id
            WHERE m.estado = 'ACTIVO' AND m.codigo_perfil <> 'APODERADO'

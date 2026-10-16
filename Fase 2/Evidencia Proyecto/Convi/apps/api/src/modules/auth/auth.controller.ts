@@ -8,10 +8,9 @@ export class AuthController {
   @ConsultaSesion()
   consultar(@Req() peticion: PeticionConSesion) {
     const sesion = peticion.sesion;
-    // Permite preparar el segundo factor sin entregar estudiantes ni expedientes.
+    // PB-144: el login solo necesita perfil y segundo factor; los IDs de escuela
+    // y membresía quedan en la sesión interna, no los elige ni necesita el cliente.
     return {
-      membresia_id: sesion.membresia_id,
-      establecimiento_id: sesion.establecimiento_id,
       codigo_perfil: sesion.codigo_perfil,
       requiere_segundo_factor: sesion.requiere_segundo_factor,
       segundo_factor_pendiente:

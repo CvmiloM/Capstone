@@ -85,7 +85,15 @@ export async function consultarCuentaActiva(
     ) {
       return { estado: "sin-conexion" };
     }
-    return { estado: "activa", cuenta };
+    // PB-144: conservar solo los campos comprobados, no propagar el JSON completo.
+    return {
+      estado: "activa",
+      cuenta: {
+        codigo_perfil: cuenta.codigo_perfil,
+        requiere_segundo_factor: cuenta.requiere_segundo_factor,
+        segundo_factor_pendiente: cuenta.segundo_factor_pendiente,
+      },
+    };
   } catch {
     return { estado: "sin-conexion" };
   }
