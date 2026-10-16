@@ -254,3 +254,106 @@ Referencias oficiales: [Container Apps](https://learn.microsoft.com/azure/contai
 [OIDC con identidad administrada](https://learn.microsoft.com/azure/developer/github/connect-from-azure-identity),
 [cifrado interno](https://learn.microsoft.com/azure/container-apps/ingress-environment-configuration),
 [facturación](https://learn.microsoft.com/azure/container-apps/billing).
+
+## Primera mejora de rendimiento, 16 de octubre de 2026
+
+Se conserva `minReplicas: 0`: no se contrataron recursos ni se cambió el modelo
+de datos. La API reutiliza las conexiones inactivas durante 60 segundos, en lugar
+de los 10 predeterminados. Esto evita abrir otra conexión cuando alguien tarda
+unos segundos en pasar a otra pantalla; no mantiene encendido un contenedor
+escalado a cero. El máximo del pool no cambia y sigue siendo 10 por proceso.
+
+El inicio de la transacción y `SET LOCAL ROLE` viajan juntos, como SQL fijo.
+La identidad y la escuela siguen siendo parámetros separados; se conservan
+aislamiento, comprobación de membresía, MFA, bloqueos, COMMIT/ROLLBACK y descarte
+de conexiones dañadas. No se agregaron tablas, columnas, índices ni migraciones.
+
+Mediciones de referencia (no equivalen al tiempo de una página completa):
+
+| Escenario | Antes | Después |
+| --- | --- | --- |
+| Viajes SQL para resolver la cuenta | 5 | 4 |
+| Viajes para una operación de establecimiento con un SELECT de trabajo | 9 | 8 |
+| Transacción sintética de solo lectura, equipo → cloud, mediana de 6 muestras | 764,5 ms | 599 ms |
+
+Las muestras se alternaron sobre la misma conexión. No se consultaron datos de
+personas ni se hicieron escrituras. El ahorro de esa transacción fue aproximadamente
+22 %; el de cada pantalla depende de sus consultas y debe medirse tras publicar.
+
+El diagnóstico previo desde Azure mostró unos 25 segundos para despertar la API
+y 96–97 ms para su raíz ya caliente, sin consultar la base. Una conexión nueva a
+PostgreSQL tardó 825 ms y SELECT 1, 117–119 ms. Esta mejora no elimina el arranque
+en frío. No usar un ping periódico como supuesto ahorro: también genera actividad.
+
+Validación local: 32 pruebas existentes, compilación, lint y formato de API;
+49 comprobaciones externas de autorización, transacciones y limpieza de contexto
+con PostgreSQL local. Las pruebas adicionales se mantienen fuera del repositorio.
+La revisión posterior quitó la consulta duplicada a la base del proxy de Admin:
+este valida la sesión firmada y cada endpoint autoriza cuenta, escuela y MFA.
+Convivencia conserva su control previo. No se cachean permisos entre solicitudes.
+PB-131/PB-137 conservan su responsable y requieren sus propios escenarios de aceptación.
+
+La imagen publicada se actualiza con el flujo habitual de PR, merge y Actions.
+Hasta ese despliegue, la web online conserva el código anterior. Comparar después
+las mismas rutas con la misma cuenta, tanto en caliente como tras inactividad.
+
+### Diagnóstico de los seis segundos y carga de Admin
+
+Sebastian observó 5 s al entrar después de MFA y unos 6 s entre Usuarios y Cursos
+en la versión publicada, antes de estos cambios. No es una medición automatizada
+ni un percentil de carga. La primera mejora de transacciones, por sí sola, no
+resolvía la cadena de peticiones de cada pantalla.
+
+EXPLAIN ANALYZE de lecturas reales cloud, conservando el contexto autorizado:
+resolver membresía ejecutó en 0,39–0,44 ms, encabezado en 1,25–1,28 ms y usuarios
+en 2,63–2,66 ms. Desde el equipo, cada viaje tardó unos 145–169 ms. Las pruebas
+separan ese coste del tiempo de ejecución dentro de PostgreSQL y no imprimen datos
+de personas. No se justifican índices o triggers para corregir esos viajes de red.
+
+Se identificó una cadena serial: proxy → sesión → encabezado → contenido. Admin
+ahora verifica la firma de sesión en el proxy y entrega datos únicamente a través
+de los endpoints protegidos. Encabezado y listas son independientes. Los 401/403
+conservan sus redirecciones y los fallos impiden mostrar los datos. El cache de
+React del encabezado sigue limitado a la solicitud, nunca es un permiso persistente.
+
+Cursos obtiene años, año elegido, niveles y cursos con `GET /admin/cursos/vista`,
+una operación autorizada y una fotografía consistente de la escuela. Reutiliza
+las consultas originales; las rutas individuales siguen disponibles. Se conserva
+la elección: año solicitado propio, o el activo, o el más reciente; sin años se
+muestra el mismo estado vacío. Un ID de otra escuela no permite consultar sus datos.
+Con años son 3 lecturas en una transacción, frente a 3 peticiones y transacciones.
+
+La aplicación está en Brazil South y el pooler de Supabase en us-east-1. La política
+Students consultada permite Canada Central, South Africa North, Chile Central,
+Brazil South y Mexico Central; no permite simplemente mover Azure a East US. Acercar
+la base y la API merece evaluarse si queda latencia, pero exige preparar migración
+y verificar también las políticas institucionales. No se cambiaron regiones, DNS,
+datos, claves ni recursos. Mantener mínimo cero sigue permitiendo arranques en frío
+que superan el objetivo de 1–2 s.
+
+La meta pendiente es medir clic → contenido completo en las mismas rutas calientes
+tras publicar; no declarar 1–2 s a partir de SELECT 1, una maqueta o una estimación.
+
+Al reproducir solo la cadena SQL de Usuarios sobre cloud, con conexiones calientes
+y las mismas consultas, las 3 muestras seriales fueron 5352/5057/5088 ms y las
+paralelas 1780/1776/2526 ms: medianas 5088 y 1780 ms. El modelo serial incluye las
+dos resoluciones previas y luego contexto y lista; el nuevo las pide en paralelo
+sin esas dos resoluciones duplicadas. Ya usa el inicio de transacción agrupado en
+ambos casos, por lo que no mezcla ese ahorro con el de la cadena. Excluye Supabase
+Auth, HTTP y navegador: no es una medición end-to-end ni garantiza un máximo.
+
+En la escuela cloud sin años, agrupar Cursos redujo viajes totales de 24 a 12,
+pero no dio un ahorro estable de tiempo frente a dos listas que ya eran paralelas:
+las muestras quedaron aproximadamente entre 1,8 y 2,4 s. Con años se elimina además
+la segunda fase secuencial de carga de cursos. No atribuir todo el ahorro a agrupar.
+
+Pasaron además 68 comprobaciones aisladas de la web y 70 de la vista de Cursos,
+incluidas comparaciones contra los servicios anteriores en dos escuelas locales,
+selección de años, MFA y rechazo de otra escuela, sin modificar datos. TypeScript,
+ESLint web, build Next en imagen de producción, 32 pruebas existentes, compilación,
+lint y formato de API correctos. Las pruebas adicionales están fuera del repositorio.
+
+Referencias: [autorización y Proxy en Next.js](https://nextjs.org/docs/app/guides/authentication#optimistic-checks-with-proxy-optional),
+[EXPLAIN de PostgreSQL](https://www.postgresql.org/docs/current/using-explain.html),
+[regiones de Supabase](https://supabase.com/docs/guides/platform/regions),
+[reubicación de Container Apps](https://learn.microsoft.com/azure/container-apps/relocate-region).

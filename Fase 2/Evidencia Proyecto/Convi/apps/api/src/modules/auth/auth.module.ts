@@ -40,6 +40,8 @@ function variable(nombre: string): string {
         const pool = new Pool({
           connectionString: variable('SUPABASE_DB_URL'),
           connectionTimeoutMillis: 5000,
+          // Reutilizar la conexión mientras la persona navega entre pantallas.
+          idleTimeoutMillis: 60000,
           statement_timeout: 5000,
         });
         pool.on('error', () =>

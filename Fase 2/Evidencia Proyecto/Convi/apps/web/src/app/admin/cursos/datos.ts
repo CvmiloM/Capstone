@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
-import { obtenerContextoAdmin } from "../datos";
+import { pedirAdmin } from "../datos";
+import type { AnioAcademico } from "../anios/datos";
+import type { NivelEducativo } from "../niveles/datos";
 import type { Rol } from "./opciones";
 
 // PB-015 (HU-013): cursos y profesores asignados del portal de administración.
@@ -79,17 +81,23 @@ async function tokenDeSesion() {
 // Lecturas: 400 y 404 se devuelven como null (un id que no es de la escuela no
 // aparece); cualquier otro error lo muestra error.tsx con su botón de reintentar.
 async function pedir<T>(ruta: string): Promise<T | null> {
-  // Misma comprobación de acceso que el resto del portal.
-  await obtenerContextoAdmin();
-  const token = await tokenDeSesion();
-  const respuesta = await fetch(`${URL_API}${ruta}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (respuesta.status === 401) redirect("/login");
+  const respuesta = await pedirAdmin(ruta);
   if (respuesta.status === 400 || respuesta.status === 404) return null;
   if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
   return (await respuesta.json()) as T;
+}
+
+/** Datos de la portada juntos, sin esperar primero años y luego otra petición de cursos. */
+export async function obtenerVistaCursos(anio?: string): Promise<{
+  anios: AnioAcademico[];
+  anio: AnioAcademico | null;
+  niveles: NivelEducativo[];
+  cursos: Curso[];
+}> {
+  const consulta = anio ? `?anio=${encodeURIComponent(anio)}` : "";
+  const respuesta = await pedirAdmin(`/admin/cursos/vista${consulta}`);
+  if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
+  return respuesta.json();
 }
 
 /** Cursos de un año, en el orden de sus niveles. */

@@ -7,8 +7,8 @@ import {
 import { consultarCuentaActiva } from "@/lib/supabase/cuenta";
 
 // Renueva la sesión de Supabase Auth antes de cada página y la guarda en
-// cookies. Antes de los portales, consulta a la API; cada operación sigue
-// comprobando sus propios permisos y escuela en el backend (PB-127).
+// cookies. Admin comprueba la sesión aquí y autoriza cada lectura en la API;
+// Convivencia conserva su control previo. El backend verifica escuela y MFA (PB-127).
 export async function proxy(request: NextRequest) {
   let respuesta = NextResponse.next({ request });
   const ruta = request.nextUrl.pathname;
@@ -42,17 +42,24 @@ export async function proxy(request: NextRequest) {
 
   // Supabase pide no poner código entre crear el cliente y esta llamada.
   try {
-    await supabase.auth.getClaims();
+    const { data, error } = await supabase.auth.getClaims();
     if (perfil) {
-      const consulta = await consultarCuentaActiva(supabase);
       let destino: string | undefined;
-      if (consulta.estado === "sin-conexion") return noDisponible();
-      if (consulta.estado === "sin-sesion") destino = "/login";
-      else if (consulta.estado === "bloqueada")
-        destino = "/verificar-segundo-factor";
-      else if (consulta.cuenta.codigo_perfil !== perfil) destino = "/";
-      else if (consulta.cuenta.segundo_factor_pendiente)
-        destino = "/verificar-segundo-factor";
+      if (perfil === "ADMIN") {
+        // No consultar la base en cada navegación y precarga. Ningún dato se
+        // entrega sin los controles de cada endpoint y de admin/datos.ts.
+        if (error) return noDisponible();
+        if (!data?.claims) destino = "/login";
+      } else {
+        const consulta = await consultarCuentaActiva(supabase);
+        if (consulta.estado === "sin-conexion") return noDisponible();
+        if (consulta.estado === "sin-sesion") destino = "/login";
+        else if (consulta.estado === "bloqueada")
+          destino = "/verificar-segundo-factor";
+        else if (consulta.cuenta.codigo_perfil !== perfil) destino = "/";
+        else if (consulta.cuenta.segundo_factor_pendiente)
+          destino = "/verificar-segundo-factor";
+      }
       if (destino) {
         const redireccion = NextResponse.redirect(
           new URL(destino, request.url),
