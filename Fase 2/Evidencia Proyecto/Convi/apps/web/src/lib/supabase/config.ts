@@ -7,6 +7,12 @@
 // que se fija un nombre común para que ambos lean la misma sesión.
 export const COOKIE_SESION = "sb-convi-auth-token";
 
+// En Azure la sesión solo viaja por HTTPS; Docker local de desarrollo usa HTTP.
+export const OPCIONES_COOKIE_SESION = {
+  name: COOKIE_SESION,
+  secure: process.env.NODE_ENV === "production",
+};
+
 /** Devuelve null si falta la URL o la clave publicable. */
 export function leerConfiguracionSupabase() {
   // Dentro del contenedor, localhost NO apunta a Supabase: el servidor usa

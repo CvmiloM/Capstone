@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { COOKIE_SESION, leerConfiguracionSupabase } from "./config";
+import { OPCIONES_COOKIE_SESION, leerConfiguracionSupabase } from "./config";
 
 /** Cliente de Supabase Auth para acciones de servidor y Route Handlers. */
 export async function crearClienteServidor() {
@@ -17,7 +17,7 @@ export async function crearClienteServidor() {
   const almacen = await cookies();
 
   return createServerClient(configuracion.url, configuracion.clave, {
-    cookieOptions: { name: COOKIE_SESION },
+    cookieOptions: OPCIONES_COOKIE_SESION,
     cookies: {
       getAll: () => almacen.getAll(),
       setAll(lista) {

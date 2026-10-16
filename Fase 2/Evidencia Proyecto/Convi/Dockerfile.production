@@ -1,0 +1,55 @@
+# PB-145: el contexto es Convi, nunca la raíz completa del repositorio Capstone.
+FROM node:22-bookworm-slim AS dependencias
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 NEXT_TELEMETRY_DISABLED=1
+WORKDIR /workspace
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/web/package.json ./apps/web/package.json
+RUN corepack pnpm install --frozen-lockfile
+COPY . .
+
+FROM dependencias AS construir-api
+RUN corepack pnpm --filter @convi/api build
+
+# Instalar desde el lockfile evita que pnpm deploy --legacy resuelva versiones nuevas.
+FROM node:22-bookworm-slim AS dependencias-api
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 CI=true
+WORKDIR /workspace
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/web/package.json ./apps/web/package.json
+RUN corepack pnpm --filter @convi/api... install --frozen-lockfile --prod
+
+FROM node:22-bookworm-slim AS api
+ENV NODE_ENV=production PORT=3001
+WORKDIR /app/apps/api
+COPY --from=dependencias-api --chown=node:node /workspace/node_modules /app/node_modules
+COPY --from=dependencias-api --chown=node:node /workspace/apps/api/node_modules ./node_modules
+COPY --from=dependencias-api --chown=node:node /workspace/apps/api/package.json ./package.json
+COPY --from=construir-api --chown=node:node /workspace/apps/api/dist ./dist
+COPY --chown=node:node supabase/certs/prod-ca-2021.crt /app/certs/prod-ca-2021.crt
+USER node
+EXPOSE 3001
+CMD ["node", "dist/main.js"]
+
+FROM dependencias AS construir-web
+# Son valores públicos, las credenciales privadas se inyectan solo al ejecutar la API.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ARG DEPLOYMENT_ID
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+    DEPLOYMENT_ID=$DEPLOYMENT_ID
+RUN corepack pnpm --filter @convi/web build
+
+FROM node:22-bookworm-slim AS web
+ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+COPY --from=construir-web --chown=node:node /workspace/apps/web/.next/standalone ./
+COPY --from=construir-web --chown=node:node /workspace/apps/web/.next/static ./apps/web/.next/static
+COPY --from=construir-web --chown=node:node /workspace/apps/web/public ./apps/web/public
+USER node
+EXPOSE 3000
+CMD ["node", "apps/web/server.js"]

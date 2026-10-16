@@ -1,0 +1,109 @@
+name: CONVI - validar y publicar en Azure
+
+on:
+  pull_request:
+    paths:
+      - 'Fase 2/Evidencia Proyecto/Convi/**'
+      - '.github/workflows/convi-azure.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Fase 2/Evidencia Proyecto/Convi/**'
+      - '.github/workflows/convi-azure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: 'Fase 2/Evidencia Proyecto/Convi'
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Instalar las versiones del lockfile
+        run: |
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+      - name: Comprobar API
+        run: |
+          corepack pnpm --filter @convi/api lint
+          corepack pnpm --filter @convi/api test
+          corepack pnpm --filter @convi/api build
+      - name: Comprobar web
+        run: |
+          corepack pnpm --filter @convi/web lint
+          corepack pnpm --filter @convi/web build
+        env:
+          # La compilación no usa cuentas reales ni necesita secretos de Supabase.
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_compilacion_sin_acceso
+          DEPLOYMENT_ID: ${{ github.sha }}
+
+  publicar:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: validar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: convi-pruebas
+      cancel-in-progress: false
+    env:
+      REGISTRY: ${{ vars.AZURE_REGISTRY_NAME }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Comprobar configuración pública
+        run: |
+          test -n "$REGISTRY"
+          test -n "$NEXT_PUBLIC_SUPABASE_URL"
+          test -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+          [[ "$NEXT_PUBLIC_SUPABASE_URL" == https://*.supabase.co ]]
+          [[ "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" == sb_publishable_* ]]
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Construir y guardar imágenes identificadas por commit
+        run: |
+          set -euo pipefail
+          az acr login --name "$REGISTRY" --only-show-errors
+          registry_server=$(az acr show --name "$REGISTRY" --query loginServer -o tsv)
+          docker build -f Dockerfile.production --target api -t "$registry_server/convi-api:$GITHUB_SHA" .
+          docker build -f Dockerfile.production --target web \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL \
+            --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+            --build-arg DEPLOYMENT_ID="$GITHUB_SHA" \
+            -t "$registry_server/convi-web:$GITHUB_SHA" .
+          docker push "$registry_server/convi-api:$GITHUB_SHA"
+          docker push "$registry_server/convi-web:$GITHUB_SHA"
+          echo "REGISTRY_SERVER=$registry_server" >> "$GITHUB_ENV"
+      - name: Actualizar API interna y web pública
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Una validación lenta de un commit anterior no debe reemplazar main más reciente.
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          test "$latest" = "$GITHUB_SHA"
+          az extension add --name containerapp --upgrade --only-show-errors
+          # Solo cambia las imágenes, conserva secretos, permisos e ingreso HTTPS.
+          az containerapp update -g rg-convi-pruebas -n ca-convi-api-estandar \
+            --image "$REGISTRY_SERVER/convi-api:$GITHUB_SHA" --only-show-errors -o none
+          az containerapp update -g rg-convi-pruebas -n ca-convi-web-estandar \
+            --image "$REGISTRY_SERVER/convi-web:$GITHUB_SHA" --only-show-errors -o none
+          host=$(az containerapp show -g rg-convi-pruebas -n ca-convi-web-estandar --query properties.configuration.ingress.fqdn -o tsv)
+          curl --fail --silent --show-error --retry 6 --retry-all-errors --retry-delay 10 --max-time 60 "https://$host/login" -o /dev/null
+          printf '### CONVI publicado\n\nCommit: `%s`\n\n[Entrar a CONVI](https://%s)\n' "$GITHUB_SHA" "$host" >> "$GITHUB_STEP_SUMMARY"
