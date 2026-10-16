@@ -2,6 +2,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -144,6 +145,8 @@ export function validarFiltro(estado: unknown, pagina: unknown): FiltroFilas {
 
 @Injectable()
 export class ImportacionesService {
+  private readonly logger = new Logger(ImportacionesService.name);
+
   constructor(
     @Inject(CuentaService) private readonly cuentas: CuentaService,
     @Inject(SUPABASE_STORAGE) private readonly supabase: SupabaseClient,
@@ -199,60 +202,92 @@ export class ImportacionesService {
     const clave = `${sesion.establecimiento_id}/importaciones/${randomUUID()}.${carga.formato}`;
     const sha256 = createHash('sha256').update(contenido).digest('hex');
 
-    return this.operar(sesion, async (db) => {
-      const guardado = await db.query<{ id: string }>(
-        `INSERT INTO convi.archivos
+    let subido = false;
+    try {
+      return await this.operar(sesion, async (db) => {
+        const guardado = await db.query<{ id: string }>(
+          `INSERT INTO convi.archivos
            (establecimiento_id, clave_almacenamiento, nombre_original,
             tipo_mime, tamano_bytes, sha256, subido_por)
          VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5,
                  convi.membresia_actual())
          RETURNING id`,
-        [
-          clave,
-          carga.nombre,
-          FORMATOS[carga.formato],
-          contenido.length,
-          sha256,
-        ],
-      );
-      const proceso = await db.query<{ id: string }>(
-        `INSERT INTO convi.procesos_importacion
+          [
+            clave,
+            carga.nombre,
+            FORMATOS[carga.formato],
+            contenido.length,
+            sha256,
+          ],
+        );
+        const proceso = await db.query<{ id: string }>(
+          `INSERT INTO convi.procesos_importacion
            (establecimiento_id, archivo_id, tipo_importacion, creado_por,
             opciones_importacion)
          VALUES (convi.establecimiento_actual(), $1, $2,
                  convi.membresia_actual(), $3::jsonb)
          RETURNING id`,
-        [
-          guardado.rows[0].id,
-          carga.tipo,
-          JSON.stringify({ columnas: hoja.columnas, formato: carga.formato }),
-        ],
-      );
-      // Todas las filas en una sola sentencia; datos_originales ya no cambia
-      // (convi.validar_integracion).
-      await db.query(
-        `INSERT INTO convi.filas_importacion
+          [
+            guardado.rows[0].id,
+            carga.tipo,
+            JSON.stringify({ columnas: hoja.columnas, formato: carga.formato }),
+          ],
+        );
+        // Todas las filas en una sola sentencia; datos_originales ya no cambia
+        // (convi.validar_integracion).
+        await db.query(
+          `INSERT INTO convi.filas_importacion
            (establecimiento_id, proceso_importacion_id, numero_fila,
             datos_originales)
          SELECT convi.establecimiento_actual(), $1,
                 (f->>'numero')::int, f->'datos'
          FROM jsonb_array_elements($2::jsonb) f`,
-        [proceso.rows[0].id, JSON.stringify(hoja.filas)],
-      );
-      // Al final, el archivo va al espacio privado: si Storage falla, la base
-      // deshace todo y no queda una importación sin archivo.
-      const { error } = await this.supabase.storage
-        .from(ESPACIO)
-        .upload(clave, contenido, {
-          contentType: FORMATOS[carga.formato],
-          upsert: false,
-        });
-      if (error)
-        throw new ServiceUnavailableException(
-          'No pudimos guardar el archivo. Inténtalo de nuevo en unos minutos.',
+          [proceso.rows[0].id, JSON.stringify(hoja.filas)],
         );
-      return buscar(db, proceso.rows[0].id, { estado: null, pagina: 1 });
-    });
+        // Al final, el archivo va al espacio privado: si Storage falla, la base
+        // deshace todo y no queda una importación sin archivo.
+        const { error } = await this.supabase.storage
+          .from(ESPACIO)
+          .upload(clave, contenido, {
+            contentType: FORMATOS[carga.formato],
+            upsert: false,
+          });
+        if (error)
+          throw new ServiceUnavailableException(
+            'No pudimos guardar el archivo. Inténtalo de nuevo en unos minutos.',
+          );
+        subido = true;
+        return buscar(db, proceso.rows[0].id, { estado: null, pagina: 1 });
+      });
+    } catch (error) {
+      if (subido) {
+        try {
+          // Storage no participa del COMMIT SQL. Antes de compensar, confirmar
+          // en otra transacción que el archivo no quedó registrado: un COMMIT
+          // puede haberse guardado aunque se haya perdido su respuesta de red.
+          const registrado = await this.operar(sesion, async (db) => {
+            const resultado = await db.query(
+              `SELECT 1 FROM convi.archivos WHERE clave_almacenamiento = $1`,
+              [clave],
+            );
+            return resultado.rows.length > 0;
+          });
+          if (!registrado) {
+            const limpieza = await this.supabase.storage
+              .from(ESPACIO)
+              .remove([clave]);
+            if (limpieza.error) throw limpieza.error;
+          }
+        } catch {
+          // Si no se puede confirmar o limpiar, conservar el archivo y avisar
+          // sin exponer contenido, claves ni datos personales en los logs.
+          this.logger.error(
+            'No se pudo conciliar una carga fallida de importación.',
+          );
+        }
+      }
+      throw error;
+    }
   }
 
   // PB-020 (CA3 y CA4): guarda qué campo trae cada columna y las opciones, y

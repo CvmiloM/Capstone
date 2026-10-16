@@ -90,8 +90,7 @@ export class AsignacionesService {
   ): Promise<Asignacion> {
     const datos = validarNuevaAsignacion(cuerpo);
     return this.operar(sesion, async (db) => {
-      // Bloquea el curso: dos asignaciones simultáneas al mismo curso se
-      // ordenan, así las revisiones de abajo ven la que se guardó primero.
+      // El curso y el año quedan bloqueados hasta terminar la asignación.
       const curso = await db.query<{ anio: number; anio_estado: string }>(
         `SELECT an.anio, an.estado AS anio_estado
          FROM convi.cursos c
@@ -107,6 +106,13 @@ export class AsignacionesService {
         throw new ConflictException(
           `El año ${anio} está cerrado: sus cursos ya no reciben asignaciones.`,
         );
+
+      // Como en matrículas, tocar la fila evita una lectura anterior al bloqueo
+      // en REPEATABLE READ: una asignación concurrente recibe 40001 y reintenta.
+      // No cambia datos del curso ni genera auditoría de una edición ficticia.
+      await db.query(`UPDATE convi.cursos SET estado = estado WHERE id = $1`, [
+        cursoId,
+      ]);
 
       // CA2: solo un profesor de la escuela; decisión del PO: Activo o Pendiente.
       const profesor = await db.query(
