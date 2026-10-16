@@ -15,12 +15,9 @@ const URL_API =
 // Las fechas llegan como texto ISO porque viajan en JSON.
 export type CursoAsignado = {
   id: string;
-  codigo: string;
   nombre: string;
-  seccion: string | null;
   nivel: string;
   anio: number;
-  estado: string;
   roles: string[];
   estudiantes: number;
 };
@@ -80,7 +77,6 @@ export const NOMBRE_ROL: Record<string, string> = {
 export type Categoria = {
   id: string;
   nombre: string;
-  descripcion: string | null;
 };
 
 export function obtenerCategorias() {

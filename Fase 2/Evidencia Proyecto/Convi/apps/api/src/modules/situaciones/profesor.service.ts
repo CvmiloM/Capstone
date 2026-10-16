@@ -27,12 +27,9 @@ const PERFILES: Perfil[] = ['PROFESOR'];
 
 export type CursoAsignado = {
   id: string;
-  codigo: string;
   nombre: string;
-  seccion: string | null;
   nivel: string;
   anio: number;
-  estado: string;
   roles: string[];
   estudiantes: number;
 };
@@ -86,7 +83,6 @@ export type DetalleSituacion = SituacionPropia & {
 export type Categoria = {
   id: string;
   nombre: string;
-  descripcion: string | null;
 };
 
 export type AclaracionRespondida = {
@@ -134,8 +130,8 @@ export class ProfesorService {
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
         const resultado = await db.query<CursoAsignado>(
-          `SELECT c.id, c.codigo, c.nombre, c.seccion, n.nombre AS nivel,
-                  an.anio, c.estado,
+          // PB-144: solo lo que muestran Mis cursos y el formulario, sin ficha administrativa.
+          `SELECT c.id, c.nombre, n.nombre AS nivel, an.anio,
                   array_agg(DISTINCT ad.rol_asignacion) AS roles,
                   (SELECT count(*) FROM convi.matriculas m
                     WHERE m.curso_id = c.id AND m.estado = 'ACTIVO')::int AS estudiantes
@@ -184,7 +180,7 @@ export class ProfesorService {
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
         const resultado = await db.query<Categoria>(
-          `SELECT id, nombre, descripcion
+          `SELECT id, nombre
            FROM convi.categorias_convivencia
            WHERE estado = 'ACTIVO'
            ORDER BY nombre`,

@@ -209,7 +209,7 @@ export type OpcionesRegistro = {
       codigo_estudiante: string;
     }[];
   }[];
-  funcionarios: { persona_id: string; nombre: string; perfil: string }[];
+  funcionarios: { persona_id: string; nombre: string }[];
   apoderados: { persona_id: string; nombre: string }[];
 };
 
