@@ -42,8 +42,11 @@ export type CargaValida = {
 const MENSAJE = 'Revisa los datos marcados. No se cargó el archivo.';
 
 /** La respuesta indica cada campo con problema, con la clave igual al campo enviado. */
-export function errorDeCampos(errores: Record<string, string>) {
-  return new BadRequestException({ mensaje: MENSAJE, errores });
+export function errorDeCampos(
+  errores: Record<string, string>,
+  mensaje = MENSAJE,
+) {
+  return new BadRequestException({ mensaje, errores });
 }
 
 // multer entrega el nombre leído como latin1: "Nómina.xlsx" llega como

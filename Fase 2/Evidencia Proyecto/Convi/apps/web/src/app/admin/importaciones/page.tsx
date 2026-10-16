@@ -4,13 +4,13 @@ import { claseEnlace, Encabezado } from "@/app/components/formulario";
 import { obtenerContextoAdmin } from "../datos";
 import { obtenerImportaciones } from "./datos";
 import { FormularioCarga } from "./formulario-carga";
-import { NOMBRE_ESTADO, NOMBRE_TIPO } from "./opciones";
+import { NOMBRE_ESTADO, NOMBRE_TIPO, type TipoImportacion } from "./opciones";
 
 export const metadata: Metadata = { title: "Importaciones" };
 
-// PB-019 (HU-015): importaciones administrativas de la escuela. Cargar un
-// archivo solo lo guarda con sus filas; nada llega a las fichas hasta
-// confirmar la importación (CA5).
+// PB-019 y PB-020 (HU-015): importaciones administrativas de la escuela.
+// Cargar un archivo solo lo guarda con sus filas; nada llega a las fichas
+// hasta confirmar la importación (CA5). Cada tipo tiene su plantilla XLSX.
 export default async function PaginaImportaciones() {
   const [importaciones, { escuela }] = await Promise.all([
     obtenerImportaciones(),
@@ -27,7 +27,7 @@ export default async function PaginaImportaciones() {
     <>
       <Encabezado
         titulo="Importaciones"
-        descripcion="Carga un archivo CSV o XLSX con estudiantes, cursos, profesores, apoderados, matrículas o asignaciones. Primero se guarda tal como viene; nada llega a las fichas hasta confirmar la importación."
+        descripcion="Carga un archivo CSV o XLSX con estudiantes, cursos, profesores, apoderados, matrículas o asignaciones. Primero se guarda tal como viene y revisas cada fila; nada llega a las fichas hasta confirmar la importación."
       />
 
       <div className="grid gap-6 xl:grid-cols-3">
@@ -96,15 +96,43 @@ export default async function PaginaImportaciones() {
           )}
         </section>
 
-        <section
-          aria-labelledby="titulo-nueva"
-          className="h-fit rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
-        >
-          <h2 id="titulo-nueva" className="mb-4 text-lg font-semibold">
-            Nueva importación
-          </h2>
-          <FormularioCarga />
-        </section>
+        <div className="h-fit space-y-6">
+          <section
+            aria-labelledby="titulo-nueva"
+            className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
+          >
+            <h2 id="titulo-nueva" className="mb-4 text-lg font-semibold">
+              Nueva importación
+            </h2>
+            <FormularioCarga />
+          </section>
+
+          <section
+            aria-labelledby="titulo-plantillas"
+            className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
+          >
+            <h2 id="titulo-plantillas" className="text-lg font-semibold">
+              Plantillas
+            </h2>
+            <p className="mt-1 mb-3 text-sm text-muted-foreground">
+              Cada plantilla trae los títulos que CONVI reconoce solos, una fila
+              de ejemplo y una hoja con instrucciones para llenarla.
+            </p>
+            <ul className="space-y-1.5 text-sm">
+              {(Object.keys(NOMBRE_TIPO) as TipoImportacion[]).map((tipo) => (
+                <li key={tipo}>
+                  <a
+                    href={`/admin/importaciones/plantillas/${tipo.toLowerCase()}`}
+                    download
+                    className={claseEnlace}
+                  >
+                    Plantilla de {NOMBRE_TIPO[tipo].toLowerCase()}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
       </div>
     </>
   );

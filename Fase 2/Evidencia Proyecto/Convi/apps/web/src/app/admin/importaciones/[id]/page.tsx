@@ -3,7 +3,14 @@ import Link from "next/link";
 import { claseEnlace, Encabezado } from "@/app/components/formulario";
 import { obtenerContextoAdmin } from "../../datos";
 import { obtenerImportacion } from "../datos";
-import { NOMBRE_ESTADO, NOMBRE_TIPO } from "../opciones";
+import { FormularioRevision } from "../formulario-revision";
+import {
+  type EstadoFila,
+  NOMBRE_ESTADO,
+  NOMBRE_ESTADO_FILA,
+  NOMBRE_TIPO,
+} from "../opciones";
+import { VistaPrevia } from "./vista-previa";
 
 export const metadata: Metadata = { title: "Importación" };
 
@@ -13,16 +20,31 @@ function tamano(bytes: number) {
     : `${(bytes / (1024 * 1024)).toLocaleString("es-CL", { maximumFractionDigits: 1 })} MB`;
 }
 
-// PB-019 (HU-015 CA2): la importación cargada con sus columnas y sus primeras
-// filas, tal como venían en el archivo. CA5: nada se guardó en las fichas.
+function leer(valor: string | undefined) {
+  return typeof valor === "string" ? valor.trim() : "";
+}
+
+// PB-019 y PB-020 (HU-015): la importación cargada. Primero se relaciona cada
+// columna con un campo de CONVI (CA3); después, la vista previa muestra cada
+// fila Válida, Con advertencia o Con error (CA4), filtrable por estado
+// (?estado=ERROR&pagina=2). CA5: nada se guarda en las fichas.
 export default async function PaginaImportacion({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ estado?: string; pagina?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, parametros] = await Promise.all([params, searchParams]);
+  const estado = leer(parametros.estado).toUpperCase();
+  const filtro = {
+    estado: Object.hasOwn(NOMBRE_ESTADO_FILA, estado)
+      ? (estado as EstadoFila)
+      : null,
+    pagina: Math.max(1, Number.parseInt(leer(parametros.pagina), 10) || 1),
+  };
   const [importacion, { escuela }] = await Promise.all([
-    obtenerImportacion(id),
+    obtenerImportacion(id, filtro),
     obtenerContextoAdmin(),
   ]);
 
@@ -46,7 +68,49 @@ export default async function PaginaImportacion({
   }).format(new Date(importacion.creado_en));
   const tipo =
     NOMBRE_TIPO[importacion.tipo_importacion] ?? importacion.tipo_importacion;
-  const estado = NOMBRE_ESTADO[importacion.estado] ?? importacion.estado;
+  const nombreEstado = NOMBRE_ESTADO[importacion.estado] ?? importacion.estado;
+  const revisada = importacion.estado === "REVISION";
+  // Solo se relacionan columnas antes de confirmar (la API también lo exige).
+  const editable = ["CARGADO", "REVISION"].includes(importacion.estado);
+  const primera = importacion.muestra[0];
+
+  const formulario = editable && (
+    <section
+      aria-labelledby="titulo-columnas"
+      className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
+    >
+      <h2 id="titulo-columnas" className="text-lg font-semibold">
+        {revisada ? "Columnas y opciones" : "Relaciona las columnas"}
+      </h2>
+      <p className="mt-1 mb-4 text-sm text-muted-foreground">
+        {revisada
+          ? "Si algo no calza, cambia el campo de una columna o las opciones y vuelve a revisar las filas."
+          : "Elige qué campo de CONVI trae cada columna. Ya vienen sugeridos según el título; las que no se relacionen no se importan."}
+      </p>
+      {/* Lo guardado cambia después de revisar: el formulario parte de nuevo
+          con eso y no con lo que se envió en un intento con errores. */}
+      <FormularioRevision
+        key={JSON.stringify([importacion.mapeo, importacion.opciones])}
+        importacion={{
+          id: importacion.id,
+          campos: importacion.campos,
+          columnas: importacion.columnas,
+          mapeo: importacion.mapeo,
+          opciones: importacion.opciones,
+          anios: importacion.anios,
+          uso_del_anio: importacion.uso_del_anio,
+        }}
+        ejemplo={
+          primera
+            ? {
+                numero_fila: primera.numero_fila,
+                datos: primera.datos_originales,
+              }
+            : null
+        }
+      />
+    </section>
+  );
 
   return (
     <>
@@ -57,7 +121,7 @@ export default async function PaginaImportacion({
       <div className="mt-4">
         <Encabezado
           titulo={importacion.archivo_nombre}
-          descripcion={`${tipo} · ${importacion.filas.toLocaleString("es-CL")} ${importacion.filas === 1 ? "fila" : "filas"} · ${tamano(importacion.archivo_bytes)} · ${estado} · Cargada por ${importacion.creado_por} el ${creado}`}
+          descripcion={`${tipo} · ${importacion.filas.toLocaleString("es-CL")} ${importacion.filas === 1 ? "fila" : "filas"} · ${tamano(importacion.archivo_bytes)} · ${nombreEstado} · Cargada por ${importacion.creado_por} el ${creado}`}
         />
       </div>
 
@@ -65,64 +129,23 @@ export default async function PaginaImportacion({
         role="note"
         className="mb-6 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground"
       >
-        El archivo quedó guardado en el espacio privado de la escuela y sus
-        filas se conservan tal como venían. Todavía no se guardó nada en las
-        fichas.
+        {revisada
+          ? "Esta es la vista previa de la importación. Todavía no se guardó nada en las fichas: eso pasa solo al confirmar la importación."
+          : "El archivo quedó guardado en el espacio privado de la escuela y sus filas se conservan tal como venían. Todavía no se guardó nada en las fichas."}
       </p>
 
-      <section aria-labelledby="titulo-filas">
-        <h2 id="titulo-filas" className="mb-3 text-lg font-semibold">
-          Filas del archivo
-        </h2>
-        <p className="mb-3 text-sm text-muted-foreground">
-          {importacion.filas > importacion.muestra.length
-            ? `Se muestran las primeras ${importacion.muestra.length} de ${importacion.filas.toLocaleString("es-CL")} filas.`
-            : `Se muestran las ${importacion.muestra.length} filas.`}{" "}
-          El número es la fila en el archivo.
-        </p>
-        <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-tarjeta">
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">
-              Filas de {importacion.archivo_nombre}
-            </caption>
-            <thead className="bg-muted text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  Fila
-                </th>
-                {importacion.columnas.map((columna) => (
-                  <th
-                    key={columna}
-                    scope="col"
-                    className="px-4 py-3 font-semibold whitespace-nowrap"
-                  >
-                    {columna}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {importacion.muestra.map((fila) => (
-                <tr key={fila.numero_fila}>
-                  <th
-                    scope="row"
-                    className="px-4 py-3 font-normal tabular-nums text-muted-foreground"
-                  >
-                    {fila.numero_fila}
-                  </th>
-                  {importacion.columnas.map((columna) => (
-                    <td key={columna} className="px-4 py-3 whitespace-pre-line">
-                      {fila.datos_originales[columna] || (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <div className="space-y-8">
+        {!revisada && formulario}
+
+        <section aria-labelledby="titulo-filas">
+          <h2 id="titulo-filas" className="mb-3 text-lg font-semibold">
+            {revisada ? "Vista previa" : "Filas del archivo"}
+          </h2>
+          <VistaPrevia importacion={importacion} />
+        </section>
+
+        {revisada && formulario}
+      </div>
     </>
   );
 }

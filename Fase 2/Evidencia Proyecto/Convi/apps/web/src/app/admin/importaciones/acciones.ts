@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { enviarArchivo } from "./datos";
+import { enviarArchivo, enviarRevision } from "./datos";
 
 export type EstadoFormulario = {
   /** Error general del formulario. */
   mensaje?: string;
   /** Error por campo, con la clave igual al campo que valida la API. */
   errores?: Record<string, string>;
-  /** El tipo elegido, para no perderlo si hay errores. El archivo hay que volver a elegirlo. */
+  /** Lo elegido, para no perderlo si hay errores. El archivo hay que volver a elegirlo. */
   valores?: Record<string, string>;
 };
 
@@ -34,4 +34,36 @@ export async function cargarImportacion(
   }
   revalidatePath("/admin/importaciones");
   redirect(`/admin/importaciones/${resultado.id}`);
+}
+
+// PB-020 (HU-015 CA3 y CA4): guarda qué campo trae cada columna (los selects
+// "mapeo-N" junto al título oculto "columna-N") con el año, el formato de
+// fecha y los duplicados, y vuelve a la importación con su vista previa.
+export async function revisarImportacion(
+  id: string,
+  _anterior: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const valores: Record<string, string> = {};
+  for (const [clave, valor] of formData.entries())
+    if (typeof valor === "string") valores[clave] = valor;
+
+  const mapeo: Record<string, string> = {};
+  for (const [clave, campo] of Object.entries(valores)) {
+    const indice = /^mapeo-(\d+)$/.exec(clave)?.[1];
+    const columna =
+      indice === undefined ? undefined : valores[`columna-${indice}`];
+    if (columna !== undefined) mapeo[columna] = campo;
+  }
+  const resultado = await enviarRevision(id, {
+    mapeo,
+    anio_academico_id: valores.anio_academico_id || null,
+    formato_fecha: valores.formato_fecha ?? "",
+    duplicados: valores.duplicados ?? "",
+  });
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  revalidatePath("/admin/importaciones");
+  redirect(`/admin/importaciones/${id}`);
 }
