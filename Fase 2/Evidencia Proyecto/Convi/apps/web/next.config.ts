@@ -4,6 +4,20 @@ import path from "node:path";
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../../"),
+  // Una pestaña de la versión anterior debe recargar después del despliegue.
+  deploymentId: process.env.DEPLOYMENT_ID,
+  async headers() {
+    return process.env.NODE_ENV === "production"
+      ? [
+          {
+            source: "/:path*",
+            headers: [
+              { key: "Strict-Transport-Security", value: "max-age=15552000" },
+            ],
+          },
+        ]
+      : [];
+  },
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {

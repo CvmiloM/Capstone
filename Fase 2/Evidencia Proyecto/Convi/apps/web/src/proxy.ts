@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  COOKIE_SESION,
+  OPCIONES_COOKIE_SESION,
   leerConfiguracionSupabase,
 } from "@/lib/supabase/config";
 import { consultarCuentaActiva } from "@/lib/supabase/cuenta";
@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const supabase = createServerClient(configuracion.url, configuracion.clave, {
-    cookieOptions: { name: COOKIE_SESION },
+    cookieOptions: OPCIONES_COOKIE_SESION,
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(lista, cabeceras) {
