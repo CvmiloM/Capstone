@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { obtenerContextoAdmin } from "../datos";
-import type { TipoImportacion } from "./opciones";
+import type { EstadoFila, TipoImportacion } from "./opciones";
 
-// PB-019 (HU-015): importaciones del portal de administración. Se piden a la
-// API desde el servidor de Next con el token de la sesión; la API vuelve a
-// comprobar el perfil ADMIN, el segundo factor y la escuela.
+// PB-019 y PB-020 (HU-015): importaciones del portal de administración. Se
+// piden a la API desde el servidor de Next con el token de la sesión; la API
+// vuelve a comprobar el perfil ADMIN, el segundo factor y la escuela.
 
 // Dentro de Docker, localhost no es la API: el .env apunta NEXT_PUBLIC_API_URL
 // a http://host.docker.internal:3001.
@@ -28,10 +28,65 @@ export type Importacion = {
   filas: number;
 };
 
+export type Problema = {
+  /** Clave del campo; null si es de la fila completa. */
+  campo: string | null;
+  nivel: "ERROR" | "ADVERTENCIA";
+  mensaje: string;
+};
+
+export type FilaImportacion = {
+  numero_fila: number;
+  estado: EstadoFila;
+  datos_originales: Record<string, string>;
+  /** null mientras la fila no se haya revisado. */
+  datos_normalizados: Record<string, string | boolean | null> | null;
+  problemas: Problema[] | null;
+};
+
+export type CampoImportacion = {
+  clave: string;
+  titulo: string;
+  obligatorio: boolean;
+  descripcion: string;
+  /** Admite varias columnas, que se juntan (como los dos apellidos). */
+  unir: boolean;
+};
+
 export type DetalleImportacion = Importacion & {
   columnas: string[];
-  /** Las primeras 50 filas del archivo, tal como venían. */
-  muestra: { numero_fila: number; datos_originales: Record<string, string> }[];
+  /** Los campos de CONVI del tipo, en el orden de la plantilla. */
+  campos: CampoImportacion[];
+  /** Si pide el año siempre, solo cuando se relaciona Curso, o nunca. */
+  uso_del_anio: "SIEMPRE" | "CON_CURSO" | "NUNCA";
+  /** Columna → campo: el de la última revisión o el sugerido por los títulos. */
+  mapeo: Record<string, string>;
+  opciones: {
+    anio_academico_id: string | null;
+    formato_fecha: string;
+    duplicados: string;
+  };
+  /** Años Planificados y Activos, para elegir al revisar. */
+  anios: { id: string; anio: number; estado: string }[];
+  /** Cantidad de filas por estado. */
+  resumen: Record<EstadoFila, number>;
+  pagina: {
+    estado: EstadoFila | null;
+    numero: number;
+    /** Filas con el estado filtrado (o todas). */
+    filas: number;
+    paginas: number;
+  };
+  /** Las filas de la página (50), con sus datos originales y su revisión. */
+  muestra: FilaImportacion[];
+};
+
+/** Lo que se envía para revisar las filas (HU-015 CA3). */
+export type NuevaRevision = {
+  mapeo: Record<string, string>;
+  anio_academico_id: string | null;
+  formato_fecha: string;
+  duplicados: string;
 };
 
 export type Resultado =
@@ -40,6 +95,8 @@ export type Resultado =
 
 const SIN_CONEXION =
   "No pudimos cargar el archivo. Inténtalo de nuevo en unos minutos.";
+const SIN_REVISION =
+  "No pudimos revisar las filas. Inténtalo de nuevo en unos minutos.";
 
 async function tokenDeSesion() {
   const supabase = await crearClienteServidor();
@@ -72,11 +129,90 @@ export async function obtenerImportaciones() {
   return importaciones ?? [];
 }
 
-/** La importación con sus columnas y sus primeras filas, o null. */
-export function obtenerImportacion(id: string) {
+/**
+ * La importación con sus columnas, su revisión y una página de 50 filas,
+ * opcionalmente solo las de un estado; o null.
+ */
+export function obtenerImportacion(
+  id: string,
+  filtro: { estado?: EstadoFila | null; pagina?: number } = {},
+) {
+  const consulta = new URLSearchParams();
+  if (filtro.estado) consulta.set("estado", filtro.estado);
+  if (filtro.pagina && filtro.pagina > 1)
+    consulta.set("pagina", String(filtro.pagina));
+  const texto = consulta.toString();
   return pedir<DetalleImportacion>(
-    `/admin/importaciones/${encodeURIComponent(id)}`,
+    `/admin/importaciones/${encodeURIComponent(id)}${texto ? `?${texto}` : ""}`,
   );
+}
+
+/** PB-020: la plantilla XLSX de un tipo, tal como la entrega la API. */
+export async function pedirPlantilla(tipo: string) {
+  await obtenerContextoAdmin();
+  const token = await tokenDeSesion();
+  const respuesta = await fetch(
+    `${URL_API}/admin/importaciones/plantillas/${encodeURIComponent(tipo)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(30000),
+    },
+  );
+  if (respuesta.status === 401) redirect("/login");
+  return respuesta;
+}
+
+/**
+ * PB-020 (HU-015 CA3 y CA4): guarda qué campo trae cada columna y las
+ * opciones, y la API revisa todas las filas. Los errores se devuelven en vez
+ * de lanzarse, para mostrarlos en el formulario.
+ */
+export async function enviarRevision(
+  id: string,
+  revision: NuevaRevision,
+): Promise<Resultado> {
+  const token = await tokenDeSesion();
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(
+      `${URL_API}/admin/importaciones/${encodeURIComponent(id)}/revision`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(revision),
+        cache: "no-store",
+        signal: AbortSignal.timeout(60000),
+      },
+    );
+  } catch {
+    return { ok: false, mensaje: SIN_REVISION };
+  }
+  if (respuesta.status === 401) redirect("/login");
+
+  const datos = (await respuesta.json().catch(() => null)) as {
+    id?: string;
+    mensaje?: string;
+    message?: string;
+    errores?: Record<string, string>;
+  } | null;
+  if (respuesta.ok && datos?.id) return { ok: true, id: datos.id };
+  if (respuesta.status === 400 && datos?.errores) {
+    return {
+      ok: false,
+      mensaje: datos.mensaje ?? "Revisa los datos marcados.",
+      errores: datos.errores,
+    };
+  }
+  // 403, 404 y 409 (por ejemplo, otra persona la revisó al mismo tiempo): la
+  // API explica qué pasó.
+  if ([403, 404, 409].includes(respuesta.status) && datos?.message) {
+    return { ok: false, mensaje: datos.message };
+  }
+  return { ok: false, mensaje: SIN_REVISION };
 }
 
 /**
