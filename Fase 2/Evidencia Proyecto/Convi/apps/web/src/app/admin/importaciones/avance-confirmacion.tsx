@@ -33,8 +33,10 @@ export function AvanceConfirmacion({
   useEffect(() => {
     let vigente = true;
     let terminada = false;
+    let consultando = false;
     const consultar = async () => {
-      if (terminada) return;
+      if (terminada || consultando) return;
+      consultando = true;
       try {
         const respuesta = await fetch(
           `/admin/importaciones/${encodeURIComponent(id)}/avance`,
@@ -57,6 +59,8 @@ export function AvanceConfirmacion({
         if (datos.confirmacion) setAvance(datos.confirmacion);
       } catch {
         // Sin conexión: se intenta de nuevo en la próxima vuelta.
+      } finally {
+        consultando = false;
       }
     };
     const intervalo = setInterval(consultar, CADA_MILISEGUNDOS);

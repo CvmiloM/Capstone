@@ -132,22 +132,25 @@ export async function cargarContexto(
     };
   }
 
-  // Cada persona con su ficha de estudiante y su cuenta, si las tiene.
-  const personas = await db.query<{
-    id: string;
-    nombres: string;
-    apellidos: string;
-    rut: string | null;
-    correo: string | null;
-    estudiante_id: string | null;
-    codigo_estudiante: string | null;
-    estado_estudiante: string | null;
-    cuenta_id: string | null;
-    codigo_perfil: string | null;
-    estado_cuenta: string | null;
-    correo_cuenta: string | null;
-  }>(
-    `SELECT p.id, p.nombres, p.apellidos, p.rut, lower(p.correo) AS correo,
+  // Cursos no usa personas; los otros tipos conservan todo su contexto.
+  const personas =
+    tipo === 'CURSOS'
+      ? { rows: [] }
+      : await db.query<{
+          id: string;
+          nombres: string;
+          apellidos: string;
+          rut: string | null;
+          correo: string | null;
+          estudiante_id: string | null;
+          codigo_estudiante: string | null;
+          estado_estudiante: string | null;
+          cuenta_id: string | null;
+          codigo_perfil: string | null;
+          estado_cuenta: string | null;
+          correo_cuenta: string | null;
+        }>(
+          `SELECT p.id, p.nombres, p.apellidos, p.rut, lower(p.correo) AS correo,
             e.id AS estudiante_id, e.codigo_estudiante,
             e.estado AS estado_estudiante,
             m.id AS cuenta_id, m.codigo_perfil, m.estado AS estado_cuenta,
@@ -156,7 +159,7 @@ export async function cargarContexto(
      LEFT JOIN convi.estudiantes e ON e.persona_id = p.id
      LEFT JOIN convi.membresias_establecimiento m ON m.persona_id = p.id
      ORDER BY p.creado_en`,
-  );
+        );
   const contexto: Contexto = {
     hoy: hoy.rows[0].hoy,
     anio,

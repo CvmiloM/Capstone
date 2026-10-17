@@ -101,7 +101,8 @@ resource web 'Microsoft.App/containerApps@2025-07-01' = {
           { type: 'Readiness', httpGet: { path: '/login', port: 3000 }, periodSeconds: 10, timeoutSeconds: 5 }
         ]
       }]
-      scale: { minReplicas: 0, maxReplicas: 1 }
+      // Evitar el arranque en frío al volver a CONVI o enviar un archivo.
+      scale: { minReplicas: 1, maxReplicas: 1 }
     }
   }
 }
