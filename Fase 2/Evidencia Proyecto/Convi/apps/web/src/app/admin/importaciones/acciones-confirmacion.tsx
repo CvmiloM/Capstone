@@ -11,32 +11,41 @@ import {
   type EstadoFormulario,
   omitirFilas,
 } from "./acciones";
-import type { EstadoFila, TipoImportacion } from "./opciones";
+import { AvanceConfirmacion } from "./avance-confirmacion";
+import type { EstadoConfirmacion } from "./datos";
+import {
+  describirResultado,
+  type EstadoFila,
+  filas,
+  type TipoImportacion,
+} from "./opciones";
 
 const estadoInicial: EstadoFormulario = {};
 
-function filas(cantidad: number) {
-  return `${cantidad.toLocaleString("es-CL")} ${cantidad === 1 ? "fila" : "filas"}`;
-}
-
-// PB-026 (HU-020): confirmar guarda en las fichas las filas Válidas y, con la
-// casilla, las Con advertencia; omitir deja fuera las filas Con error. Las dos
-// acciones piden confirmación antes de enviarse. La API vuelve a revisar todo.
+// PB-026 y PB-027 (HU-020): confirmar guarda en las fichas las filas Válidas
+// y, con la casilla, las Con advertencia; omitir deja fuera las filas Con
+// error. Las dos acciones piden confirmación antes de enviarse. La API vuelve
+// a revisar todo y confirma en segundo plano; mientras tanto se ve el avance.
 export function AccionesConfirmacion({
   id,
   tipo,
   estado,
   resumen,
+  confirmacion,
   confirmadaEl,
+  terminadaEl,
 }: {
   id: string;
   tipo: TipoImportacion;
   estado: string;
   resumen: Record<EstadoFila, number>;
+  confirmacion: EstadoConfirmacion | null;
   /** Fecha legible en la zona horaria de la escuela, si ya está Confirmada. */
   confirmadaEl: string | null;
+  /** Fecha legible de cuando terminó la última confirmación. */
+  terminadaEl: string | null;
 }) {
-  const [confirmacion, confirmar, confirmando] = useActionState(
+  const [confirmado, confirmar, confirmando] = useActionState(
     confirmarImportacion.bind(null, id),
     estadoInicial,
   );
@@ -45,23 +54,49 @@ export function AccionesConfirmacion({
     estadoInicial,
   );
   const [incluirAdvertencias, setIncluirAdvertencias] = useState(true);
+
+  if (estado === "PROCESANDO" && confirmacion) {
+    // La clave hace que el avance parta de nuevo si se reanuda.
+    return (
+      <AvanceConfirmacion
+        key={`${confirmacion.iniciada_en}-${confirmacion.en_curso}`}
+        id={id}
+        tipo={tipo}
+        inicial={confirmacion}
+      />
+    );
+  }
+
   const enRevision = estado === "REVISION";
   const porConfirmar =
     resumen.VALIDO + (incluirAdvertencias ? resumen.ADVERTENCIA : 0);
-  const exito = confirmacion.exito ?? omision.exito;
-  const error = confirmacion.mensaje ?? omision.mensaje;
+  const error = confirmado.mensaje ?? omision.mensaje;
+  const ultima = confirmacion?.resultado ? confirmacion : null;
 
   return (
     <div className="space-y-4">
-      {exito && (
+      {omision.exito && (
         <p
           role="status"
           className="rounded-lg border border-verde/40 bg-verde/10 px-3 py-2.5 text-sm"
         >
-          {exito}
+          {omision.exito}
         </p>
       )}
       {error && <AvisoError>{error}</AvisoError>}
+
+      {ultima?.resultado && (
+        <p
+          role="status"
+          className="rounded-lg border border-verde/40 bg-verde/10 px-3 py-2.5 text-sm"
+        >
+          <span className="font-medium">
+            Última confirmación
+            {terminadaEl ? `, terminada el ${terminadaEl}` : ""}:
+          </span>{" "}
+          {describirResultado(ultima.resultado)}
+        </p>
+      )}
 
       {estado === "CONFIRMADO" && (
         <p className="text-sm text-muted-foreground">
@@ -91,7 +126,7 @@ export function AccionesConfirmacion({
                   incluirAdvertencias && resumen.ADVERTENCIA > 0
                     ? ` y ${filas(resumen.ADVERTENCIA)} con advertencia`
                     : ""
-                }. Antes de guardar, cada fila se revisa de nuevo con los datos de hoy.`}
+                }. Antes de guardar, cada fila se revisa de nuevo con los datos de hoy; después se confirman en segundo plano y puedes salir de esta página.`}
             {tipo === "PROFESORES" &&
               " Cada profesor nuevo recibe su invitación por correo."}
           </p>
@@ -118,7 +153,9 @@ export function AccionesConfirmacion({
             disabled={confirmando || omitiendo || porConfirmar === 0}
             className={claseBotonPrimario}
           >
-            {confirmando ? "Confirmando…" : `Confirmar ${filas(porConfirmar)}`}
+            {confirmando
+              ? "Revisando las filas…"
+              : `Confirmar ${filas(porConfirmar)}`}
           </button>
         </form>
       )}

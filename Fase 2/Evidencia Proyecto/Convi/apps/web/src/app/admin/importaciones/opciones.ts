@@ -65,3 +65,30 @@ export const NOMBRE_ROL: Record<string, string> = {
   PROFESOR_JEFE: "Profesor jefe",
   PROFESOR: "Profesor",
 };
+
+/** "1 fila", "1.200 filas". */
+export function filas(cantidad: number) {
+  return `${cantidad.toLocaleString("es-CL")} ${cantidad === 1 ? "fila" : "filas"}`;
+}
+
+/** PB-027: el resultado de una confirmación, en palabras. */
+export function describirResultado(resultado: {
+  confirmadas: number;
+  con_error: number;
+  sin_enviar: number;
+}) {
+  const partes = [
+    resultado.confirmadas > 0
+      ? `Se guardaron en las fichas ${filas(resultado.confirmadas)}.`
+      : "No se guardó ninguna fila.",
+  ];
+  if (resultado.con_error > 0)
+    partes.push(
+      `${filas(resultado.con_error)} no se pudieron confirmar y quedaron Con error: revisa su detalle.`,
+    );
+  if (resultado.sin_enviar > 0)
+    partes.push(
+      `${filas(resultado.sin_enviar)} de profesores quedaron sin invitar porque se alcanzó el límite de correos: vuelve a confirmar en unos minutos.`,
+    );
+  return partes.join(" ");
+}
