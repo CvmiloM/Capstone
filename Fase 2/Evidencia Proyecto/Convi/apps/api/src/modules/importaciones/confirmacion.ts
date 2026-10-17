@@ -334,16 +334,34 @@ async function confirmarEstudiante(c: Confirmacion, d: Datos) {
     };
     estudiante = existente;
   } else {
-    const persona = await crearPersona(c, d);
-    const nuevo = await una<{ id: string }>(
+    // RETURNING enlaza ambas altas en una sentencia; conserva RLS y disparadores.
+    const nuevo = await una<{ id: string; persona_id: string }>(
       c.db,
-      `INSERT INTO convi.estudiantes
+      `WITH persona AS (
+         INSERT INTO convi.personas
+           (establecimiento_id, nombres, apellidos, rut, correo, telefono, direccion)
+         VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5, $6)
+         RETURNING id
+       )
+       INSERT INTO convi.estudiantes
          (establecimiento_id, persona_id, codigo_estudiante, fecha_nacimiento)
-       VALUES (convi.establecimiento_actual(), $1, $2, $3)
-       RETURNING id`,
-      [persona, codigo, valor(d, 'fecha_nacimiento')],
+       SELECT convi.establecimiento_actual(), persona.id, $7, $8 FROM persona
+       RETURNING id, persona_id`,
+      [
+        valor(d, 'nombres'),
+        valor(d, 'apellidos'),
+        valor(d, 'rut'),
+        valor(d, 'correo'),
+        valor(d, 'telefono'),
+        valor(d, 'direccion'),
+        codigo,
+        valor(d, 'fecha_nacimiento'),
+      ],
     );
-    const id = (nuevo as { id: string }).id;
+    const { id, persona_id: persona } = nuevo as {
+      id: string;
+      persona_id: string;
+    };
     entidades = {
       persona: { id: persona, accion: 'CREADO' },
       estudiante: { id, accion: 'CREADO' },

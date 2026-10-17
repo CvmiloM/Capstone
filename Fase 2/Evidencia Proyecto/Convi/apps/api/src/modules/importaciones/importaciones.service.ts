@@ -42,7 +42,7 @@ import {
   type TipoImportacion,
   validarCarga,
 } from './importacion.js';
-import { ArchivoNoValido, leerArchivo } from './lector.js';
+import { ArchivoNoValido, LecturaNoDisponible, leerArchivo } from './lector.js';
 import { validarRevision } from './mapeo.js';
 import { crearPlantilla, nombreDePlantilla } from './plantilla.js';
 import { type FilaRevisada, type Problema, revisarFilas } from './revision.js';
@@ -57,6 +57,8 @@ import type { FormatoFecha, TratamientoDuplicado } from './valores.js';
 const PERFILES: Perfil[] = ['ADMIN'];
 const ESPACIO = 'convi-privado';
 const FILAS_POR_PAGINA = 50;
+// Acotar cada sentencia sin perder la transacción completa ni subir su timeout.
+const FILAS_POR_LOTE = 1000;
 // Cada tramo de la confirmación es una transacción y el avance se ve al
 // terminar cada uno; los profesores van de a uno porque cada uno recibe su
 // invitación por correo.
@@ -186,11 +188,12 @@ type ConfirmacionGuardada = {
   resultado: ResultadoConfirmacion | null;
 };
 
-const COLUMNAS = `
+const DATOS_PROCESO = `
   p.id, p.tipo_importacion, p.estado,
   a.nombre_original AS archivo_nombre, a.tamano_bytes::int AS archivo_bytes,
   p.creado_en, pe.nombres || ' ' || pe.apellidos AS creado_por,
-  p.confirmado_en,
+  p.confirmado_en`;
+const COLUMNAS = `${DATOS_PROCESO},
   (SELECT count(*) FROM convi.filas_importacion f
     WHERE f.proceso_importacion_id = p.id)::int AS filas`;
 
@@ -275,6 +278,8 @@ export class ImportacionesService {
     } catch (error) {
       if (error instanceof ArchivoNoValido)
         throw errorDeCampos({ archivo: error.message });
+      if (error instanceof LecturaNoDisponible)
+        throw new ServiceUnavailableException(error.message);
       throw error;
     }
     const clave = `${sesion.establecimiento_id}/importaciones/${randomUUID()}.${carga.formato}`;
@@ -311,17 +316,25 @@ export class ImportacionesService {
             JSON.stringify({ columnas: hoja.columnas, formato: carga.formato }),
           ],
         );
-        // Todas las filas en una sola sentencia; datos_originales ya no cambia
-        // (convi.validar_integracion).
-        await db.query(
-          `INSERT INTO convi.filas_importacion
+        // Lotes dentro de la misma transacción; datos_originales ya no cambia.
+        for (
+          let inicio = 0;
+          inicio < hoja.filas.length;
+          inicio += FILAS_POR_LOTE
+        ) {
+          await db.query(
+            `INSERT INTO convi.filas_importacion
            (establecimiento_id, proceso_importacion_id, numero_fila,
             datos_originales)
          SELECT convi.establecimiento_actual(), $1,
                 (f->>'numero')::int, f->'datos'
          FROM jsonb_array_elements($2::jsonb) f`,
-          [proceso.rows[0].id, JSON.stringify(hoja.filas)],
-        );
+            [
+              proceso.rows[0].id,
+              JSON.stringify(hoja.filas.slice(inicio, inicio + FILAS_POR_LOTE)),
+            ],
+          );
+        }
         // Al final, el archivo va al espacio privado: si Storage falla, la base
         // deshace todo y no queda una importación sin archivo.
         const { error } = await this.supabase.storage
@@ -744,31 +757,38 @@ async function buscar(
   filtro: FiltroFilas,
 ): Promise<DetalleImportacion> {
   const proceso = await db.query<
-    Importacion & {
+    Omit<Importacion, 'filas'> & {
       columnas: string[];
       mapeo: Record<string, string>;
       opciones: Record<string, unknown>;
+      anios: DetalleImportacion['anios'];
     }
   >(
-    `SELECT ${COLUMNAS},
+    `SELECT ${DATOS_PROCESO},
             coalesce(p.opciones_importacion->'columnas', '[]'::jsonb) AS columnas,
-            p.mapeo_columnas AS mapeo, p.opciones_importacion AS opciones
+            p.mapeo_columnas AS mapeo, p.opciones_importacion AS opciones,
+            coalesce((
+              SELECT jsonb_agg(jsonb_build_object('id', id, 'anio', anio,
+                                                 'estado', estado) ORDER BY anio DESC)
+              FROM convi.anios_academicos
+              WHERE estado IN ('PLANIFICADO', 'ACTIVO')
+            ), '[]'::jsonb) AS anios
      ${DESDE} WHERE p.id = $1`,
     [id],
   );
   if (proceso.rows.length === 0)
     throw new NotFoundException('No encontramos esa importación.');
-  const { columnas, mapeo, opciones, ...importacion } = proceso.rows[0];
+  const { columnas, mapeo, opciones, anios, ...importacion } = proceso.rows[0];
   const tipo = importacion.tipo_importacion;
 
-  const anios = await db.query<DetalleImportacion['anios'][number]>(
-    `SELECT id, anio, estado FROM convi.anios_academicos
-     WHERE estado IN ('PLANIFICADO', 'ACTIVO')
-     ORDER BY anio DESC`,
-  );
   const resumen = await contarFilas(db, id);
 
-  const filas = filtro.estado ? resumen[filtro.estado] : importacion.filas;
+  // El mismo conteo sirve para el total; no volver a recorrer las filas.
+  const total = Object.values(resumen).reduce(
+    (suma, cantidad) => suma + cantidad,
+    0,
+  );
+  const filas = filtro.estado ? resumen[filtro.estado] : total;
   const paginas = Math.max(1, Math.ceil(filas / FILAS_POR_PAGINA));
   const numero = Math.min(filtro.pagina, paginas);
   const muestra = await db.query<FilaImportacion>(
@@ -785,9 +805,10 @@ async function buscar(
   // Antes de revisar no hay mapeo guardado: se sugiere por los títulos. El
   // año por omisión es el Activo.
   const revisada = Object.keys(mapeo).length > 0;
-  const activo = anios.rows.find((a) => a.estado === 'ACTIVO');
+  const activo = anios.find((a) => a.estado === 'ACTIVO');
   return {
     ...importacion,
+    filas: total,
     columnas,
     campos: CAMPOS[tipo].map((campo) => ({
       clave: campo.clave,
@@ -807,7 +828,7 @@ async function buscar(
         opciones.formato_fecha === 'MM-DD-AAAA' ? 'MM-DD-AAAA' : 'DD-MM-AAAA',
       duplicados: opciones.duplicados === 'ERROR' ? 'ERROR' : 'USAR_EXISTENTE',
     },
-    anios: anios.rows,
+    anios,
     resumen,
     pagina: { estado: filtro.estado, numero, filas, paginas },
     muestra: muestra.rows,
@@ -815,21 +836,25 @@ async function buscar(
   };
 }
 
-/** Todas las filas revisadas en una sola sentencia; los datos originales no cambian. */
+/** Solo cambia las filas distintas, en lotes de la misma transacción. */
 async function actualizarFilas(
   db: PoolClient,
   id: string,
   revisadas: FilaRevisada[],
 ) {
-  await db.query(
-    `UPDATE convi.filas_importacion f
+  for (let inicio = 0; inicio < revisadas.length; inicio += FILAS_POR_LOTE) {
+    await db.query(
+      `UPDATE convi.filas_importacion f
      SET estado = r.estado, datos_normalizados = r.datos,
          problemas = r.problemas
      FROM jsonb_to_recordset($2::jsonb)
           AS r(numero int, estado text, datos jsonb, problemas jsonb)
-     WHERE f.proceso_importacion_id = $1 AND f.numero_fila = r.numero`,
-    [id, JSON.stringify(revisadas)],
-  );
+     WHERE f.proceso_importacion_id = $1 AND f.numero_fila = r.numero
+       AND (f.estado, f.datos_normalizados, f.problemas)
+           IS DISTINCT FROM (r.estado, r.datos, r.problemas)`,
+      [id, JSON.stringify(revisadas.slice(inicio, inicio + FILAS_POR_LOTE))],
+    );
+  }
 }
 
 /**
@@ -1018,11 +1043,17 @@ async function confirmarTramo(
   let limite = false;
   const confirmadas: { id: string; entidades: Entidades; principal: string }[] =
     [];
+  let puntoDeGuardado = false;
   for (const fila of filas.rows) {
-    await db.query('SAVEPOINT fila');
+    // Cerrar el anterior y abrir el siguiente comparten un viaje a la base.
+    await db.query(
+      puntoDeGuardado
+        ? 'RELEASE SAVEPOINT fila; SAVEPOINT fila'
+        : 'SAVEPOINT fila',
+    );
+    puntoDeGuardado = true;
     try {
       const entidades = await CONFIRMAR[tipo](c, fila.datos_normalizados ?? {});
-      await db.query('RELEASE SAVEPOINT fila');
       confirmadas.push({
         id: fila.id,
         entidades,
@@ -1045,6 +1076,7 @@ async function confirmarTramo(
       );
     }
   }
+  if (puntoDeGuardado) await db.query('RELEASE SAVEPOINT fila');
   // Las confirmadas del tramo, en una sola sentencia (CA1: qué creó o reutilizó).
   await db.query(
     `UPDATE convi.filas_importacion f

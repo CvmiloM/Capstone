@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { Readable } from 'node:stream';
+import { Worker } from 'node:worker_threads';
 import { type Formato, LIMITES } from './importacion.js';
 
 // PB-019 (HU-015 CA2): lee la primera hoja de un CSV o XLSX. La primera fila
@@ -20,8 +21,82 @@ export type HojaLeida = {
 
 /** El archivo no se pudo leer o no cumple los límites; el mensaje es para la persona. */
 export class ArchivoNoValido extends Error {}
+/** Capacidad temporal del servidor; no significa que el archivo sea inválido. */
+export class LecturaNoDisponible extends Error {}
+
+// Un solo Excel grande a la vez para limitar CPU/memoria, sin bloquear las páginas.
+let leyendoGrande = false;
 
 export async function leerArchivo(
+  contenido: Buffer,
+  formato: Formato,
+): Promise<HojaLeida> {
+  if (formato !== 'xlsx' || contenido.length < 256 * 1024)
+    return leerArchivoDirecto(contenido, formato);
+  if (leyendoGrande)
+    throw new LecturaNoDisponible(
+      'Ya se está leyendo otro Excel grande. Espera a que termine y vuelve a intentarlo.',
+    );
+  leyendoGrande = true;
+  try {
+    return await leerEnHilo(contenido);
+  } finally {
+    leyendoGrande = false;
+  }
+}
+
+function leerEnHilo(contenido: Buffer): Promise<HojaLeida> {
+  return new Promise((resolve, reject) => {
+    // Se transfiere una copia: el original todavía debe subirse a Storage.
+    const copia = new Uint8Array(contenido);
+    const hilo = new Worker(new URL('./lector-hilo.js', import.meta.url), {
+      workerData: copia,
+      transferList: [copia.buffer],
+      env: {},
+    });
+    let vencido = false;
+    const plazo = setTimeout(() => {
+      vencido = true;
+      void hilo.terminate().catch(() => undefined);
+    }, 45000);
+    plazo.unref();
+    let resultado:
+      | { ok: true; hoja: HojaLeida }
+      | { ok: false; mensaje: string }
+      | undefined;
+    hilo.once('message', (mensaje: NonNullable<typeof resultado>) => {
+      resultado = mensaje;
+    });
+    hilo.once('error', () => {
+      clearTimeout(plazo);
+      reject(
+        new LecturaNoDisponible(
+          'No se pudo completar la lectura del Excel. Inténtalo nuevamente.',
+        ),
+      );
+    });
+    hilo.once('exit', (codigo) => {
+      clearTimeout(plazo);
+      if (vencido)
+        reject(
+          new LecturaNoDisponible(
+            'El Excel tardó demasiado en leerse. Inténtalo nuevamente o usa CSV.',
+          ),
+        );
+      else if (codigo !== 0 || !resultado)
+        reject(
+          new LecturaNoDisponible(
+            'No se pudo completar la lectura del Excel. Inténtalo nuevamente.',
+          ),
+        );
+      else if (resultado.ok) resolve(resultado.hoja);
+      else reject(new ArchivoNoValido(resultado.mensaje));
+    });
+  });
+}
+
+/** Solo el hilo lector y los archivos pequeños llaman al lector directamente. */
+export async function leerArchivoDirecto(
   contenido: Buffer,
   formato: Formato,
 ): Promise<HojaLeida> {
@@ -46,7 +121,9 @@ export async function leerArchivo(
     );
   }
   if (!hoja) throw new ArchivoNoValido('El archivo no tiene hojas.');
-  if (hoja.columnCount > LIMITES.columnas)
+  // ExcelJS calcula columnCount recorriendo las filas; no repetirlo por celda.
+  const columnasDeLaHoja = hoja.columnCount;
+  if (columnasDeLaHoja > LIMITES.columnas)
     throw new ArchivoNoValido(
       `El archivo tiene más de ${LIMITES.columnas} columnas.`,
     );
@@ -55,7 +132,7 @@ export async function leerArchivo(
   const filas: FilaLeida[] = [];
   hoja.eachRow({ includeEmpty: false }, (fila, numero) => {
     const valores: string[] = [];
-    for (let c = 1; c <= hoja.columnCount; c++)
+    for (let c = 1; c <= columnasDeLaHoja; c++)
       valores.push(aTexto(fila.getCell(c).value));
     if (valores.every((v) => v === '')) return;
     if (!columnas) {

@@ -1,10 +1,11 @@
 # PB-145: CONVI en Azure con HTTPS
 
-Actualización 17/10/2026: piloto Redis de PB-027 creado y conectado a la API;
-API mínima/máxima 1/1 y web 0/1. Presupuesto de aviso actualizado a USD45.
-TLS/PONG desde la API y BullMQ con una cola ficticia comprobados. PR36 de Camilo
-sigue pendiente de merge y de la prueba funcional publicada. Los cambios de
-infraestructura y documentación están preparados; Git lo maneja Sebastian.
+Actualización 17/10/2026: PR36 (BullMQ) y PR37 (infraestructura Redis) fusionados;
+API y web publicadas con la imagen `07d5b2c`. API mínima/máxima 1/1 y, con
+autorización de Sebastian, web también 1/1. Presupuesto de aviso actualizado
+a USD60, conservando destinatarios y umbrales. No es un límite de gasto.
+Correcciones del lector Excel, escrituras y consulta de avance preparadas en
+`sebastian/rendimiento-importaciones`, todavía sin publicar. Git lo maneja Sebastian.
 Los apartados del despliegue inicial y rendimiento conservan su contexto histórico;
 la configuración vigente del piloto se detalla al final.
 
@@ -94,8 +95,9 @@ Conservar ese bloqueo: las plantillas nuevas ya no administran el entorno antigu
 - Supabase cloud conserva Auth, PostgreSQL y Storage. PostgreSQL usa
   `sslmode=verify-full` y el certificado público incluido en la imagen de API.
 - Piloto PB-027: API 0,25 vCPU/0,5 GiB con mínimo y máximo una réplica,
-  para que el trabajador siga sin visitas. Web 0,5 vCPU/1 GiB con mínimo cero y
-  máximo una réplica; la web aún puede tener arranque en frío.
+  para que el trabajador siga sin visitas. Web 0,5 vCPU/1 GiB con mínimo y máximo
+  una réplica, para evitar el arranque por escalado a cero. Reinicios y despliegues
+  todavía pueden producir esperas.
 - Azure Managed Redis Balanced B0 de un nodo, TLS, NoEviction y NoCluster,
   en Brazil South. Sin alta disponibilidad ni persistencia; ver el apartado del piloto.
 - **Container Registry Basic tiene coste por día incluso con las apps apagadas**,
@@ -103,8 +105,9 @@ Conservar ese bloqueo: las plantillas nuevas ya no administran el entorno antigu
   gratuita para otro SKU lo cubre. Tarifa pública consultada en Brazil South:
   USD0,1666/día, aproximadamente USD5 por 30 días, antes de extras y condiciones
   de la suscripción. Las imágenes se construyen en Docker/GitHub, no ACR Tasks.
-- Presupuesto mensual de aviso originalmente USD10, actualizado a USD45 para el
-  piloto aprobado del 17/10. Conserva destinatarios y umbrales 50/80/100 %. No corta el gasto.
+- Presupuesto mensual de aviso originalmente USD10, después USD45 y actualizado
+  a USD60 al aprobar la web encendida el 17/10. Conserva destinatarios y umbrales
+  50/80/100 %. No corta el gasto.
   El crédito estudiantil inicial USD100 vence el 16/10/2027, según su panel.
 - Este directorio Duoc tiene administradores institucionales con permisos heredados,
   Sebastian conoce esa condición. Se usa como entorno académico con datos ficticios.
@@ -231,7 +234,8 @@ y la renovación automática de Name.com está desactivada por Sebastian.
 - Un Contributor del grupo puede hacerlo desde Container App → Revisions,
   **Deactivate/Activate**, con coordinación del equipo. No eliminar el grupo para
   apagar una demo. Un despliegue nuevo puede volver a activar las aplicaciones.
-- En una defensa se puede fijar temporalmente mínimo uno, volver a cero después.
+- Configuración vigente: mínimo uno en ambas apps. Volver la web a cero requiere
+  actualizar también Bicep; la API debe continuar disponible mientras haya trabajos.
 - Para volver al código previo, seleccionar sus revisiones guardadas de **ambas**
   apps o sus imágenes SHA anteriores. No reconstruir un tag antiguo con código nuevo.
 - No hay rollback automático de datos, revisar compatibilidad antes de migraciones.
@@ -282,7 +286,9 @@ Referencias oficiales: [Container Apps](https://learn.microsoft.com/azure/contai
 
 ## Primera mejora de rendimiento, 16 de octubre de 2026
 
-Se conserva `minReplicas: 0`: no se contrataron recursos ni se cambió el modelo
+Registro histórico: en esta primera mejora se conservó `minReplicas: 0`.
+El piloto del 17/10 y la autorización posterior de web encendida lo reemplazan.
+En aquella mejora no se contrataron recursos ni se cambió el modelo
 de datos. La API reutiliza las conexiones inactivas durante 60 segundos, en lugar
 de los 10 predeterminados. Esto evita abrir otra conexión cuando alguien tarda
 unos segundos en pasar a otra pantalla; no mantiene encendido un contenedor
@@ -388,7 +394,7 @@ Referencias: [autorización y Proxy en Next.js](https://nextjs.org/docs/app/guid
 
 Sebastian aprobó este piloto para probar CONVI online hasta cerca de fin de año
 y revisar el consumo real al mes. El PR36 de Camilo aporta BullMQ, trabajador,
-avance y Reanudar; la infraestructura se prepara antes de su merge. No se cambian
+avance y Reanudar; ambos PR ya se fusionaron y publicaron en `07d5b2c`. No se cambian
 tablas, columnas, permisos ni migraciones.
 
 `redis-convi-vpko3nqhasxza` se declara en `infra/azure/redis.bicep`: Balanced B0,
@@ -404,8 +410,9 @@ conserva la configuración; no necesita otra variable o secreto en GitHub.
 
 La API mantiene una réplica para que el trabajador continúe aunque no haya
 visitas; máximo uno conserva el escenario probado por Camilo. Esto evita el
-escalado a cero de la API, pero no elimina reinicios, despliegues o fallos. La web
-conserva mínimo cero. No se modifica el entorno Express antiguo bloqueado.
+escalado a cero de la API, pero no elimina reinicios, despliegues o fallos. Sebastian
+autorizó también mínimo uno en la web después de medir su arranque en frío.
+No se modifica el entorno Express antiguo bloqueado.
 
 ### Coste y límites del piloto
 
@@ -416,15 +423,15 @@ impuestos, cuotas gratuitas y consumos adicionales:
 | --- | --- | ---: |
 | Redis B0, un nodo | 0,023 USD/h, siempre asignado | 16,79 USD |
 | API mínima 1 | Desde todo idle hasta todo activo | 5,91–19,71 USD |
-| Web mínima 0 | Aproximadamente 2 h activas al día | 3,29 USD |
+| Web mínima 1 | Aproximadamente 2 h activas y 22 h idle al día | 14,13 USD |
 | ACR Basic | 0,1666 USD/día | 5,07 USD |
-| Total de referencia | Antes de cuotas y extras | 31,06–44,86 USD |
+| Total de referencia | Antes de cuotas y extras | 41,90–55,70 USD |
 
-El presupuesto de aviso es 45 USD/mes, no un tope ni una garantía de consumo.
+El presupuesto de aviso es 60 USD/mes, no un tope ni una garantía de consumo.
 La web puede consumir más que el supuesto: activa 24 h/día serían unos 39,42 USD
 solo de web, antes de cuotas. Las cuotas gratuitas se comparten a nivel de
 suscripción; no se suman los créditos de los tres integrantes. Los 100 USD
-nominales cubrirían aproximadamente 2–3 meses del escenario de referencia,
+nominales cubrirían aproximadamente 1,8–2,4 meses del escenario de referencia,
 dependiendo del saldo y actividad real. Revisar Cost Management → Cost analysis
 en el grupo y Education → crédito restante; el gasto tarda en aparecer.
 
@@ -442,10 +449,11 @@ decisión de presupuesto aparte. No se ha contratado.
 
 ### Comprobación y recuperación
 
-Resultado del 17/10: despliegue `convi-redis-piloto` Succeeded, Redis 7.4.3.
+Resultado inicial del 17/10, antes de los merges: despliegue `convi-redis-piloto`
+Succeeded, Redis 7.4.3.
 La API quedó Ready en revisión `ca-convi-api-estandar--0000005`, con REDIS_URL
 referida al secreto. Se comprobó AUTH/PONG desde ese contenedor con validación de
-certificado y TLS mínimo 1.2. La imagen de API y web sigue identificada por
+certificado y TLS mínimo 1.2. La imagen de API y web en esa comprobación estaba identificada por
 `95c3ca8ea37fc6575f1ad9bbde5920111e1a9b03`; no se adelantó el código de PR36.
 Ambos dominios devolvieron HTTP200 en /login por HTTPS. Las referencias a secretos
 Supabase, su configuración pública, el ingreso interno y los dominios se conservaron.
@@ -475,3 +483,160 @@ Fuentes: [Managed Redis](https://azure.microsoft.com/en-us/pricing/details/manag
 [facturación Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/billing),
 [persistencia y requisito de HA](https://learn.microsoft.com/en-us/azure/redis/how-to-persistence),
 [conexiones BullMQ](https://docs.bullmq.io/guide/connections).
+
+## Corrección de lentitud de importaciones, 17/10/2026
+
+Rama `sebastian/rendimiento-importaciones`. Trabajo transversal a PB-019,
+PB-020, PB-026 y PB-027; conserva los responsables y la lógica de confirmación
+de Camilo. Sin tablas, columnas, índices ni migraciones nuevas. El código de
+esta sección está preparado localmente; falta commit, PR y publicación.
+
+### Diagnóstico y cambios
+
+- En ExcelJS 4.4.0, `Worksheet.columnCount` recorre las filas. Consultarlo en la
+  condición del bucle de cada celda multiplicaba el trabajo aproximadamente de
+  forma cuadrática. Ahora se calcula una vez por hoja.
+- Los XLSX desde 256 KiB se leen en un hilo de Node separado del que atiende
+  peticiones. Se transfiere una copia para conservar el archivo original que
+  luego se guarda en Storage. El hilo no hereda variables de entorno privadas;
+  no es un sandbox de seguridad ni obtiene recursos adicionales.
+- Se admite una lectura pesada por proceso; otra recibe 503 antes de escribir
+  en PostgreSQL o Storage. No queda una carga pendiente oculta. Los CSV y XLSX
+  pequeños pueden seguir leyéndose. El hilo se termina a los 45 segundos si no
+  acaba, devuelve un error recuperable y libera la capacidad para reintentar.
+- Carga y revisión escriben lotes de hasta 1.000 filas dentro de la misma
+  transacción, sin elevar el `statement_timeout` de cinco segundos. Una falla
+  deshace todos los lotes. La revisión omite filas cuyo estado, datos normalizados
+  y problemas son idénticos, incluyendo valores NULL.
+- La barra de avance mantiene como máximo una petición en vuelo. Una respuesta
+  lenta ya no se acumula con consultas posteriores ni reemplaza un avance más nuevo.
+
+### Mediciones y alcance
+
+Docker local, imagen de producción, Node 22, 512 MiB, sin red. Se usó el mismo
+XLSX de 5.000 filas y unos 4,4 MB, sin imprimir sus celdas. Son ensayos del lector,
+no tiempos completos de subida, revisión, confirmación o navegación.
+
+| Lector | Límite CPU | Tiempo de lectura |
+| --- | ---: | ---: |
+| Original | 0,25 CPU | Más de 270 s; benchmark detenido sin terminar |
+| Original | 1 CPU | 178,8 s |
+| Corregido, imagen final con hilo | 0,25 CPU | 17,4 s |
+| Corregido, imagen final con hilo | 1 CPU | 6,3 s |
+
+Con 20 filas: 0,36 s a 0,25 CPU y 0,11 s a 1 CPU en esos ensayos finales.
+La salida de las 5.000 filas del hilo coincide íntegramente con la lectura
+directa y el Buffer original queda intacto. El ensayo intermedio sin hilo dio
+10,6 s a 0,25 CPU: el hilo añade coste, pero reduce el bloqueo del proceso que
+atiende páginas. En la prueba final a 0,25 CPU, el retraso máximo del bucle
+principal fue unos 0,70 s y el proceso usó unos 202 MiB de RSS máximo.
+Estas cifras no garantizan la misma duración bajo tráfico real.
+
+Prueba PostgreSQL local con RLS y rollback: repetir la revisión de 5.000 filas
+sin cambios pasó de unas 6,9 s y 5.000 reescrituras a 1,5 s y cero reescrituras
+con los cinco lotes. Cambios reales y NULL también comprobados. La carga real
+del servicio con 5.000 filas ficticias conservó atomicidad: una falla provocada
+en el tercer lote no dejó proceso, archivo ni filas parciales, ni llamó Storage.
+Se comprobaron formatos de celdas, codificación CSV, encabezados repetidos,
+límites, capacidad ocupada, error del hilo, vencimiento y recuperación posterior.
+Pasaron las 32 pruebas existentes de API, lint de API y web, compilaciones de
+API, web e imagen API de producción y compilación de Bicep. Otras 22 comprobaciones
+externas cubrieron errores de Storage/SQL/COMMIT y contratos ya existentes.
+Las pruebas adicionales permanecen fuera de Git y las dos muestras privadas
+binarias se eliminaron al terminar; no se registraron celdas ni credenciales.
+
+En Azure, antes de estos cambios, la API alcanzó su cuota de 0,25 CPU con cero
+reinicios y unos 261 MiB de memoria máxima sobre 512 MiB. Las consultas de
+lectura medidas bajo el rol de la aplicación no explicaban por sí solas 50 s:
+conteo de 4.500 filas unos 352 ms de servidor; muestra de 50 filas unos 4 ms.
+No se pudo precisar qué etapa produjo los 50 segundos reportados por Camilo.
+
+La web escalada a cero tardó 23,3 s en responder /login y, ya activa, 0,4 s.
+Sebastian autorizó mínimo uno y la alerta USD60; ambos cambios se aplicaron
+sin reemplazar imágenes ni dominios. Después, /login respondió HTTPS200 en
+0,54 s. Esto evita dormir por inactividad, no esperas por reinicios/despliegues.
+La API conserva 0,25 CPU/0,5 GiB: la prueba de 1 CPU fue solo local.
+
+Después de publicar, repetir los mismos archivos midiendo por separado subir,
+revisar y confirmar, además de navegar mientras trabaja. La confirmación conserva
+su cola, tramos y operaciones por fila; no atribuirle la mejora medida del lector
+ni prometer tiempos máximos de un segundo para importar miles de filas.
+
+Referencias: [código ExcelJS 4.4.0](https://github.com/exceljs/exceljs/blob/v4.4.0/lib/doc/worksheet.js),
+[hilos Node 22](https://nodejs.org/docs/latest-v22.x/api/worker_threads.html),
+[escalado Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/scale-app).
+
+### Segunda revisión: viajes a Supabase y confirmación
+
+Sebastian pidió investigar más mejoras conservando las funciones. Se consultaron
+las guías oficiales de rendimiento, conexiones, RLS y regiones de Supabase,
+y la documentación PostgreSQL 17 de SAVEPOINT, RELEASE y RETURNING.
+Esta ronda conserva escuela, permisos, MFA, auditoría, cola, errores por fila,
+reanudación y duplicados. No cambia la estructura ni las políticas de la base.
+
+- El detalle de una importación obtiene los años editables en la consulta del
+  proceso y calcula el total con el resumen por estado que ya necesita devolver.
+  Pasa de cuatro consultas de negocio a tres y de dos conteos completos a uno.
+  El listado conserva su contrato y su propio total por importación.
+- El contexto de una importación de Cursos omite la consulta de personas,
+  estudiantes y cuentas, que su validación no usa. Los otros cinco tipos
+  conservan su contexto completo. No cambia ningún dato ni opción de pantalla.
+- Al confirmar, cerrar el punto de guardado anterior y abrir el siguiente
+  comparten una llamada con SQL fijo, dentro de la misma conexión/transacción.
+  Cada fila conserva su rollback; no se acumulan puntos de guardado abiertos.
+- Crear una persona nueva y su ficha de estudiante usa una sentencia con
+  `WITH ... INSERT ... RETURNING`. Ambas altas mantienen sus restricciones,
+  RLS y disparadores. La búsqueda y reutilización del estudiante existente
+  conservan sus reglas; no se usan nombres para identificar duplicados.
+
+Comparación local con servicios reales, PostgreSQL/RLS, 60 estudiantes nuevos,
+dos tramos y cola/Storage simulados: el trabajador pasó de 331 a 213 llamadas a
+la base (118 menos, alrededor del 36 %). Con un fallo SQL provocado después de
+guardar una fila, de 332 a 215; las otras 59 se confirmaron y la fallida no dejó
+persona huérfana. Los conteos de auditoría por recurso/acción y los resultados
+coincidieron entre las implementaciones. No es una medida del tiempo online.
+
+El detalle devolvió exactamente los mismos valores y errores con filtros,
+estados sin filas y páginas fuera de rango. Se compararon los seis contextos;
+se comprobó aislamiento entre dos escuelas. Los ensayos se deshacen mediante
+rollback y no envían correos ni escriben en Supabase cloud.
+Un fallo general provocado tras escribir un estudiante revirtió el tramo entero;
+el reintento confirmó los 60. Otra importación reutilizó esas fichas sin duplicar
+personas. El límite 429 de invitaciones se simuló: las filas quedaron disponibles
+para reintentar y no quedaron cuentas pendientes sin invitación. Pasaron lint,
+las 32 pruebas existentes, build de API y la imagen de producción actualizada.
+
+Lectura agregada de estadísticas existentes de Supabase, sin mostrar consultas
+ni valores: grupo `filas_importacion`, 262 llamadas históricas, media de ejecución
+48,20 ms y máximo 3.077,13 ms; resolver membresía, 1.866 llamadas, media 1,77 ms.
+Son grupos de sentencias y un historial compartido: no representan una sola
+importación ni incluyen tiempo de red, espera del pool, Auth o parseo del Excel.
+La conexión usa el pooler `us-east-1`, puerto 5432 (sesión), apropiado para un
+backend persistente IPv4. La API está en Brazil South. No cambiar de modo de
+pool ni multiplicar conexiones sin medir una espera real del pool.
+
+Dos candidatos posteriores:
+
+1. **Regiones próximas.** Reducir la distancia API/PostgreSQL puede beneficiar
+   cada consulta secuencial. Requiere planificar una migración o un despliegue
+   distinto con sus políticas, secretos, dominio y coste; no forma parte de
+   estos cambios. Una réplica de lectura no acelera las escrituras de importación.
+2. **RLS con initPlan.** El modelo llama funciones de sesión por fila. Supabase
+   documenta envolver funciones que no dependen de la fila en `SELECT` para
+   evaluarlas por sentencia. Aplicarlo requiere revisar políticas y demostrar
+   equivalencia de permisos. No corresponde cambiar una función que sí dependa
+   de cada registro ni desactivar RLS para obtener velocidad.
+
+Tampoco se sustituye esta importación por COPY: PostgreSQL no admite COPY FROM
+con RLS aplicada al rol. La importación de CONVI necesita conservar validación,
+aislamiento, vista previa, auditoría y recuperación. El pool ya se reutiliza;
+las transacciones siguen usando el mismo cliente y el DSN conserva verify-full.
+No se agregan dependencias ni se amplían recursos de Azure en esta ronda.
+
+Fuentes: [rendimiento Supabase](https://supabase.com/docs/guides/platform/performance),
+[conexiones](https://supabase.com/docs/guides/database/connecting-to-postgres),
+[casos y buenas prácticas RLS](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv),
+[regiones](https://supabase.com/docs/guides/platform/regions),
+[RETURNING](https://www.postgresql.org/docs/17/dml-returning.html),
+[SAVEPOINT](https://www.postgresql.org/docs/17/sql-savepoint.html),
+[COPY y RLS](https://www.postgresql.org/docs/17/sql-copy.html).
