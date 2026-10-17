@@ -230,21 +230,7 @@ async function matricular(
         `La ficha de ${estudiante.nombre} no está activa: no se puede matricular.`,
       );
   }
-  const { anio } = curso;
-  const desde = fecha ?? anio.fecha_inicio;
-  if (!desde)
-    throw new FilaNoConfirmada(
-      'fecha_matricula',
-      `Indica la fecha de matrícula: el año ${anio.anio} no tiene fecha de inicio.`,
-    );
-  if (
-    (anio.fecha_inicio && desde < anio.fecha_inicio) ||
-    (anio.fecha_fin && desde > anio.fecha_fin)
-  )
-    throw new FilaNoConfirmada(
-      'fecha_matricula',
-      `Elige una fecha dentro del año ${anio.anio}.`,
-    );
+  const desde = fechaParaMatricula(curso, fecha);
 
   const entidades: Entidades = {
     curso: { id: curso.id, accion: 'REUTILIZADO' },
@@ -301,7 +287,181 @@ async function matricular(
   return entidades;
 }
 
+function fechaParaMatricula(
+  curso: Awaited<ReturnType<typeof buscarCurso>>,
+  fecha: string | null,
+) {
+  const { anio } = curso;
+  const desde = fecha ?? anio.fecha_inicio;
+  if (!desde)
+    throw new FilaNoConfirmada(
+      'fecha_matricula',
+      `Indica la fecha de matrícula: el año ${anio.anio} no tiene fecha de inicio.`,
+    );
+  if (
+    (anio.fecha_inicio && desde < anio.fecha_inicio) ||
+    (anio.fecha_fin && desde > anio.fecha_fin)
+  )
+    throw new FilaNoConfirmada(
+      'fecha_matricula',
+      `Elige una fecha dentro del año ${anio.anio}.`,
+    );
+
+  return desde;
+}
+
 // ===== Estudiantes (con su matrícula si trae curso) =====
+
+/** Un fallo del lote se deshace y deja que la ruta por fila identifique el error. */
+export async function confirmarEstudiantesEnLote(
+  c: Confirmacion,
+  filas: Datos[],
+): Promise<Entidades[] | null> {
+  if (filas.length < 2) return null;
+  const datos = filas.map((d, indice) => ({
+    indice,
+    codigo_estudiante: valor(d, 'codigo_estudiante'),
+    rut: valor(d, 'rut'),
+    nombres: valor(d, 'nombres'),
+    apellidos: valor(d, 'apellidos'),
+    correo: valor(d, 'correo'),
+    telefono: valor(d, 'telefono'),
+    direccion: valor(d, 'direccion'),
+    fecha_nacimiento: valor(d, 'fecha_nacimiento'),
+    curso: valor(d, 'curso'),
+    fecha_matricula: valor(d, 'fecha_matricula'),
+    curso_id: null as string | null,
+  }));
+  const codigos = datos.map((d) => d.codigo_estudiante);
+  const ruts = datos.flatMap((d) => (d.rut ? [d.rut] : []));
+  // Las repeticiones deben ver lo creado por la fila anterior, en su orden.
+  if (
+    codigos.includes(null) ||
+    new Set(codigos).size !== codigos.length ||
+    new Set(ruts).size !== ruts.length
+  )
+    return null;
+
+  await c.db.query('SAVEPOINT lote_estudiantes');
+  try {
+    const encontrados = await c.db.query<{
+      indice: number;
+      id: string | null;
+      persona_id: string | null;
+    }>(
+      `WITH entrada AS (
+       SELECT * FROM jsonb_to_recordset($1::jsonb)
+         AS r(indice int, codigo_estudiante text, rut text)
+     ), por_codigo AS (
+       SELECT r.indice, e.id, e.persona_id
+       FROM entrada r JOIN convi.estudiantes e
+         ON e.codigo_estudiante = r.codigo_estudiante
+       JOIN convi.personas p ON p.id = e.persona_id
+     ), por_rut AS (
+       SELECT r.indice, e.id, e.persona_id
+       FROM entrada r JOIN convi.personas p ON p.rut = r.rut
+       JOIN convi.estudiantes e ON e.persona_id = p.id
+       WHERE r.rut IS NOT NULL
+     )
+     SELECT r.indice, coalesce(c.id, u.id) AS id,
+            coalesce(c.persona_id, u.persona_id) AS persona_id
+     FROM entrada r LEFT JOIN por_codigo c ON c.indice = r.indice
+     LEFT JOIN por_rut u ON u.indice = r.indice`,
+      [JSON.stringify(datos)],
+    );
+    if (
+      encontrados.rows.some(
+        (e) => e.id && (c.duplicados === 'ERROR' || datos[e.indice].curso),
+      )
+    ) {
+      await c.db.query('RELEASE SAVEPOINT lote_estudiantes');
+      return null;
+    }
+    const existentes = new Map(encontrados.rows.map((e) => [e.indice, e]));
+    const nuevos = datos.filter((d) => !existentes.get(d.indice)?.id);
+    for (const d of nuevos) {
+      if (!d.curso) continue;
+      const curso = await buscarCurso(c, d.curso);
+      d.curso_id = curso.id;
+      d.fecha_matricula = fechaParaMatricula(curso, d.fecha_matricula);
+    }
+    const entidades = new Map<number, Entidades>();
+    for (const e of encontrados.rows) {
+      if (e.id && e.persona_id)
+        entidades.set(e.indice, {
+          persona: { id: e.persona_id, accion: 'REUTILIZADO' },
+          estudiante: { id: e.id, accion: 'REUTILIZADO' },
+        });
+    }
+    if (nuevos.length) {
+      const creados = await c.db.query<{
+        indice: number;
+        id: string;
+        persona_id: string;
+        curso_id: string | null;
+        matricula_id: string | null;
+      }>(
+        `WITH entrada AS MATERIALIZED (
+           SELECT r.*, gen_random_uuid() AS persona_id
+           FROM jsonb_to_recordset($1::jsonb) AS r(
+             indice int, codigo_estudiante text, nombres text, apellidos text,
+             rut text, correo text, telefono text, direccion text,
+             fecha_nacimiento date, curso_id uuid, fecha_matricula date)
+         ), personas AS (
+           INSERT INTO convi.personas
+             (id, establecimiento_id, nombres, apellidos, rut, correo, telefono, direccion)
+           SELECT persona_id, convi.establecimiento_actual(), nombres, apellidos,
+                  rut, correo, telefono, direccion FROM entrada
+           RETURNING id
+         ), estudiantes AS (
+           INSERT INTO convi.estudiantes
+             (establecimiento_id, persona_id, codigo_estudiante, fecha_nacimiento)
+           SELECT convi.establecimiento_actual(), r.persona_id,
+                  r.codigo_estudiante, r.fecha_nacimiento
+           FROM entrada r JOIN personas p ON p.id = r.persona_id
+           RETURNING id, persona_id
+         ), matriculas AS (
+           INSERT INTO convi.matriculas
+             (establecimiento_id, estudiante_id, curso_id, anio_academico_id, matriculado_en)
+           SELECT convi.establecimiento_actual(), e.id, r.curso_id, $2::uuid,
+                  r.fecha_matricula
+           FROM estudiantes e JOIN entrada r ON r.persona_id = e.persona_id
+           WHERE r.curso_id IS NOT NULL
+           RETURNING id, estudiante_id
+         )
+         SELECT r.indice, e.id, e.persona_id, r.curso_id, m.id AS matricula_id
+         FROM estudiantes e JOIN entrada r ON r.persona_id = e.persona_id
+         LEFT JOIN matriculas m ON m.estudiante_id = e.id`,
+        [JSON.stringify(nuevos), c.anioId],
+      );
+      if (creados.rows.length !== nuevos.length)
+        throw new Error('El lote no devolvió todas sus fichas.');
+      for (const e of creados.rows) {
+        if (e.curso_id && !e.matricula_id)
+          throw new Error('El lote no devolvió todas sus matrículas.');
+        entidades.set(e.indice, {
+          persona: { id: e.persona_id, accion: 'CREADO' },
+          estudiante: { id: e.id, accion: 'CREADO' },
+          ...(e.curso_id && e.matricula_id
+            ? {
+                curso: { id: e.curso_id, accion: 'REUTILIZADO' as const },
+                matricula: { id: e.matricula_id, accion: 'CREADO' as const },
+              }
+            : {}),
+        });
+      }
+    }
+    await c.db.query('RELEASE SAVEPOINT lote_estudiantes');
+    return datos.map((d) => entidades.get(d.indice)!);
+  } catch (error) {
+    await c.db.query(
+      'ROLLBACK TO SAVEPOINT lote_estudiantes; RELEASE SAVEPOINT lote_estudiantes',
+    );
+    c.memoria.clear();
+    if (!problemaDeError(error)) throw error;
+    return null;
+  }
+}
 
 async function confirmarEstudiante(c: Confirmacion, d: Datos) {
   const codigo = valor(d, 'codigo_estudiante');

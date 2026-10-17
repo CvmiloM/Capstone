@@ -640,3 +640,84 @@ Fuentes: [rendimiento Supabase](https://supabase.com/docs/guides/platform/perfor
 [RETURNING](https://www.postgresql.org/docs/17/dml-returning.html),
 [SAVEPOINT](https://www.postgresql.org/docs/17/sql-savepoint.html),
 [COPY y RLS](https://www.postgresql.org/docs/17/sql-copy.html).
+
+### Prueba online y confirmación por lotes (17 de octubre de 2026)
+
+La versión publicada `6118098` completó una importación ficticia de 20
+estudiantes: 20 fichas guardadas y ninguna fila omitida. La escuela de prueba
+no tenía años; Sebastián autorizó crear 2026 Planificado, sin activarlo.
+Un XLSX ficticio de 5.000 filas y 405 KiB abrió su vista previa en unos 21 s
+y sus 5.000 filas quedaron válidas. No es una prueba de un archivo de 5 MiB.
+Los tiempos observados incluyen la navegación y el control del navegador;
+los avisos de confirmación impidieron cronometrar con precisión el caso de 20.
+
+La confirmación masiva sí mostró otro cuello de botella: 550 filas confirmadas
+en 220 s, y 1.850 en 713 s. Seguía Procesando y avanzando, sin filas Con error
+en esas lecturas. La estimación a ese ritmo era de unos 33 minutos, no una
+medición final. Navegando durante el trabajo, Usuarios respondió en unos 2,9 s
+y Cursos en unos 11,1 s. El flujo en segundo plano funcionaba, pero esos tiempos
+no cumplen el objetivo de rendimiento. La API estaba Running, mínimo uno,
+0,25 CPU y 0,5 GiB; no era un arranque desde cero.
+
+Se preparó una tercera mejora, pendiente de commit y publicación:
+
+- El trabajador mantiene sus transacciones de 50 filas, su cola y sus permisos.
+  Los estudiantes se buscan por código y RUT en conjunto. El código conserva
+  prioridad cuando ambos identifican fichas diferentes. Las fichas existentes
+  se reutilizan sin cambiar sus datos, conforme a la opción elegida.
+- Para estudiantes nuevos, las personas, fichas y matrículas opcionales se
+  insertan en conjunto mediante CTE y `RETURNING`, con SQL parametrizado.
+  RLS, restricciones y disparadores siguen ejecutándose. Año, curso y fecha
+  usan los mismos controles de la ruta por fila; los bloqueos duran el tramo.
+- Si un estudiante existente trae curso, si se repite un código o RUT dentro
+  del tramo o si corresponde marcar duplicados como error, se conserva la
+  ruta por fila. También sigue usándose para los otros tipos de importación.
+- El lote tiene su propio SAVEPOINT. Un error esperado lo revierte y permite
+  identificar las filas fallidas con el método anterior. Un error inesperado
+  sigue revirtiendo el tramo completo. Tras revertir, se descarta la memoria
+  de cursos/año para volver a leerlos y adquirir sus bloqueos al reintentar.
+  No se amplían timeouts ni se ignoran errores para obtener velocidad.
+
+Comparación local de servicios reales con PostgreSQL, rol `convi_backend`,
+RLS y rollback final:
+
+| Caso del trabajador | Consultas anteriores | Consultas por lotes |
+| --- | ---: | ---: |
+| 60 estudiantes nuevos sin curso, dos tramos | 213 | 39 |
+| Los mismos 60 con un fallo SQL provocado en una fila | 215 | 192 |
+| Reutilizar 60 fichas ya existentes | — | 37 |
+| 20 estudiantes nuevos con matrícula | 105 | 28 |
+| Curso cerrado después de encolar: 19 confirmadas y una fallida | 106 | 112 |
+
+El caso de error puede necesitar consultas adicionales para recuperar la ruta
+por fila; se privilegia conservar el resultado. Resultados, acciones y conteos
+de auditoría por recurso coincidieron con la implementación anterior. Se
+comprobaron mezcla de nuevos/existentes, datos previos intactos, prioridad del
+código sobre el RUT, fechas y campos opcionales, fallo de búsqueda recuperable,
+error tras escribir, reintento sin duplicados y aislamiento entre escuelas.
+Una confirmación local de 5.000 nuevos sin curso terminó en unos 30–33 s,
+1.411 consultas, 5.000 confirmadas y cero errores. No es un tiempo de Azure.
+Las pruebas adicionales quedan fuera de Git y revierten sus datos locales;
+no envían correos ni modifican la estructura de la base.
+
+La imagen final de producción también se probó con 0,25 CPU y 512 MiB, usando
+PostgreSQL local y un CSV ficticio de 5.000 filas: carga 3,5 s, revisión 3,6 s,
+confirmación 33,1 s, 1.411 consultas del trabajador, 5.000 confirmadas y cero
+errores; RSS al finalizar 108 MiB, no una medición de su máximo. Storage y
+cola se simularon; se usaron los servicios, SQL y RLS reales y rollback final.
+Pasaron compilación, lint, las 32 pruebas existentes de API y construcción de
+la imagen Docker. La prueba no incluye red Azure/Supabase ni tráfico concurrente.
+
+La distancia Brazil South / Supabase us-east-1 sigue siendo un candidato a
+investigar con mediciones desde la API. El ping de 142–148 ms se midió desde
+el equipo de desarrollo, no desde Azure. Las estadísticas agregadas de SQL
+no incluyen esa red. Esta mejora reduce viajes mediante operaciones sobre
+conjuntos; no cambia de driver, no activa pipeline de libpq, no migra regiones
+ni aumenta recursos o costes contratados.
+
+Fundamento: PostgreSQL explica el coste acumulado de muchos viajes pequeños
+en su [documentación de latencia y pipeline](https://www.postgresql.org/docs/17/libpq-pipeline-mode.html#LIBPQ-PIPELINE-WHEN-TO-USE).
+Supabase recomienda considerar la cercanía a la base para trabajo intensivo
+en datos en su [guía de ejecución regional](https://supabase.com/docs/guides/functions/regional-invocation).
+Después de publicar hay que repetir la prueba online antes de atribuirle
+un porcentaje o duración garantizados a la mejora.

@@ -20,6 +20,7 @@ import {
 } from './campos.js';
 import {
   CONFIRMAR,
+  confirmarEstudiantesEnLote,
   type Confirmacion,
   type Entidades,
   LimiteDeCorreos,
@@ -1041,10 +1042,23 @@ async function confirmarTramo(
   }
 
   let limite = false;
+  const entidadesLote =
+    tipo === 'ESTUDIANTES'
+      ? await confirmarEstudiantesEnLote(
+          c,
+          filas.rows.map((fila) => fila.datos_normalizados ?? {}),
+        )
+      : null;
   const confirmadas: { id: string; entidades: Entidades; principal: string }[] =
-    [];
+    entidadesLote
+      ? filas.rows.map((fila, indice) => ({
+          id: fila.id,
+          entidades: entidadesLote[indice],
+          principal: entidadesLote[indice].estudiante.id,
+        }))
+      : [];
   let puntoDeGuardado = false;
-  for (const fila of filas.rows) {
+  for (const fila of entidadesLote ? [] : filas.rows) {
     // Cerrar el anterior y abrir el siguiente comparten un viaje a la base.
     await db.query(
       puntoDeGuardado
