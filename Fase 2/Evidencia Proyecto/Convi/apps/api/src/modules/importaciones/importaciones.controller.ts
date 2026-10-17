@@ -22,8 +22,8 @@ import {
   validarFiltro,
 } from './importaciones.service.js';
 
-// PB-019, PB-020 y PB-026 (HU-015 y HU-020): importaciones del portal de
-// administración. El decorador de la clase aplica a todas las rutas: solo
+// PB-019, PB-020, PB-026 y PB-027 (HU-015 y HU-020): importaciones del portal
+// de administración. El decorador de la clase aplica a todas las rutas: solo
 // entra una cuenta ADMIN activa con el segundo factor completo, y se comprueba
 // antes de recibir el archivo.
 @Controller('admin/importaciones')
@@ -97,11 +97,11 @@ export class ImportacionesController {
     return this.importaciones.revisar(peticion.sesion, id, cuerpo);
   }
 
-    // PB-026: { incluir_advertencias: boolean }. Confirma las filas Válidas (y
-  // las Con advertencia, si se pide) y responde con la importación y cuántas
-  // se confirmaron.
+    // PB-026 y PB-027: { incluir_advertencias: boolean }. Vuelve a revisar las
+  // filas y deja la confirmación en la cola: responde 202 con la importación
+  // Procesando (o En revisión, si no quedó nada que confirmar).
   @Post(':id/confirmacion')
-  @HttpCode(200)
+  @HttpCode(202)
   confirmar(
     @Req() peticion: PeticionConSesion,
     @Param('id', ParseUUIDPipe) id: string,
@@ -118,5 +118,25 @@ export class ImportacionesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.importaciones.omitir(peticion.sesion, id);
+  }
+ 
+  // PB-027: vuelve a encolar una confirmación que se detuvo. Sigue desde la
+  // fila donde quedó.
+  @Post(':id/reanudacion')
+  @HttpCode(202)
+  reanudar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.importaciones.reanudar(peticion.sesion, id);
+  }
+
+  // PB-027 (HU-020 CA5): estado, conteos por estado y avance, sin las filas.
+  @Get(':id/avance')
+  avance(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.importaciones.avance(peticion.sesion, id);
   }
 }

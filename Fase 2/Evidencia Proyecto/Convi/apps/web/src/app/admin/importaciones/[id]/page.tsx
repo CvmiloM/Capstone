@@ -25,11 +25,11 @@ function leer(valor: string | undefined) {
   return typeof valor === "string" ? valor.trim() : "";
 }
 
-// PB-019, PB-020 y PB-026 (HU-015 y HU-020): la importación cargada. Primero
-// se relaciona cada columna con un campo de CONVI (CA3); después, la vista
-// previa muestra cada fila Válida, Con advertencia o Con error (CA4),
+// PB-019, PB-020, PB-026 y PB-027 (HU-015 y HU-020): la importación cargada.
+// Primero se relaciona cada columna con un campo de CONVI (CA3); después, la
+// vista previa muestra cada fila Válida, Con advertencia o Con error (CA4),
 // filtrable por estado (?estado=ERROR&pagina=2). Recién al confirmar se
-// guardan en las fichas.
+// guardan en las fichas, en segundo plano y con su avance.
 export default async function PaginaImportacion({
   params,
   searchParams,
@@ -63,27 +63,28 @@ export default async function PaginaImportacion({
     );
   }
 
-  const creado = new Intl.DateTimeFormat("es-CL", {
-    dateStyle: "long",
-    timeStyle: "short",
-    timeZone: escuela.zonaHoraria,
-  }).format(new Date(importacion.creado_en));
+  // Fechas con la zona horaria de la escuela.
+  const fecha = (iso: string | null | undefined) =>
+    iso
+      ? new Intl.DateTimeFormat("es-CL", {
+          dateStyle: "long",
+          timeStyle: "short",
+          timeZone: escuela.zonaHoraria,
+        }).format(new Date(iso))
+      : null;
+  const creado = fecha(importacion.creado_en);
   const tipo =
     NOMBRE_TIPO[importacion.tipo_importacion] ?? importacion.tipo_importacion;
   const nombreEstado = NOMBRE_ESTADO[importacion.estado] ?? importacion.estado;
   const revisada = importacion.estado === "REVISION";
+  const procesando = importacion.estado === "PROCESANDO";
   const confirmada = importacion.estado === "CONFIRMADO";
   const conConfirmadas = importacion.resumen.CONFIRMADO > 0;
   // Solo se relacionan columnas antes de confirmar filas (la API también lo exige).
   const editable =
     ["CARGADO", "REVISION"].includes(importacion.estado) && !conConfirmadas;
-  const confirmadaEl = importacion.confirmado_en
-    ? new Intl.DateTimeFormat("es-CL", {
-        dateStyle: "long",
-        timeStyle: "short",
-        timeZone: escuela.zonaHoraria,
-      }).format(new Date(importacion.confirmado_en))
-    : null;
+  const confirmadaEl = fecha(importacion.confirmado_en);
+  const terminadaEl = fecha(importacion.confirmacion?.terminada_en);
   const primera = importacion.muestra[0];
 
   const formulario = editable && (
@@ -143,17 +144,19 @@ export default async function PaginaImportacion({
       >
         {confirmada
           ? "La importación quedó Confirmada: sus filas confirmadas ya están en las fichas de la escuela."
-          : revisada && conConfirmadas
-            ? "Las filas Confirmadas ya están en las fichas de la escuela. Las demás se pueden confirmar u omitir."
-            : revisada
-              ? "Esta es la vista previa de la importación. Todavía no se guardó nada en las fichas: eso pasa solo al confirmar la importación."
-              : "El archivo quedó guardado en el espacio privado de la escuela y sus filas se conservan tal como venían. Todavía no se guardó nada en las fichas."}
+          : procesando
+            ? "La importación se está confirmando en segundo plano. Las filas Confirmadas ya están en las fichas de la escuela; las que esperan, todavía no."
+            : revisada && conConfirmadas
+              ? "Las filas Confirmadas ya están en las fichas de la escuela. Las demás se pueden confirmar u omitir."
+              : revisada
+                ? "Esta es la vista previa de la importación. Todavía no se guardó nada en las fichas: eso pasa solo al confirmar la importación."
+                : "El archivo quedó guardado en el espacio privado de la escuela y sus filas se conservan tal como venían. Todavía no se guardó nada en las fichas."}
       </p>
 
       <div className="space-y-8">
         {!revisada && formulario}
 
-        {(revisada || confirmada) && (
+        {(revisada || procesando || confirmada) && (
           <section
             aria-labelledby="titulo-confirmar"
             className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
@@ -161,21 +164,25 @@ export default async function PaginaImportacion({
             <h2 id="titulo-confirmar" className="mb-3 text-lg font-semibold">
               {confirmada
                 ? "Importación confirmada"
-                : "Confirmar la importación"}
+                : procesando
+                  ? "Confirmando la importación"
+                  : "Confirmar la importación"}
             </h2>
             <AccionesConfirmacion
               id={importacion.id}
               tipo={importacion.tipo_importacion}
               estado={importacion.estado}
               resumen={importacion.resumen}
+              confirmacion={importacion.confirmacion}
               confirmadaEl={confirmadaEl}
+              terminadaEl={terminadaEl}
             />
           </section>
         )}
 
         <section aria-labelledby="titulo-filas">
           <h2 id="titulo-filas" className="mb-3 text-lg font-semibold">
-            {confirmada
+            {confirmada || procesando
               ? "Filas de la importación"
               : revisada
                 ? "Vista previa"

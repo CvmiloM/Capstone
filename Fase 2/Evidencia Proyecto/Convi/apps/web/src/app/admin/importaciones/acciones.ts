@@ -6,6 +6,7 @@ import {
   enviarArchivo,
   enviarConfirmacion,
   enviarOmision,
+  enviarReanudacion,
   enviarRevision,
 } from "./datos";
 
@@ -19,10 +20,6 @@ export type EstadoFormulario = {
   /** Lo que se hizo, cuando salió bien. */
   exito?: string;
 };
-
-function filas(cantidad: number) {
-  return `${cantidad.toLocaleString("es-CL")} ${cantidad === 1 ? "fila" : "filas"}`;
-}
 
 // PB-019 (HU-015 CA1 y CA2): sube el archivo y abre la importación Cargada.
 export async function cargarImportacion(
@@ -79,9 +76,9 @@ export async function revisarImportacion(
   redirect(`/admin/importaciones/${id}`);
 }
 
-// PB-026 (HU-020): guarda en las fichas las filas Válidas y, si se marcó la
-// casilla, las Con advertencia. Los estudiantes, cursos y demás aparecen
-// después en sus pantallas.
+// PB-026 y PB-027 (HU-020): pide guardar en las fichas las filas Válidas y,
+// si se marcó la casilla, las Con advertencia. La confirmación sigue en
+// segundo plano: la página muestra el avance y después el resultado.
 export async function confirmarImportacion(
   id: string,
   _anterior: EstadoFormulario,
@@ -92,24 +89,17 @@ export async function confirmarImportacion(
     formData.get("incluir_advertencias") === "si",
   );
   revalidatePath("/admin", "layout");
-  if (!resultado.ok) return { mensaje: resultado.mensaje };
-  const { confirmadas, con_error, sin_enviar } = resultado.confirmacion;
-  const partes = [
-    confirmadas > 0
-      ? `Se guardaron en las fichas ${filas(confirmadas)}.`
-      : "No se confirmó ninguna fila.",
-  ];
-  if (con_error > 0)
-    partes.push(
-      `${filas(con_error)} no se pudieron confirmar y quedaron Con error: revisa su detalle.`,
-    );
-  if (sin_enviar > 0)
-    partes.push(
-      `${filas(sin_enviar)} de profesores quedaron sin invitar porque se alcanzó el límite de correos: vuelve a confirmar en unos minutos.`,
-    );
-  if (resultado.estado === "CONFIRMADO")
-    partes.push("La importación quedó Confirmada.");
-  return { exito: partes.join(" ") };
+  return resultado.ok ? {} : { mensaje: resultado.mensaje };
+}
+
+// PB-027: retoma una confirmación que se detuvo; sigue desde la fila donde
+// quedó. No necesita nada del formulario: solo el id de la importación.
+export async function reanudarConfirmacion(
+  id: string,
+): Promise<EstadoFormulario> {
+  const resultado = await enviarReanudacion(id);
+  revalidatePath("/admin", "layout");
+  return resultado.ok ? {} : { mensaje: resultado.mensaje };
 }
 
 // PB-026 (HU-020 CA5): las filas Con error no se importan. No necesita

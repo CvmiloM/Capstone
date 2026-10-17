@@ -20,6 +20,8 @@ services:
       # Compatibilidad temporal con integraciones basadas en claves antiguas.
       SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY:-}"
       SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:-}"
+      # PB-027: cola de la confirmación de importaciones (Redis de Docker).
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
     ports:
       - "127.0.0.1:${API_PORT:-3001}:3001"
     volumes:
@@ -27,6 +29,8 @@ services:
       - pnpm_root_modules:/workspace/node_modules
       - web_modules:/workspace/apps/web/node_modules
       - api_modules:/workspace/apps/api/node_modules
+    depends_on:
+      - redis
     restart: unless-stopped
 
   web:
@@ -56,8 +60,19 @@ services:
       - api
     restart: unless-stopped
 
+  # PB-027: Redis para la cola de BullMQ. Sin puerto publicado: solo lo usa la
+  # API dentro de Docker. AOF conserva la cola si el contenedor se reinicia, y
+  # noeviction es lo que exige BullMQ para no perder trabajos.
+  redis:
+    image: redis:7.4.11-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
 volumes:
   pnpm_root_modules:
   web_modules:
   api_modules:
   web_next:
+  redis_data:

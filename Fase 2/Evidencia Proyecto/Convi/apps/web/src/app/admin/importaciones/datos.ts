@@ -3,10 +3,10 @@ import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { pedirAdmin } from "../datos";
 import type { EstadoFila, TipoImportacion } from "./opciones";
 
-// PB-019, PB-020 y PB-026 (HU-015 y HU-020): importaciones del portal de
-// administración. Se piden a la API desde el servidor de Next con el token de
-// la sesión; la API vuelve a comprobar el perfil ADMIN, el segundo factor y la
-// escuela.
+// PB-019, PB-020, PB-026 y PB-027 (HU-015 y HU-020): importaciones del portal
+// de administración. Se piden a la API desde el servidor de Next con el token
+// de la sesión; la API vuelve a comprobar el perfil ADMIN, el segundo factor y
+// la escuela.
 
 // Dentro de Docker, localhost no es la API: el .env apunta NEXT_PUBLIC_API_URL
 // a http://host.docker.internal:3001.
@@ -87,6 +87,8 @@ export type DetalleImportacion = Importacion & {
   };
   /** Las filas de la página (50), con sus datos originales y su revisión. */
   muestra: FilaImportacion[];
+  /** La confirmación en curso o la última; null si nunca se confirmó. */
+  confirmacion: EstadoConfirmacion | null;
 };
 
 /** Lo que se envía para revisar las filas (HU-015 CA3). */
@@ -102,11 +104,34 @@ export type Resultado =
   | { ok: false; mensaje: string; errores?: Record<string, string> };
 
 /** Cuántas filas se confirmaron y cuántas no (PB-026). */
-export type ResumenConfirmacion = {
+export type ResultadoConfirmacion = {
   confirmadas: number;
   con_error: number;
   /** Profesores que quedaron sin invitar por el límite de correos. */
   sin_enviar: number;
+};
+
+/** PB-027 (HU-020 CA5): la confirmación en segundo plano. */
+export type EstadoConfirmacion = {
+  incluir_advertencias: boolean;
+  /** Filas que entraron a la confirmación. */
+  total: number;
+  /** Las ya procesadas (confirmadas o con error). */
+  procesadas: number;
+  /** Fecha y hora ISO. */
+  iniciada_en: string;
+  /** Fecha y hora ISO; null mientras se confirma. */
+  terminada_en: string | null;
+  resultado: ResultadoConfirmacion | null;
+  /** Hay un trabajo en la cola para esta importación. */
+  en_curso: boolean;
+};
+
+/** Lo que la pantalla consulta mientras la importación está Procesando. */
+export type AvanceImportacion = {
+  estado: string;
+  resumen: Record<EstadoFila, number>;
+  confirmacion: EstadoConfirmacion | null;
 };
 
 type Respuesta =
@@ -118,7 +143,9 @@ const SIN_CONEXION =
 const SIN_REVISION =
   "No pudimos revisar las filas. Inténtalo de nuevo en unos minutos.";
 const SIN_CONFIRMACION =
-  "No pudimos terminar de confirmar. Las filas que alcanzaron a guardarse quedan Confirmadas: recarga la página y vuelve a confirmar las que falten.";
+  "No pudimos iniciar la confirmación. Inténtalo de nuevo en unos minutos.";
+const SIN_REANUDACION =
+  "No pudimos reanudar la confirmación. Inténtalo de nuevo en unos minutos.";
 const SIN_OMISION =
   "No pudimos omitir las filas. Inténtalo de nuevo en unos minutos.";
 
@@ -216,10 +243,10 @@ async function enviarAccion(
       errores: datos.errores as Record<string, string>,
     };
   }
-  // 403, 404 y 409 (por ejemplo, otra persona cambió la importación al mismo
-  // tiempo): la API explica qué pasó.
+  // 403, 404, 409 (por ejemplo, otra persona cambió la importación al mismo
+  // tiempo) y 503 (la cola no responde): la API explica qué pasó.
   if (
-    [403, 404, 409].includes(respuesta.status) &&
+    [403, 404, 409, 503].includes(respuesta.status) &&
     typeof datos?.message === "string"
   ) {
     return { ok: false, mensaje: datos.message };
@@ -245,28 +272,42 @@ export async function enviarRevision(
 }
 
 /**
- * PB-026 (HU-020): confirma las filas Válidas y, si se pide, las Con
- * advertencia. Un archivo grande puede tardar cerca de un minuto.
+ * PB-026 y PB-027 (HU-020): pide confirmar las filas Válidas y, si se pide,
+ * las Con advertencia. La API las revisa de nuevo y deja la confirmación en
+ * la cola: responde al tiro, aunque el archivo sea grande.
  */
 export async function enviarConfirmacion(
   id: string,
   incluirAdvertencias: boolean,
-): Promise<
-  | { ok: true; estado: string; confirmacion: ResumenConfirmacion }
-  | { ok: false; mensaje: string }
-> {
+): Promise<{ ok: true } | { ok: false; mensaje: string }> {
   const resultado = await enviarAccion(
     `/admin/importaciones/${encodeURIComponent(id)}/confirmacion`,
     { incluir_advertencias: incluirAdvertencias },
     SIN_CONFIRMACION,
-    180,
+    60,
   );
-  if (!resultado.ok) return resultado;
-  return {
-    ok: true,
-    estado: String(resultado.datos.estado),
-    confirmacion: resultado.datos.confirmacion as ResumenConfirmacion,
-  };
+  return resultado.ok ? { ok: true } : resultado;
+}
+
+/** PB-027: vuelve a encolar una confirmación que se detuvo. */
+export async function enviarReanudacion(
+  id: string,
+): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  const resultado = await enviarAccion(
+    `/admin/importaciones/${encodeURIComponent(id)}/reanudacion`,
+    {},
+    SIN_REANUDACION,
+    30,
+  );
+  return resultado.ok ? { ok: true } : resultado;
+}
+
+/**
+ * PB-027 (HU-020 CA5): el estado y el avance, sin las filas, tal como los
+ * entrega la API. Lo usa la ruta avance/route.ts que consulta la pantalla.
+ */
+export function pedirAvance(id: string) {
+  return pedirAdmin(`/admin/importaciones/${encodeURIComponent(id)}/avance`);
 }
 
 /** PB-026 (HU-020 CA5): marca Omitidas las filas Con error. */
