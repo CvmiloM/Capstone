@@ -1,12 +1,12 @@
 param(
     [Parameter(Mandatory = $true)][string]$SubscriptionId,
-    [ValidateSet('Base', 'Aplicaciones')][string]$Etapa = 'Base',
+    [ValidateSet('Base', 'Redis', 'Aplicaciones')][string]$Etapa = 'Base',
     [ValidatePattern('^[a-z0-9][a-z0-9-]{0,63}$')][string]$Version = ('inicial-' + (Get-Date -Format 'yyyyMMddHHmmss'))
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# PB-145: nunca invoca Git, nunca modifica .env.cloud ni ejecuta migraciones.
+# PB-145/PB-027: nunca invoca Git ni ejecuta migraciones. Redis solo guarda AZURE_REDIS_URL en .env.cloud.
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $resourceGroup = 'rg-convi-pruebas'
 function Invocar-Az {
@@ -39,6 +39,25 @@ try {
         return
     }
 
+
+    if ($Etapa -eq 'Redis') {
+        $cloudPath = Join-Path $projectRoot '.env.cloud'
+        if (-not (Test-Path -LiteralPath $cloudPath)) { throw 'Prepara primero el archivo privado .env.cloud.' }
+        $lineas = @([System.IO.File]::ReadAllLines($cloudPath))
+        if ($lineas -match '^\s*REDIS_URL=') { throw 'Quita REDIS_URL de .env.cloud: Docker local debe usar su propio Redis.' }
+        $null = Invocar-Az -Argumentos @('provider', 'register', '--namespace', 'Microsoft.Cache', '--wait', '-o', 'none')
+        $null = Invocar-Az -Argumentos @('deployment', 'group', 'create', '-g', $resourceGroup, '-n', 'convi-redis-piloto', '--template-file', 'infra/azure/redis.bicep', '-o', 'none')
+        $redis = Invocar-Az -Argumentos @('deployment', 'group', 'show', '-g', $resourceGroup, '-n', 'convi-redis-piloto', '--query', 'properties.outputs', '-o', 'json') | ConvertFrom-Json
+        $uriClaves = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Cache/redisEnterprise/$($redis.redisName.value)/databases/default/listKeys?api-version=2025-07-01"
+        $claves = Invocar-Az -Argumentos @('rest', '--method', 'post', '--url', $uriClaves, '-o', 'json') | ConvertFrom-Json
+        $urlRedis = 'rediss://:' + [uri]::EscapeDataString($claves.primaryKey) + '@' + $redis.redisHost.value + ':' + $redis.redisPort.value
+        $conservadas = @($lineas | Where-Object { $_ -notmatch '^\s*AZURE_REDIS_URL=' })
+        [System.IO.File]::WriteAllText($cloudPath, (($conservadas + ('AZURE_REDIS_URL=' + $urlRedis)) -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
+        Write-Host ('Redis piloto: ' + $redis.redisName.value + '. URL guardada en .env.cloud como AZURE_REDIS_URL, sin imprimir credenciales.')
+        Write-Host 'La etapa Aplicaciones entrega ese secreto solo a la API de Azure. No lo copies a REDIS_URL local.'
+        return
+    }
+
     $cloud = @{}
     foreach ($linea in [System.IO.File]::ReadAllLines((Join-Path $projectRoot '.env.cloud'))) {
         if ($linea -match '^\s*([A-Z][A-Z0-9_]*)=(.*)$') {
@@ -52,6 +71,15 @@ try {
         $cloud['SUPABASE_DB_URL'] -notmatch '(?:[?&])sslmode=verify-full(?:&|$)') {
         throw 'Falta configuracion cloud HTTPS/verify-full o claves modernas del proyecto CONVI, no se muestran valores privados.'
     }
+
+    try { $redisUrl = [uri]$cloud['AZURE_REDIS_URL'] } catch { throw 'AZURE_REDIS_URL no es una URL TLS valida; no se muestran credenciales.' }
+    if (-not $redisUrl -or $redisUrl.Scheme -ne 'rediss' -or
+        $redisUrl.Host -notmatch '^[a-z0-9-]+\.brazilsouth\.redis\.azure\.net$' -or
+        $redisUrl.Port -ne 10000 -or $redisUrl.UserInfo -notmatch '^:.+' -or
+        $redisUrl.Query -or $redisUrl.Fragment -or $redisUrl.AbsolutePath -notin @('', '/')) {
+        throw 'Falta AZURE_REDIS_URL TLS del Redis piloto. Ejecuta primero la etapa Redis; no uses REDIS_URL local.'
+    }
+
     $base = Invocar-Az -Argumentos @('deployment', 'group', 'show', '-g', $resourceGroup, '-n', 'convi-base', '--query', 'properties.outputs', '-o', 'json') | ConvertFrom-Json
     $registro = $base.registryServer.value
     $apiImage = "$registro/convi-api:$Version"
@@ -89,6 +117,7 @@ try {
         registryName = $base.registryName.value; apiImage = $apiImage; webImage = $webImage
         supabaseUrl = $cloud['SUPABASE_URL']; supabasePublishableKey = $cloud['SUPABASE_PUBLISHABLE_KEY']
         supabaseSecretKey = $cloud['SUPABASE_SECRET_KEY']; supabaseDbUrl = $db
+        redisUrl = $cloud['AZURE_REDIS_URL']
         webCustomDomains = $dominios
     }
     $parametros = @{}

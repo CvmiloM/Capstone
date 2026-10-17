@@ -10,6 +10,8 @@ param supabasePublishableKey string
 param supabaseSecretKey string
 @secure()
 param supabaseDbUrl string
+@secure()
+param redisUrl string
 // Conserva certificados y dominios existentes al repetir la instalación inicial.
 param webCustomDomains array = []
 
@@ -39,6 +41,7 @@ resource api 'Microsoft.App/containerApps@2025-07-01' = {
       secrets: [
         { name: 'supabase-secret', value: supabaseSecretKey }
         { name: 'supabase-db', value: supabaseDbUrl }
+        { name: 'redis-url', value: redisUrl }
       ]
     }
     template: {
@@ -51,13 +54,15 @@ resource api 'Microsoft.App/containerApps@2025-07-01' = {
           { name: 'SUPABASE_PUBLISHABLE_KEY', value: supabasePublishableKey }
           { name: 'SUPABASE_SECRET_KEY', secretRef: 'supabase-secret' }
           { name: 'SUPABASE_DB_URL', secretRef: 'supabase-db' }
+          { name: 'REDIS_URL', secretRef: 'redis-url' }
         ]
         probes: [
           { type: 'Startup', tcpSocket: { port: 3001 }, periodSeconds: 2, failureThreshold: 60 }
           { type: 'Readiness', httpGet: { path: '/', port: 3001 }, periodSeconds: 10, timeoutSeconds: 5 }
         ]
       }]
-      scale: { minReplicas: 0, maxReplicas: 1 }
+      // PB-027: el trabajador debe continuar aunque no haya visitas.
+      scale: { minReplicas: 1, maxReplicas: 1 }
     }
   }
 }

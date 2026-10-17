@@ -1,5 +1,13 @@
 # PB-145: CONVI en Azure con HTTPS
 
+Actualización 17/10/2026: piloto Redis de PB-027 creado y conectado a la API;
+API mínima/máxima 1/1 y web 0/1. Presupuesto de aviso actualizado a USD45.
+TLS/PONG desde la API y BullMQ con una cola ficticia comprobados. PR36 de Camilo
+sigue pendiente de merge y de la prueba funcional publicada. Los cambios de
+infraestructura y documentación están preparados; Git lo maneja Sebastian.
+Los apartados del despliegue inicial y rendimiento conservan su contexto histórico;
+la configuración vigente del piloto se detalla al final.
+
 Estado: publicado con HTTPS y dominio propio. PB-145 se fusionó en PR32,
 commit original `2897f73`, merge `8853de3`. Validación y publicación automáticas
 aprobadas en el segundo intento de Actions38871008073. Corrección persistente
@@ -85,14 +93,18 @@ Conservar ese bloqueo: las plantillas nuevas ya no administran el entorno antigu
   CORS público, no se cambia ningún permiso de CONVI ni se publica PostgreSQL.
 - Supabase cloud conserva Auth, PostgreSQL y Storage. PostgreSQL usa
   `sslmode=verify-full` y el certificado público incluido en la imagen de API.
-- Mínimo cero y máximo una réplica por aplicación, web 0,5 vCPU/1 GiB y API
-  0,25 vCPU/0,5 GiB. El arranque después de inactividad puede demorar.
+- Piloto PB-027: API 0,25 vCPU/0,5 GiB con mínimo y máximo una réplica,
+  para que el trabajador siga sin visitas. Web 0,5 vCPU/1 GiB con mínimo cero y
+  máximo una réplica; la web aún puede tener arranque en frío.
+- Azure Managed Redis Balanced B0 de un nodo, TLS, NoEviction y NoCluster,
+  en Brazil South. Sin alta disponibilidad ni persistencia; ver el apartado del piloto.
 - **Container Registry Basic tiene coste por día incluso con las apps apagadas**,
   más almacenamiento/tráfico que supere lo incluido. No asumir que una oferta
   gratuita para otro SKU lo cubre. Tarifa pública consultada en Brazil South:
   USD0,1666/día, aproximadamente USD5 por 30 días, antes de extras y condiciones
   de la suscripción. Las imágenes se construyen en Docker/GitHub, no ACR Tasks.
-- Presupuesto mensual de aviso USD10 creado por Sebastian, no es un corte de gasto.
+- Presupuesto mensual de aviso originalmente USD10, actualizado a USD45 para el
+  piloto aprobado del 17/10. Conserva destinatarios y umbrales 50/80/100 %. No corta el gasto.
   El crédito estudiantil inicial USD100 vence el 16/10/2027, según su panel.
 - Este directorio Duoc tiene administradores institucionales con permisos heredados,
   Sebastian conoce esa condición. Se usa como entorno académico con datos ficticios.
@@ -106,7 +118,7 @@ Conservar ese bloqueo: las plantillas nuevas ya no administran el entorno antigu
    `az login --use-device-code` y seleccionar Azure for Students.
 2. Confirmar que el grupo anterior existe y que la región está permitida. Camilo
    Monge y Fernando Torres tienen Contributor limitado al grupo, Sebastian Owner.
-3. Revisar las plantillas `infra/azure/base.bicep` y `aplicaciones.bicep`. La primera
+3. Revisar las plantillas `infra/azure/base.bicep`, `redis.bicep` y `aplicaciones.bicep`. La primera
    crea ACR privado sin contraseña de administrador, entorno e identidades. La
    identidad de GitHub recibe Contributor **solo en el grupo** y AcrPush; la de
    las aplicaciones solo AcrPull en el registro. No se crea una cuenta Microsoft
@@ -118,12 +130,25 @@ Conservar ese bloqueo: las plantillas nuevas ya no administran el entorno antigu
    ```
 
 5. Conservar las cuatro variables públicas que imprime. El script no ejecuta Git,
-   no imprime claves, no cambia `.env.cloud` ni ejecuta migraciones. Las plantillas
+   no imprime claves ni ejecuta migraciones. La etapa Redis actualiza únicamente
+   `AZURE_REDIS_URL` dentro de `.env.cloud`. Las plantillas
    son declarativas y se pueden volver a aplicar al mismo grupo.
 6. Completar el `.env.cloud` privado existente con las claves modernas del proyecto
    CONVI (`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`), URL HTTPS y DSN con
    verify-full. No enviar el archivo al repositorio ni copiarlo a GitHub Actions.
-7. Ejecutar la etapa inicial de imágenes y aplicaciones:
+7. Crear primero el Redis piloto y guardar su conexión privada:
+
+   ```powershell
+   .\scripts\publicar-azure.ps1 -SubscriptionId 'ID-DE-TU-SUSCRIPCION' -Etapa Redis
+   ```
+
+   Esta etapa registra Microsoft.Cache y aplica `infra/azure/redis.bicep` al mismo
+   grupo. Guarda la clave codificada en `AZURE_REDIS_URL` del `.env.cloud` existente,
+   sin imprimirla. No agrega `REDIS_URL` a ese archivo: la API local debe consumir
+   el Redis de Docker, incluso cuando use Supabase cloud. El archivo sigue excluido
+   tanto de Git como del contexto de construcción Docker. No compartirlo ni usar trazas.
+
+   Después ejecutar la etapa inicial de imágenes y aplicaciones:
 
    ```powershell
    .\scripts\publicar-azure.ps1 -SubscriptionId 'ID-DE-TU-SUSCRIPCION' -Etapa Aplicaciones
@@ -357,3 +382,96 @@ Referencias: [autorización y Proxy en Next.js](https://nextjs.org/docs/app/guid
 [EXPLAIN de PostgreSQL](https://www.postgresql.org/docs/current/using-explain.html),
 [regiones de Supabase](https://supabase.com/docs/guides/platform/regions),
 [reubicación de Container Apps](https://learn.microsoft.com/azure/container-apps/relocate-region).
+
+
+## Piloto de importaciones en segundo plano: PB-027, 17/10/2026
+
+Sebastian aprobó este piloto para probar CONVI online hasta cerca de fin de año
+y revisar el consumo real al mes. El PR36 de Camilo aporta BullMQ, trabajador,
+avance y Reanudar; la infraestructura se prepara antes de su merge. No se cambian
+tablas, columnas, permisos ni migraciones.
+
+`redis-convi-vpko3nqhasxza` se declara en `infra/azure/redis.bicep`: Balanced B0,
+sin alta disponibilidad, autenticación por clave habilitada, TLS mínimo 1.2,
+protocolo cifrado, NoCluster y NoEviction. No usar OSSCluster con el cliente
+ioredis del PR ni permitir que Redis elimine trabajos al llenarse.
+
+`aplicaciones.bicep` recibe `redisUrl` como parámetro seguro, guarda `redis-url`
+y lo entrega únicamente como `REDIS_URL` a `ca-convi-api-estandar`. El script lee
+`AZURE_REDIS_URL` del archivo privado y valida TLS antes de construir imágenes.
+La web no recibe esta clave. El workflow de GitHub solo actualiza imágenes y
+conserva la configuración; no necesita otra variable o secreto en GitHub.
+
+La API mantiene una réplica para que el trabajador continúe aunque no haya
+visitas; máximo uno conserva el escenario probado por Camilo. Esto evita el
+escalado a cero de la API, pero no elimina reinicios, despliegues o fallos. La web
+conserva mínimo cero. No se modifica el entorno Express antiguo bloqueado.
+
+### Coste y límites del piloto
+
+Estimación consultada el 17/10/2026, Brazil South, 730 h/mes, USD antes de
+impuestos, cuotas gratuitas y consumos adicionales:
+
+| Recurso | Supuesto | Estimación mensual |
+| --- | --- | ---: |
+| Redis B0, un nodo | 0,023 USD/h, siempre asignado | 16,79 USD |
+| API mínima 1 | Desde todo idle hasta todo activo | 5,91–19,71 USD |
+| Web mínima 0 | Aproximadamente 2 h activas al día | 3,29 USD |
+| ACR Basic | 0,1666 USD/día | 5,07 USD |
+| Total de referencia | Antes de cuotas y extras | 31,06–44,86 USD |
+
+El presupuesto de aviso es 45 USD/mes, no un tope ni una garantía de consumo.
+La web puede consumir más que el supuesto: activa 24 h/día serían unos 39,42 USD
+solo de web, antes de cuotas. Las cuotas gratuitas se comparten a nivel de
+suscripción; no se suman los créditos de los tres integrantes. Los 100 USD
+nominales cubrirían aproximadamente 2–3 meses del escenario de referencia,
+dependiendo del saldo y actividad real. Revisar Cost Management → Cost analysis
+en el grupo y Education → crédito restante; el gasto tarda en aparecer.
+
+Redis y ACR tienen coste aunque no entren usuarios. Quitar REDIS_URL o cerrar el
+navegador no detiene ese coste. Si se decide volver a local, primero resolver o
+detener las confirmaciones pendientes y acordar retirar los recursos facturables;
+no se eliminan recursos automáticamente ni se corta el sitio por alcanzar la alerta.
+
+El piloto de un nodo no admite persistencia AOF/RDB: Azure exige alta disponibilidad
+para habilitarla. Puede perderse la cola por fallo o mantenimiento. Las filas ya
+confirmadas quedan en PostgreSQL; tras publicar PB-027, Reanudar permite continuar
+desde las pendientes. No equivale a recuperación automática ni alta disponibilidad.
+La alternativa de dos nodos añadiría aproximadamente 16,79 USD/mes y necesita una
+decisión de presupuesto aparte. No se ha contratado.
+
+### Comprobación y recuperación
+
+Resultado del 17/10: despliegue `convi-redis-piloto` Succeeded, Redis 7.4.3.
+La API quedó Ready en revisión `ca-convi-api-estandar--0000005`, con REDIS_URL
+referida al secreto. Se comprobó AUTH/PONG desde ese contenedor con validación de
+certificado y TLS mínimo 1.2. La imagen de API y web sigue identificada por
+`95c3ca8ea37fc6575f1ad9bbde5920111e1a9b03`; no se adelantó el código de PR36.
+Ambos dominios devolvieron HTTP200 en /login por HTTPS. Las referencias a secretos
+Supabase, su configuración pública, el ingreso interno y los dominios se conservaron.
+
+Con BullMQ 6.3.11 e ioredis 5.11.1 se verificaron encolar, progreso, fallo ficticio,
+reintento y finalización usando una cola de nombre único. Se eliminó solo esa cola;
+no se usaron trabajos reales, PostgreSQL ni FLUSHDB. Ambas plantillas compilaron
+y el script pasó comprobaciones simuladas de TLS, codificación de clave, preservación
+de variables/dominios, aislamiento de Docker local y limpieza de parámetros privados
+en éxito y error. Las pruebas adicionales están fuera del repositorio.
+
+Antes de avisar que Redis está listo: comprobar TLS y PONG desde la API real,
+configuración NoEviction/NoCluster y una cola ficticia aislada con las versiones
+del PR. No usar FLUSHDB/FLUSHALL ni la cola real para verificar conectividad.
+Después del merge y publicación de PR36, revisar que no aparezcan los avisos
+«Falta configurar REDIS_URL» o «No hay conexión con Redis» y confirmar un archivo
+pequeño en convi.tech: respuesta rápida, progreso, finalización y reanudación.
+La conectividad por sí sola no valida esa prueba funcional completa.
+
+Si falla la cola, los demás endpoints deben seguir atendiendo. Quitar REDIS_URL
+deshabilita confirmar; no restaura el código síncrono anterior. Para recuperar ese
+comportamiento hay que volver a la revisión/imagen previa compatible. No borrar
+Redis ni cambiar su política de clúster para solucionar errores sin revisar antes
+los trabajos pendientes. Ningún secreto debe aparecer en Git, Sheet o logs.
+
+Fuentes: [Managed Redis](https://azure.microsoft.com/en-us/pricing/details/managed-redis/),
+[facturación Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/billing),
+[persistencia y requisito de HA](https://learn.microsoft.com/en-us/azure/redis/how-to-persistence),
+[conexiones BullMQ](https://docs.bullmq.io/guide/connections).
