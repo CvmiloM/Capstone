@@ -1075,6 +1075,7 @@ async function confirmarTramo(
       });
     } catch (error) {
       await db.query('ROLLBACK TO SAVEPOINT fila');
+      c.memoria.clear();
       if (error instanceof LimiteDeCorreos) {
         limite = true;
         break;
