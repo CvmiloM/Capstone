@@ -12,7 +12,7 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
     // PB-009 comprueba el acceso en proxy y al leer datos del portal.
     return (
         <div className="flex flex-1 flex-col lg:flex-row">
-            <aside className="border-b border-border bg-card lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-b-0">
+            <aside className="border-b border-border material-menu lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-b-0">
                 <div className="flex items-center gap-2 px-4 pt-4 pb-3">
                     <Link
                         href="/admin"
@@ -46,7 +46,7 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
             </aside>
 
             <div className="flex min-w-0 flex-1 flex-col">
-                <header className="flex h-16 items-center justify-end border-b border-border bg-card px-4 sm:px-8">
+                <header className="sticky top-0 z-20 flex h-16 items-center justify-end border-b border-border material-menu px-4 [view-transition-name:barra-superior] sm:px-8">
                     <Suspense fallback={<Esqueleto className="h-8 w-44" />}>
                         <UsuarioSesion />
                     </Suspense>

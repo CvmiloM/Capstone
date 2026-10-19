@@ -14,7 +14,7 @@ export default function LayoutConvivencia({
 }) {
   return (
     <div className="flex flex-1 flex-col lg:flex-row">
-      <aside className="border-b border-border bg-card lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:shrink-0 lg:border-r lg:border-b-0">
+      <aside className="border-b border-border material-menu lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:shrink-0 lg:border-r lg:border-b-0">
         <div className="flex items-center gap-2 px-4 pt-4 pb-3">
           <Link
             href="/convivencia"

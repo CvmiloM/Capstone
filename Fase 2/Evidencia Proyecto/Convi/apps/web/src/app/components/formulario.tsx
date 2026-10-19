@@ -110,9 +110,11 @@ export function AvisoError({ children }: { children: ReactNode }) {
 export const claseEnlace =
   "font-medium text-primary underline-offset-4 hover:underline";
 
-// Estilos de botón, para <button> y también para <Link> con forma de botón
-export const claseBotonPrimario =
-  "inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60";
+// Estilos de botón, para <button> y también para <Link> con forma de botón.
+// Al presionarlo responde en el acto (se oscurece y se achica un poco) y al
+// soltarlo vuelve con un resorte, como un botón físico (presion, en globals.css).
+const clasePresion = "select-none presion";
 
-export const claseBotonSecundario =
-  "inline-flex items-center justify-center rounded-lg border border-input bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+export const claseBotonPrimario = `inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground ${clasePresion} hover:bg-primary/90 active:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60`;
+
+export const claseBotonSecundario = `inline-flex items-center justify-center rounded-lg border border-input bg-card px-4 py-2.5 text-sm font-medium text-foreground ${clasePresion} hover:bg-muted active:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`;

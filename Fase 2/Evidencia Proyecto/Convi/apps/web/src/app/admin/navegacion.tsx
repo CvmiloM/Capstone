@@ -1,14 +1,8 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Icono, type NombreIcono } from "@/app/components/icono";
-
-type Enlace = { href: string; texto: string; icono: NombreIcono };
+import { MenuLateral, type SeccionMenu } from "@/app/components/menu-lateral";
 
 // Secciones del portal. El comentario de cada enlace indica las tablas del
 // modelo de datos que administra esa pantalla.
-const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
+const SECCIONES: SeccionMenu[] = [
     {
         titulo: "General",
         enlaces: [{ href: "/admin", texto: "Resumen", icono: "resumen" }],
@@ -73,46 +67,12 @@ const SECCIONES: { titulo: string; enlaces: Enlace[] }[] = [
 
 // El resumen (/admin) solo se marca en su propia página; las demás secciones
 // también en sus subpáginas, por ejemplo /admin/estudiantes/123.
-function estaActivo(ruta: string, href: string) {
-    if (href === "/admin") return ruta === href;
-    return ruta === href || ruta.startsWith(`${href}/`);
-}
-
 export function Navegacion() {
-    const ruta = usePathname();
-
     return (
-        <nav
-            aria-label="Secciones de administración"
-            className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:gap-5 lg:overflow-visible lg:py-4"
-        >
-            {SECCIONES.map(({ titulo, enlaces }) => (
-                <div key={titulo} className="flex lg:block">
-                    <p className="hidden px-2.5 pb-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground lg:block">
-                        {titulo}
-                    </p>
-                    <ul className="flex gap-1 lg:flex-col lg:gap-0.5">
-                        {enlaces.map(({ href, texto, icono }) => {
-                            const activo = estaActivo(ruta, href);
-                            return (
-                                <li key={href}>
-                                    <Link
-                                        href={href}
-                                        aria-current={activo ? "page" : undefined}
-                                        className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring ${activo
-                                                ? "bg-primary text-primary-foreground"
-                                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                            }`}
-                                    >
-                                        <Icono nombre={icono} className="size-4 shrink-0" />
-                                        {texto}
-                                    </Link>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
-            ))}
-        </nav>
+        <MenuLateral
+            etiqueta="Secciones de administración"
+            raiz="/admin"
+            secciones={SECCIONES}
+        />
     );
 }
