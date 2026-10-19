@@ -24,7 +24,7 @@
   --input: #d6d3cc; /* bordes de campos */
   --ring: #3b5b85; /* foco del teclado */
   --destructive: #b42318; /* errores */
-  
+
   /* Paleta de la landing (marca Convi): bg-tinta, text-verde, bg-naranjo... */
   --tinta: #13254a; /* azul tinta: textos y fondos oscuros */
   --crema: #fbf7f0; /* fondo crema */
@@ -54,7 +54,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
-  
+
   --color-tinta: var(--tinta);
   --color-crema: var(--crema);
   --color-verde: var(--verde);
@@ -79,7 +79,35 @@
     0 12px 32px -12px color-mix(in oklab, var(--primary) 22%, transparent);
 }
 
+/*
+ * Tipografía según el tamaño: los textos grandes juntan un poco sus letras y
+ * usan menos interlineado; los muy chicos las separan apenas para leerse
+ * mejor. Se aplica sola con text-xs, text-2xl, etc. Una clase tracking-* o
+ * leading-* en el elemento sigue mandando sobre estos valores.
+ */
+@theme {
+  --text-xs--letter-spacing: 0.01em;
+  --text-lg--letter-spacing: -0.005em;
+  --text-xl--letter-spacing: -0.01em;
+  --text-xl--line-height: 1.4;
+  --text-2xl--letter-spacing: -0.015em;
+  --text-2xl--line-height: 1.25;
+  --text-3xl--letter-spacing: -0.02em;
+  --text-3xl--line-height: 1.15;
+  --text-4xl--letter-spacing: -0.022em;
+  --text-4xl--line-height: 1.1;
+}
+
 @layer base {
+  html {
+    /* El celular no agranda el texto por su cuenta al girar la pantalla. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Reserva el espacio de la barra de desplazamiento: el contenido no
+       salta de lado al pasar de una página corta a una larga. */
+    scrollbar-gutter: stable;
+  }
+
   body {
     background: var(--background);
     color: var(--foreground);
@@ -94,11 +122,210 @@
     text-wrap: balance;
   }
 
+  /* Sin una palabra sola en la última línea de un párrafo. */
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Cifras del mismo ancho en las tablas: las columnas de números quedan alineadas. */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* El mismo anillo de foco del teclado en toda la app, también en los
+     enlaces y elementos que no lo definen. Las clases focus-visible:* de
+     cada componente siguen mandando. */
+  :where(
+    a,
+    button,
+    summary,
+    [role="button"],
+    [tabindex]:not([tabindex="-1"])
+  ):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
   ::selection {
     background-color: var(--accent);
     color: var(--accent-foreground);
   }
 }
+/*
+ * Material translúcido de los menús, como las barras de macOS: deja ver
+ * desenfocado el contenido que pasa por detrás. Queda sólido si la persona
+ * pidió menos transparencia o más contraste en su sistema, o si el
+ * navegador no sabe desenfocar. Uso: <aside className="material-menu ...">
+ */
+@utility material-menu {
+  background-color: color-mix(in oklab, var(--card) 60%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+
+  @supports not (
+    (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+  ) {
+    background-color: var(--card);
+  }
+
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    background-color: var(--card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/*
+ * Movimiento de CONVI, al estilo de Apple. Las cosas se mueven como un
+ * resorte sin rebote (amortiguación 1, respuesta de unos 0,34 s): arrancan
+ * rápido y se asientan suave, sin pasarse. Por decisión del PO, CONVI anima
+ * siempre, aunque el sistema operativo pida menos movimiento.
+ */
+:root {
+  --resorte: linear(
+    0,
+    0.059,
+    0.184,
+    0.327,
+    0.463,
+    0.581,
+    0.679,
+    0.757,
+    0.819,
+    0.866,
+    0.901,
+    0.928,
+    0.948,
+    0.962,
+    0.973,
+    0.98,
+    0.986,
+    0.99,
+    0.993,
+    0.995,
+    1
+  );
+  --duracion-resorte: 420ms;
+}
+
+@theme inline {
+  /* Para usar el resorte en las clases: ease-resorte */
+  --ease-resorte: var(--resorte);
+}
+
+/*
+ * Botón que responde al presionarlo: se achica en el acto (sin transición)
+ * y al soltarlo vuelve con el resorte. Los colores cambian en 150 ms.
+ */
+@utility presion {
+  transition:
+    color 150ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    outline-color 150ms ease-out,
+    scale var(--duracion-resorte) var(--resorte);
+
+  &:active:not(:disabled) {
+    scale: 0.97;
+    transition-duration: 0ms;
+  }
+}
+
+/*
+ * Cambio de pantalla dentro de los portales (React ViewTransition, en
+ * components/transicion-pagina.tsx). La dirección la marca el menú en
+ * <html data-navegacion="...">: al bajar en el menú, el contenido nuevo sube
+ * desde abajo; al subir, baja desde arriba; al entrar a un detalle llega
+ * desde la derecha y al volver, desde la izquierda. Lo viejo sale rápido
+ * (160 ms) para no competir con lo nuevo.
+ */
+:root {
+  --entra-desde: 0 0;
+  --sale-hacia: 0 0;
+}
+
+:root[data-navegacion="abajo"] {
+  --entra-desde: 0 18px;
+  --sale-hacia: 0 -12px;
+}
+
+:root[data-navegacion="arriba"] {
+  --entra-desde: 0 -18px;
+  --sale-hacia: 0 12px;
+}
+
+:root[data-navegacion="adelante"] {
+  --entra-desde: 48px 0;
+  --sale-hacia: -32px 0;
+}
+
+:root[data-navegacion="atras"] {
+  --entra-desde: -48px 0;
+  --sale-hacia: 32px 0;
+}
+
+::view-transition-old(.pagina-sale) {
+  animation: 160ms ease-in both pagina-sale;
+}
+
+::view-transition-new(.pagina-entra) {
+  animation:
+    220ms ease-out 60ms both pagina-aparece,
+    var(--duracion-resorte) var(--resorte) both pagina-entra;
+}
+
+@keyframes pagina-sale {
+  to {
+    opacity: 0;
+    translate: var(--sale-hacia);
+  }
+}
+
+@keyframes pagina-aparece {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pagina-entra {
+  from {
+    translate: var(--entra-desde);
+  }
+}
+
+/* El resto de la página no se funde: queda la versión nueva al instante. */
+::view-transition-old(root) {
+  display: none;
+}
+
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* El menú lateral y la barra superior quedan quietos, como punto de
+   referencia, y por encima del contenido que se mueve. El menú sigue vivo:
+   su resaltado se desliza mientras cambia la pantalla. */
+::view-transition-group(menu-lateral),
+::view-transition-group(barra-superior) {
+  animation: none;
+  z-index: 100;
+}
+
+::view-transition-old(menu-lateral),
+::view-transition-old(barra-superior) {
+  display: none;
+}
+
+::view-transition-new(menu-lateral),
+::view-transition-new(barra-superior) {
+  animation: none;
+}
+
+/* Los clics durante la transición llegan a la página. */
+::view-transition {
+  pointer-events: none;
+}
+
 
 /*
  * Fondo cuadriculado, como hoja de cuaderno, que se desvanece hacia los
