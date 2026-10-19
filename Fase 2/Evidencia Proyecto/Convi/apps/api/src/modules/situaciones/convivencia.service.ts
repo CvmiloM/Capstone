@@ -18,6 +18,7 @@ import {
   comprobarFechaYCategoria,
   conReintentosDeCodigo,
   insertarSituacion,
+  matriculasAlOcurrir,
   type SituacionRegistrada,
 } from './registro-situacion.js';
 
@@ -73,8 +74,10 @@ export type DetalleConvivencia = SituacionBandeja & {
     apellidos: string;
     codigo_estudiante: string | null;
     rol: string;
-    /** Curso de la matrícula que tenía al registrarse (HU-035 CA4). */
+    /** Curso y año de la matrícula del día del hecho; null si no tenía (HU-066). */
     curso_matricula: string | null;
+    /** Curso y año de su matrícula activa hoy, aparte del anterior (HU-066 CA2). */
+    curso_actual: string | null;
   }[];
   aclaraciones: {
     id: string;
@@ -100,6 +103,14 @@ const NO_EXISTE = 'La situación no existe.';
 const CAMBIO_SIMULTANEO =
   'Otra persona cambió esta situación al mismo tiempo. Recarga la página para ver su estado actual.';
 
+type EstudianteOpcion = {
+  id: string;
+  persona_id: string;
+  nombres: string;
+  apellidos: string;
+  codigo_estudiante: string;
+};
+
 /** Lo que necesita el formulario de registro de Convivencia (PB-043). */
 export type OpcionesRegistro = {
   categorias: { id: string; nombre: string }[];
@@ -107,14 +118,10 @@ export type OpcionesRegistro = {
   cursos: {
     id: string;
     nombre: string;
-    estudiantes: {
-      id: string;
-      persona_id: string;
-      nombres: string;
-      apellidos: string;
-      codigo_estudiante: string;
-    }[];
+    estudiantes: EstudianteOpcion[];
   }[];
+  /** Estudiantes sin matrícula activa hoy, como retirados o egresados (HU-066). */
+  sin_matricula: EstudianteOpcion[];
   /** Personas con una cuenta activa del equipo de la escuela. */
   funcionarios: { persona_id: string; nombre: string }[];
   /** Apoderados con un vínculo vigente con algún estudiante. */
@@ -230,13 +237,23 @@ export class ConvivenciaService {
         const participantes = await db.query<
           DetalleConvivencia['participantes'][number]
         >(
+          // PB-076 (HU-066 CA2): el curso del día del hecho y, aparte, el
+          // actual. Un estudiante tiene a lo sumo una matrícula activa: sin
+          // fecha de término chocaría con cualquier otra.
           `SELECT p.nombres, p.apellidos, e.codigo_estudiante,
-                  pa.rol_contextual AS rol, cm.nombre AS curso_matricula
+                  pa.rol_contextual AS rol,
+                  cm.nombre || ' (' || am.anio || ')' AS curso_matricula,
+                  ca.nombre || ' (' || aa.anio || ')' AS curso_actual
            FROM convi.participaciones pa
            JOIN convi.personas p ON p.id = pa.persona_id
            LEFT JOIN convi.estudiantes e ON e.persona_id = p.id
            LEFT JOIN convi.matriculas mt ON mt.id = pa.matricula_contexto_id
            LEFT JOIN convi.cursos cm ON cm.id = mt.curso_id
+           LEFT JOIN convi.anios_academicos am ON am.id = cm.anio_academico_id
+           LEFT JOIN convi.matriculas ma
+             ON ma.estudiante_id = e.id AND ma.estado = 'ACTIVO'
+           LEFT JOIN convi.cursos ca ON ca.id = ma.curso_id
+           LEFT JOIN convi.anios_academicos aa ON aa.id = ca.anio_academico_id
            WHERE pa.situacion_id = $1 AND pa.activo_hasta IS NULL
            ORDER BY p.apellidos, p.nombres`,
           [id],
@@ -483,10 +500,7 @@ export class ConvivenciaService {
            WHERE estado = 'ACTIVO' ORDER BY nombre`,
         );
         const estudiantes = await db.query<
-          OpcionesRegistro['cursos'][number]['estudiantes'][number] & {
-            curso_id: string;
-            curso: string;
-          }
+          EstudianteOpcion & { curso_id: string; curso: string }
         >(
           `SELECT e.id, e.persona_id, p.nombres, p.apellidos, e.codigo_estudiante,
                   c.id AS curso_id, c.nombre AS curso
@@ -508,6 +522,18 @@ export class ConvivenciaService {
           grupo.estudiantes.push(estudiante);
           cursos.set(curso_id, grupo);
         }
+        // PB-076 (HU-066): un hecho anterior puede involucrar a un estudiante
+        // que hoy no tiene matrícula activa.
+        const sinMatricula = await db.query<EstudianteOpcion>(
+          `SELECT e.id, e.persona_id, p.nombres, p.apellidos, e.codigo_estudiante
+           FROM convi.estudiantes e
+           JOIN convi.personas p ON p.id = e.persona_id
+           WHERE NOT EXISTS (
+             SELECT 1 FROM convi.matriculas m
+             WHERE m.estudiante_id = e.id AND m.estado = 'ACTIVO'
+           )
+           ORDER BY p.apellidos, p.nombres`,
+        );
         const funcionarios = await db.query<
           OpcionesRegistro['funcionarios'][number]
         >(
@@ -531,6 +557,7 @@ export class ConvivenciaService {
         return {
           categorias: categorias.rows,
           cursos: [...cursos.values()],
+          sin_matricula: sinMatricula.rows,
           funcionarios: funcionarios.rows,
           apoderados: apoderados.rows.map(({ persona_id, nombre }) => ({
             persona_id,
@@ -576,27 +603,25 @@ export class ConvivenciaService {
                 'La persona elegida no corresponde a ese origen.';
           }
 
-          // HU-035 CA4: la matrícula activa de cada estudiante, de cualquier curso.
-          const matriculas = await db.query<{
-            estudiante_id: string;
-            persona_id: string;
-            matricula_id: string;
-          }>(
-            `SELECT e.id AS estudiante_id, e.persona_id, m.id AS matricula_id
-             FROM convi.matriculas m
-             JOIN convi.estudiantes e ON e.id = m.estudiante_id
-             WHERE m.estado = 'ACTIVO' AND e.id = ANY($1::uuid[])`,
-            [datos.participantes.map((p) => p.estudiante_id)],
+          // PB-076 (HU-066): basta con que el estudiante sea de la escuela,
+          // aunque hoy no tenga matrícula activa (retirado o egresado).
+          const estudianteIds = datos.participantes.map((p) => p.estudiante_id);
+          const estudiantes = await db.query(
+            'SELECT 1 FROM convi.estudiantes WHERE id = ANY($1::uuid[])',
+            [estudianteIds],
           );
-          const matriculaDe = new Map(
-            matriculas.rows.map((fila) => [fila.estudiante_id, fila]),
-          );
-          if (matriculaDe.size !== datos.participantes.length)
-            errores.participantes =
-              'Hay estudiantes sin una matrícula activa en la escuela.';
+          if (estudiantes.rowCount !== datos.participantes.length)
+            errores.participantes = 'Elige estudiantes de la lista.';
 
           if (!ocurridoEn || Object.keys(errores).length > 0)
             throw errorDeCampos(errores);
+
+          // HU-066 CA1: se guarda la matrícula del día del hecho, si la tenía.
+          const alOcurrir = await matriculasAlOcurrir(
+            db,
+            estudianteIds,
+            ocurridoEn,
+          );
 
           return insertarSituacion(
             db,
@@ -612,7 +637,7 @@ export class ConvivenciaService {
             },
             datos.participantes.map((p) => ({
               rol: p.rol,
-              ...matriculaDe.get(p.estudiante_id)!,
+              ...alOcurrir.get(p.estudiante_id)!,
             })),
           );
         },

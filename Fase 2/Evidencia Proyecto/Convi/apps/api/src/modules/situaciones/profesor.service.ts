@@ -15,6 +15,7 @@ import {
   comprobarFechaYCategoria,
   conReintentosDeCodigo,
   insertarSituacion,
+  matriculasAlOcurrir,
   type SituacionRegistrada,
 } from './registro-situacion.js';
 import { validarRespuesta } from './respuesta-aclaracion.js';
@@ -210,30 +211,29 @@ export class ProfesorService {
         const errores: Record<string, string> = {};
         const ocurridoEn = await comprobarFechaYCategoria(db, datos, errores);
 
-        // CA4: la matrícula activa de cada estudiante en este curso se guarda en
-        // la participación, para conservar su curso histórico.
-        const matriculas = await db.query<{
-          estudiante_id: string;
-          persona_id: string;
-          matricula_id: string;
-        }>(
-          `SELECT e.id AS estudiante_id, e.persona_id, m.id AS matricula_id
-           FROM convi.matriculas m
-           JOIN convi.estudiantes e ON e.id = m.estudiante_id
-           WHERE m.curso_id = $1 AND m.estado = 'ACTIVO'
-             AND e.id = ANY($2::uuid[])`,
-          [datos.curso_id, datos.participantes.map((p) => p.estudiante_id)],
+        // CA1: el profesor elige entre los estudiantes matriculados hoy en su curso.
+        const estudianteIds = datos.participantes.map((p) => p.estudiante_id);
+        const delCurso = await db.query(
+          `SELECT 1 FROM convi.matriculas
+           WHERE curso_id = $1 AND estado = 'ACTIVO'
+             AND estudiante_id = ANY($2::uuid[])`,
+          [datos.curso_id, estudianteIds],
         );
-        const matriculaDe = new Map(
-          matriculas.rows.map((fila) => [fila.estudiante_id, fila]),
-        );
-        if (matriculaDe.size !== datos.participantes.length)
+        if (delCurso.rowCount !== datos.participantes.length)
           errores.participantes =
             'Hay estudiantes que no están matriculados en este curso.';
 
         // CA5: si falta algo no se inserta nada.
         if (!ocurridoEn || Object.keys(errores).length > 0)
           throw errorDeCampos(errores);
+
+        // CA4 y PB-076 (HU-066): se guarda la matrícula del día del hecho, que
+        // puede ser de otro curso si el estudiante cambió de curso después.
+        const alOcurrir = await matriculasAlOcurrir(
+          db,
+          estudianteIds,
+          ocurridoEn,
+        );
 
         return insertarSituacion(
           db,
@@ -249,7 +249,7 @@ export class ProfesorService {
           },
           datos.participantes.map((p) => ({
             rol: p.rol,
-            ...matriculaDe.get(p.estudiante_id)!,
+            ...alOcurrir.get(p.estudiante_id)!,
           })),
         );
       },

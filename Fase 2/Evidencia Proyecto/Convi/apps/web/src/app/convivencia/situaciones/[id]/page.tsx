@@ -126,23 +126,28 @@ export default async function PaginaRevisionSituacion({
                 key={`${p.codigo_estudiante ?? ""}-${p.apellidos}-${p.nombres}-${p.rol}`}
                 className="flex flex-wrap items-center justify-between gap-2 py-2.5"
               >
-                <span className="font-medium">
-                  {p.apellidos}, {p.nombres}
-                  {p.codigo_estudiante && (
-                    <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
-                      {p.codigo_estudiante}
-                    </span>
-                  )}
-                </span>
-                <span className="flex flex-wrap items-center gap-1.5">
-                  {p.curso_matricula && (
-                    <span className="text-xs text-muted-foreground">
-                      {p.curso_matricula}
-                    </span>
-                  )}
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                    {NOMBRE_ROL_EN_SITUACION[p.rol] ?? p.rol}
-                  </span>
+                <div>
+                  <p className="font-medium">
+                    {p.apellidos}, {p.nombres}
+                    {p.codigo_estudiante && (
+                      <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                        {p.codigo_estudiante}
+                      </span>
+                    )}
+                  </p>
+                  {/* PB-076 (HU-066 CA2 y CA3): el curso del día del hecho y, aparte, el actual. */}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {p.curso_matricula
+                      ? `Curso al ocurrir el hecho: ${p.curso_matricula}`
+                      : "Curso histórico no registrado"}
+                    {" · "}
+                    {p.curso_actual
+                      ? `Curso actual: ${p.curso_actual}`
+                      : "Sin matrícula activa hoy"}
+                  </p>
+                </div>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                  {NOMBRE_ROL_EN_SITUACION[p.rol] ?? p.rol}
                 </span>
               </li>
             ))}
