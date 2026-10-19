@@ -32,6 +32,20 @@ export function FormularioRegistro({ opciones }: { opciones: OpcionesRegistro })
   const errores = estado.errores ?? {};
   const [origen, setOrigen] = useState(valores.tipo_origen ?? "");
   const urgencia = valores.urgencia || "NORMAL";
+  
+  // PB-076 (HU-066): quienes hoy no tienen matrícula activa van en un grupo
+  // aparte; la API guarda la matrícula que tenían el día del hecho.
+  const grupos =
+    opciones.sin_matricula.length > 0
+      ? [
+          ...opciones.cursos,
+          {
+            id: "sin-matricula",
+            nombre: "Sin matrícula activa",
+            estudiantes: opciones.sin_matricula,
+          },
+        ]
+      : opciones.cursos;
 
   // CA1: la lista de informantes depende de quién informó.
   const informantes =
@@ -253,14 +267,14 @@ export function FormularioRegistro({ opciones }: { opciones: OpcionesRegistro })
           <legend className="sr-only">Rol de cada estudiante en el hecho</legend>
           <Mensaje
             id="participantes"
-            ayuda="Abre cada curso y elige el rol de los estudiantes que participaron; pueden ser de cursos distintos. Los demás quedan como «No participa»."
+            ayuda="Abre cada curso y elige el rol de los estudiantes que participaron; pueden ser de cursos distintos. Los retirados o egresados están en «Sin matrícula activa». Los demás quedan como «No participa»."
           />
           <div
             className={`mt-3 divide-y divide-border rounded-xl border ${
               errores.participantes ? "border-destructive" : "border-border"
             }`}
           >
-            {opciones.cursos.map((curso) => (
+            {grupos.map((curso) => (
               <details
                 key={curso.id}
                 // Al volver con errores, los cursos con estudiantes elegidos quedan abiertos.

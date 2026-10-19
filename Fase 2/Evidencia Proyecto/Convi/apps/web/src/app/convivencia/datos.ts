@@ -45,7 +45,10 @@ export type DetalleConvivencia = SituacionBandeja & {
     apellidos: string;
     codigo_estudiante: string | null;
     rol: string;
+    /** Curso y año el día del hecho; null si no tenía matrícula (HU-066). */
     curso_matricula: string | null;
+    /** Curso y año de su matrícula activa hoy (HU-066 CA2). */
+    curso_actual: string | null;
   }[];
   aclaraciones: {
     id: string;
@@ -196,19 +199,23 @@ export function enviarAclaracion(id: string, pregunta: string) {
 // --- Registro por otros canales (PB-043, HU-036) ---
 
 /** Misma forma que devuelve GET /convivencia/registro/opciones. */
+type EstudianteOpcion = {
+  id: string;
+  persona_id: string;
+  nombres: string;
+  apellidos: string;
+  codigo_estudiante: string;
+};
+
 export type OpcionesRegistro = {
   categorias: { id: string; nombre: string }[];
   cursos: {
     id: string;
     nombre: string;
-    estudiantes: {
-      id: string;
-      persona_id: string;
-      nombres: string;
-      apellidos: string;
-      codigo_estudiante: string;
-    }[];
+    estudiantes: EstudianteOpcion[];
   }[];
+  /** Estudiantes sin matrícula activa hoy, como retirados o egresados (HU-066). */
+  sin_matricula: EstudianteOpcion[];
   funcionarios: { persona_id: string; nombre: string }[];
   apoderados: { persona_id: string; nombre: string }[];
 };

@@ -85,6 +85,43 @@ export async function comprobarFechaYCategoria(
   return ocurrido && !ocurrido.futura ? ocurrido.ocurrido_en : null;
 }
 
+/** Estudiante de la escuela con la matrícula que tenía el día del hecho. */
+export type ParticipanteAlOcurrir = {
+  estudiante_id: string;
+  persona_id: string;
+  /** null si ese día no tenía matrícula (HU-066 CA3). */
+  matricula_id: string | null;
+};
+
+/**
+ * PB-076 (HU-066 CA1): busca la matrícula de cada estudiante en la fecha del
+ * hecho, según la hora de la escuela, aunque hoy esté en otro curso o ya no
+ * esté matriculado. Las matrículas de un estudiante no se superponen (trigger
+ * de convi.matriculas), así que hay a lo sumo una. Los estudiantes que no son
+ * de la escuela no aparecen en el resultado.
+ */
+export async function matriculasAlOcurrir(
+  db: PoolClient,
+  estudianteIds: string[],
+  ocurridoEn: Date,
+): Promise<Map<string, ParticipanteAlOcurrir>> {
+  const resultado = await db.query<ParticipanteAlOcurrir>(
+    `SELECT e.id AS estudiante_id, e.persona_id, m.id AS matricula_id
+     FROM convi.estudiantes e
+     JOIN convi.establecimientos es ON es.id = e.establecimiento_id
+     CROSS JOIN LATERAL (
+       SELECT ($2::timestamptz AT TIME ZONE es.zona_horaria)::date AS dia
+     ) h
+     LEFT JOIN convi.matriculas m
+       ON m.estudiante_id = e.id
+      AND m.matriculado_en <= h.dia
+      AND (m.finalizado_en IS NULL OR m.finalizado_en >= h.dia)
+     WHERE e.id = ANY($1::uuid[])`,
+    [estudianteIds, ocurridoEn],
+  );
+  return new Map(resultado.rows.map((fila) => [fila.estudiante_id, fila]));
+}
+
 /**
  * Inserta la situación y sus participantes. La base asigna el código, la
  * fecha de registro del servidor y el estado NUEVA (HU-035 CA3); el autor es
@@ -102,7 +139,11 @@ export async function insertarSituacion(
     categoria_id: string | null;
     urgencia: string;
   },
-  participantes: { persona_id: string; rol: string; matricula_id: string }[],
+  participantes: {
+    persona_id: string;
+    rol: string;
+    matricula_id: string | null;
+  }[],
 ): Promise<SituacionRegistrada> {
   const insertada = await db
     .query<SituacionRegistrada>(
@@ -131,7 +172,9 @@ export async function insertarSituacion(
     });
   const registrada = insertada.rows[0];
 
-  // HU-035 CA4: cada estudiante queda con la matrícula que tenía al registrarse.
+  // HU-066 CA1: cada estudiante queda con la matrícula que tenía el día del
+  // hecho, o sin matrícula si ese día no tenía. El trigger de participaciones
+  // exige que sea suya y no deja cambiarla después (CA3).
   await db.query(
     `INSERT INTO convi.participaciones
        (establecimiento_id, persona_id, situacion_id, rol_contextual,
