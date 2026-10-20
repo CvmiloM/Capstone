@@ -7,8 +7,19 @@ const nextConfig: NextConfig = {
   // Una pestaña de la versión anterior debe recargar después del despliegue.
   deploymentId: process.env.DEPLOYMENT_ID,
   async headers() {
+    const recuperacion = [
+      "/recuperar-contrasena",
+      "/restablecer-contrasena",
+    ].map((source) => ({
+      source,
+      headers: [
+        { key: "Cache-Control", value: "private, no-store" },
+        { key: "Referrer-Policy", value: "no-referrer" },
+      ],
+    }));
     return process.env.NODE_ENV === "production"
       ? [
+          ...recuperacion,
           {
             source: "/:path*",
             headers: [
@@ -16,7 +27,7 @@ const nextConfig: NextConfig = {
             ],
           },
         ]
-      : [];
+      : recuperacion;
   },
   cacheComponents: true,
   partialPrefetching: true,

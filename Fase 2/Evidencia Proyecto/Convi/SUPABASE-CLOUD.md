@@ -111,6 +111,28 @@ equipo. Preparar SMTP y remitente antes de probar cuentas externas e invitacione
 
 ## Correos con Brevo
 
+### Recuperación de contraseña (PB-005)
+
+Además de las plantillas existentes, guardar en Supabase → Authentication →
+Emails → Reset password el contenido de `supabase/templates/recuperacion.html`,
+con asunto **Recupera tu contraseña de CONVI**. El archivo `config.toml` solo
+configura el entorno local: el deploy de GitHub no modifica la plantilla cloud.
+
+El enlace usa `SiteURL` y llega a `/restablecer-contrasena` con `type=recovery`.
+Conservar Site URL en `https://www.convi.tech` para la web publicada. No hace
+falta añadir un destino proporcionado por el navegador a Redirect URLs.
+Probar después de publicar: solicitar desde Login, abrir el correo más reciente,
+pulsar Continuar, definir contraseña y confirmar el TOTP si la identidad lo tiene.
+Comprobar que la clave anterior se rechaza y la nueva permite el login normal.
+No compartir el enlace ni los códigos. Perder TOTP requiere PB-154, no se
+soluciona eliminando el factor para cambiar la contraseña.
+
+El comportamiento, archivos, datos utilizados y pruebas están en
+`apps/web/PB-005.md`. La recepción cloud no se considera comprobada hasta que
+Sebastián complete la prueba manual. La plantilla anterior de invitación no cambia.
+
+### SMTP y plantillas existentes
+
 SMTP se configura una sola vez en Supabase / Authentication / Emails /
 SMTP Settings. El equipo no necesita agregar la clave SMTP a sus archivos
 locales. Usar el remitente verificado en Brevo, host `smtp-relay.brevo.com`,
