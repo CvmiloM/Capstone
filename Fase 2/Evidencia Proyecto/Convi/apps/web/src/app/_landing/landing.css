@@ -1,0 +1,459 @@
+/*
+ * Estilos de la landing (page.tsx). Van como CSS global con el prefijo lp-
+ * porque next.config.ts trata todo archivo .css como global (sin CSS Modules).
+ *
+ * Landing de Convi: la página es la carpeta de expedientes del equipo de
+ * convivencia. Solo usa los colores con nombre de globals.css (tinta, crema,
+ * pizarra, verde, menta, amarillo, naranjo, niebla).
+ */
+.lp-pagina {
+  --margen: clamp(16px, 4vw, 56px);
+  --t-display: clamp(88px, 10vw, 160px);
+  --t-titulo: clamp(34px, 3.6vw, 52px);
+  --t-frase: clamp(22px, 2.1vw, 30px);
+  --t-texto: clamp(17px, 1.25vw, 19px);
+  --t-chico: 16px;
+  --seccion: clamp(72px, 6.5vw, 96px);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-suave: cubic-bezier(0.33, 1, 0.68, 1);
+
+  background: var(--tinta);
+  color: var(--tinta);
+  font-size: var(--t-texto);
+  line-height: 1.55;
+}
+
+.lp-pagina h1,
+.lp-pagina h2,
+.lp-pagina h3 {
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  text-wrap: balance;
+}
+
+/* ---------- Entradas al bajar (entradas.tsx) ---------- */
+.lp-pagina [data-entra][data-estado="espera"] {
+  opacity: 0;
+  translate: 0 28px;
+}
+
+.lp-pagina [data-entra][data-estado="entro"] {
+  transition:
+    opacity 700ms var(--ease-out) var(--retraso, 0ms),
+    translate 900ms var(--ease-expo) var(--retraso, 0ms);
+}
+
+.lp-pagina [data-entra="1"] {
+  --retraso: 80ms;
+}
+
+.lp-pagina [data-entra="2"] {
+  --retraso: 160ms;
+}
+
+.lp-pagina [data-entra="3"] {
+  --retraso: 240ms;
+}
+
+@media print {
+  .lp-pagina [data-entra] {
+    opacity: 1 !important;
+    translate: none !important;
+  }
+}
+
+/* ---------- Primera pantalla: la pila de carpetas ---------- */
+.lp-heroe {
+  position: relative;
+  min-height: calc(51svh + 54rem);
+  overflow: hidden;
+  background: var(--tinta);
+  color: var(--crema);
+}
+
+.lp-barra {
+  position: relative;
+  display: flex;
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--margen);
+}
+
+.lp-barra .lp-acceso {
+  position: absolute;
+  right: var(--margen);
+  font-size: var(--t-chico);
+  font-weight: 600;
+}
+
+.lp-nombre {
+  margin-top: 28px;
+  font-size: var(--t-display);
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  text-align: center;
+  animation: aparece-subiendo 1000ms var(--ease-expo) both;
+}
+
+.lp-bajada {
+  margin: 36px auto 0;
+  max-width: 46ch;
+  padding-inline: var(--margen);
+  color: var(--crema);
+  text-align: center;
+  font-size: clamp(18px, 1.4vw, 21px);
+  animation: aparece-subiendo 1000ms var(--ease-expo) 120ms both;
+}
+
+.lp-carpetas {
+  position: absolute;
+  inset-inline: 0;
+  top: 51svh;
+  bottom: 0;
+}
+
+.lp-carpeta {
+  --alto-pestana: 40px;
+  position: absolute;
+  left: var(--margen);
+  right: var(--margen);
+  top: calc(var(--i) * 64px);
+  bottom: 0;
+  display: block;
+  background: var(--fondo);
+  color: var(--tinta-carpeta, var(--tinta));
+  animation: carpeta-sube 1100ms var(--ease-expo) calc(260ms + var(--i) * 90ms)
+    both;
+}
+
+.lp-pestana {
+  position: absolute;
+  top: calc(-1 * var(--alto-pestana) + 1px);
+  left: var(--x);
+  display: flex;
+  height: var(--alto-pestana);
+  min-width: 13rem;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 2.25rem;
+  background: var(--fondo);
+  font-size: var(--t-texto);
+  font-weight: 700;
+  white-space: nowrap;
+  clip-path: polygon(12% 0, 88% 0, 100% 100%, 0 100%);
+}
+
+a.lp-carpeta {
+  transition: translate 400ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  a.lp-carpeta:hover {
+    translate: 0 -10px;
+  }
+}
+
+a.lp-carpeta:focus-visible {
+  outline: 3px solid var(--crema);
+  outline-offset: 4px;
+}
+
+.lp-frente {
+  padding: 32px clamp(16px, 3vw, 40px) 0;
+}
+
+.lp-boton-pestana {
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 100%, 0 100%);
+}
+
+@keyframes aparece-subiendo {
+  from {
+    opacity: 0;
+    translate: 0 32px;
+  }
+}
+
+@keyframes carpeta-sube {
+  from {
+    translate: 0 120px;
+  }
+}
+
+@media (max-width: 767px) {
+  .lp-heroe {
+    min-height: calc(48svh + 60rem);
+  }
+
+  .lp-nombre {
+    margin-top: 24px;
+    font-size: 17vw;
+  }
+
+  .lp-carpetas {
+    top: 48svh;
+  }
+
+  .lp-carpeta {
+    --alto-pestana: 32px;
+    left: 0;
+    right: 0;
+    top: calc(var(--i) * 52px);
+  }
+
+  .lp-pestana {
+    left: var(--x-telefono);
+    min-width: 0;
+    padding-inline: 1.25rem;
+    font-size: var(--t-chico);
+  }
+}
+
+/* ---------- El registro: foto del patio y comprobantes ---------- */
+.lp-registro {
+  position: relative;
+  min-height: 96svh;
+  overflow: hidden;
+  background: var(--pizarra);
+}
+
+.lp-foto {
+  object-fit: cover;
+  animation: deriva 24s var(--ease-suave) infinite alternate;
+}
+
+@keyframes deriva {
+  from {
+    scale: 1.04;
+    translate: -1% 0;
+  }
+  to {
+    scale: 1.12;
+    translate: 1% -1%;
+  }
+}
+
+.lp-columna-registro {
+  position: relative;
+  margin-left: 18%;
+  max-width: 34rem;
+  padding: 40px 40px 44px;
+  background: color-mix(in oklab, var(--tinta) 82%, transparent);
+  color: var(--crema);
+}
+
+.lp-comprobantes {
+  position: absolute;
+  inset-inline: var(--margen);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.lp-comprobante {
+  /* El borde de abajo queda bajo el corte de la sección, como un papel
+     que sigue; el relleno deja todo el texto a la vista. */
+  min-height: var(--alto);
+  margin-bottom: -2rem;
+  padding: 20px 18px calc(2rem + 20px);
+  background: var(--crema);
+  color: var(--tinta);
+  font-size: var(--t-chico);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  rotate: var(--giro, 0deg);
+}
+
+.lp-comprobante .lp-separador {
+  margin-block: 8px;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--pizarra);
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .lp-comprobantes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .lp-comprobante:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .lp-registro {
+    min-height: 100svh;
+  }
+
+  .lp-columna-registro {
+    margin: 0;
+    padding: 28px var(--margen) 32px;
+  }
+
+  .lp-comprobantes {
+    inset-inline: 0;
+    display: flex;
+    overflow-x: auto;
+    padding-inline: var(--margen);
+    scroll-snap-type: x mandatory;
+  }
+
+  .lp-comprobante {
+    flex: 0 0 64vw;
+    scroll-snap-align: start;
+    font-size: 15px;
+  }
+}
+
+/* ---------- Cómo avanza: fila de momentos ---------- */
+.lp-fila {
+  display: flex;
+  gap: 32px;
+  overflow-x: auto;
+  padding-inline: var(--margen);
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--margen);
+  scrollbar-width: none;
+  cursor: grab;
+}
+
+.lp-fila::-webkit-scrollbar {
+  display: none;
+}
+
+.lp-fila[data-arrastrando="si"] {
+  cursor: grabbing;
+  scroll-snap-type: none;
+}
+
+.lp-momento {
+  flex: 0 0 300px;
+  scroll-snap-align: start;
+  user-select: none;
+}
+
+.lp-progreso {
+  height: 6px;
+  background: color-mix(in oklab, var(--tinta) 18%, transparent);
+}
+
+.lp-progreso > span {
+  display: block;
+  height: 100%;
+  background: var(--tinta);
+  transition: width 240ms var(--ease-out);
+}
+
+.lp-boton-cuadrado {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  background: var(--tinta);
+  color: var(--crema);
+  transition: scale 140ms var(--ease-out);
+}
+
+.lp-boton-cuadrado:active {
+  scale: 0.94;
+}
+
+.lp-boton-cuadrado:disabled {
+  opacity: 0.4;
+}
+
+@media (max-width: 767px) {
+  .lp-fila {
+    gap: 16px;
+  }
+
+  .lp-momento {
+    flex-basis: 76vw;
+  }
+}
+
+/* ---------- Lo que incluye: la hoja con puntos guía ---------- */
+.lp-hoja {
+  background: var(--crema);
+  padding: 52px 48px 52px;
+  /* Bordes de arriba y abajo en zigzag, como una hoja cortada. */
+  clip-path: polygon(0% 12px, 4.16667% 0, 8.33333% 12px, 12.5% 0, 16.6667% 12px, 20.8333% 0, 25% 12px, 29.1667% 0, 33.3333% 12px, 37.5% 0, 41.6667% 12px, 45.8333% 0, 50% 12px, 54.1667% 0, 58.3333% 12px, 62.5% 0, 66.6667% 12px, 70.8333% 0, 75% 12px, 79.1667% 0, 83.3333% 12px, 87.5% 0, 91.6667% 12px, 95.8333% 0, 100% 12px, 100% calc(100% - 12px), 95.8333% 100%, 91.6667% calc(100% - 12px), 87.5% 100%, 83.3333% calc(100% - 12px), 79.1667% 100%, 75% calc(100% - 12px), 70.8333% 100%, 66.6667% calc(100% - 12px), 62.5% 100%, 58.3333% calc(100% - 12px), 54.1667% 100%, 50% calc(100% - 12px), 45.8333% 100%, 41.6667% calc(100% - 12px), 37.5% 100%, 33.3333% calc(100% - 12px), 29.1667% 100%, 25% calc(100% - 12px), 20.8333% 100%, 16.6667% calc(100% - 12px), 12.5% 100%, 8.33333% calc(100% - 12px), 4.16667% 100%, 0% calc(100% - 12px));
+}
+
+.lp-guia {
+  flex: 1;
+  min-width: 2rem;
+  margin-inline: 10px;
+  translate: 0 -6px;
+  border-bottom: 4px dotted color-mix(in oklab, var(--tinta) 55%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp-menu:has(.lp-fila-menu:hover, .lp-fila-menu:focus-visible)
+    .lp-fila-menu:not(:hover, :focus-visible) {
+    opacity: 0.45;
+  }
+}
+
+.lp-fila-menu {
+  transition: opacity 180ms ease;
+}
+
+/* La vista previa entra cada vez que cambia de grupo. */
+.lp-vista {
+  animation: vista-entra 420ms var(--ease-expo) both;
+}
+
+@keyframes vista-entra {
+  from {
+    opacity: 0;
+    translate: 0 18px;
+    clip-path: inset(0 0 12% 0 round 16px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 16px);
+  }
+}
+
+@media (max-width: 767px) {
+  .lp-hoja {
+    padding: 48px 20px 56px;
+  }
+}
+
+/* ---------- Empezar: la tarjeta de respuesta ---------- */
+.lp-tarjeta {
+  rotate: 2deg;
+  transition: rotate 600ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp-tarjeta:hover {
+    rotate: 1deg;
+  }
+}
+
+@media (max-width: 767px) {
+  .lp-tarjeta {
+    rotate: 1deg;
+  }
+}
+
+/* ---------- El reverso: festón del pie ---------- */
+.lp-feston {
+  display: block;
+  width: 100%;
+  height: 28px;
+  color: var(--crema);
+}
+
+.lp-sello {
+  rotate: 3deg;
+}
