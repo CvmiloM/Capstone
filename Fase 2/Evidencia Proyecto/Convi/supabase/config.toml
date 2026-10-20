@@ -50,6 +50,10 @@ content_path = "./supabase/templates/confirmacion.html"
 subject = "Continúa tu acceso a CONVI"
 content_path = "./supabase/templates/continuar-invitacion.html"
 
+[auth.email.template.recovery]
+subject = "Recupera tu contraseña de CONVI"
+content_path = "./supabase/templates/recuperacion.html"
+
 # HU-008: segundo factor con app autenticadora para Administración y Convivencia
 [auth.mfa]
 max_enrolled_factors = 10

@@ -14,6 +14,13 @@ export default function PaginaLogin() {
       />
       <FormularioLogin />
 
+      <Link
+        href="/recuperar-contrasena"
+        className={`${claseEnlace} mt-4 inline-block text-sm`}
+      >
+        ¿Olvidaste tu contraseña?
+      </Link>
+
       <div className="mt-8 space-y-2 border-t border-border pt-6 text-sm text-muted-foreground">
         <p>
           ¿Tu establecimiento aún no usa CONVI?{" "}
