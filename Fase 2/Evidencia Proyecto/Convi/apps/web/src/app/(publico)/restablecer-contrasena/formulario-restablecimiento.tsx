@@ -21,25 +21,16 @@ const inicial: EstadoRecuperacion = {};
 export function FormularioRestablecimiento({
   tokenHash,
   requiereCodigo = false,
+  estadoInicial = inicial,
 }: {
   tokenHash?: string;
   requiereCodigo?: boolean;
+  estadoInicial?: EstadoRecuperacion;
 }) {
   const [estado, accion, pendiente] = useActionState(
     tokenHash ? aceptarEnlaceRecuperacion : restablecerContrasena,
-    inicial,
+    estadoInicial,
   );
-  if (estado.paso === "completado")
-    return (
-      <div className="space-y-5">
-        <p role="status" className="text-sm text-muted-foreground">
-          {estado.mensaje}
-        </p>
-        <a href="/login" className={claseEnlace}>
-          Ir a iniciar sesión
-        </a>
-      </div>
-    );
   return (
     <form action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}

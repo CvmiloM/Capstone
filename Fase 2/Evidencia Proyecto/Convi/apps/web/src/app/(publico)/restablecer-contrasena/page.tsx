@@ -50,16 +50,36 @@ async function Contenido({
       </>
     );
   }
+  // Es un aviso público, no una prueba de identidad ni un permiso de acceso.
+  if (parametros.resultado === "actualizada")
+    return (
+      <>
+        <Encabezado
+          titulo="Contraseña actualizada"
+          descripcion={
+            parametros.salida === "pendiente"
+              ? "Tu contraseña se cambió. No pudimos cerrar esta sesión; ciérrala antes de volver a ingresar."
+              : "Tu contraseña se cambió. Inicia sesión con la nueva contraseña."
+          }
+        />
+        <a href="/login" className={claseEnlace}>
+          Ir a iniciar sesión
+        </a>
+      </>
+    );
   const estado = await consultarRestablecimiento();
-  if (estado.paso === "invalido")
-    return <EnlaceInvalido mensaje={estado.mensaje} />;
+  // Mantener el formulario: MFA y logout cambian cookies y Next vuelve a
+  // renderizar esta página. Su resultado de acción debe conservarse.
   return (
     <>
       <Encabezado
         titulo="Define tu nueva contraseña"
         descripcion="La contraseña cambiará solo para la cuenta del enlace que confirmaste."
       />
-      <FormularioRestablecimiento requiereCodigo={estado.paso === "codigo"} />
+      <FormularioRestablecimiento
+        requiereCodigo={estado.paso === "codigo"}
+        estadoInicial={estado}
+      />
     </>
   );
 }
