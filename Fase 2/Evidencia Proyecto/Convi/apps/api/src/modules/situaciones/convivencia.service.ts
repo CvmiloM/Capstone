@@ -22,6 +22,15 @@ import {
   type SituacionRegistrada,
 } from './registro-situacion.js';
 import { validarCambioResponsable } from './responsable-revision.js';
+import {
+  comprobarNormativaVigente,
+  insertarRevisionNormativa,
+  opcionesNormativa,
+  revisionesNormativas,
+  validarRevisionNormativa,
+  type OpcionesNormativa,
+  type RevisionNormativa,
+} from './revision-normativa.js';
 
 // PB-044 (HU-037): bandeja y revisión inicial del equipo de Convivencia.
 // La seguridad por fila de la base separa por escuela y Convivencia ve todas
@@ -94,6 +103,10 @@ export type DetalleConvivencia = SituacionBandeja & {
   }[];
   /** PB-046 (HU-039 CA1): cuentas de Convivencia activas que pueden revisar. */
   opciones_responsable: { id: string; nombre: string; propia: boolean }[];
+  /** PB-155 (HU-134): lo que se registró del reglamento o protocolo. */
+  revisiones_normativas: RevisionNormativa[];
+  /** PB-155: versiones publicadas y vigentes que se pueden citar. */
+  opciones_normativa: OpcionesNormativa;
 };
 
 export type ResponsableAsignado = {
@@ -306,6 +319,8 @@ export class ConvivenciaService {
           participantes: participantes.rows,
           aclaraciones: aclaraciones.rows,
           opciones_responsable: responsables.rows,
+          revisiones_normativas: await revisionesNormativas(db, id),
+          opciones_normativa: await opcionesNormativa(db),
         };
       },
     );
@@ -471,6 +486,65 @@ export class ConvivenciaService {
         return resultado.rows[0];
       },
     );
+  }
+
+  // PB-155 (HU-134): registra lo que indica el reglamento o el protocolo
+  // durante la revisión, antes de decidir. Es una consulta: el estado de la
+  // situación no cambia (CA4). Si otra persona cambió la situación al mismo
+  // tiempo se reintenta una vez con el estado nuevo.
+  async registrarRevisionNormativa(
+    sesion: Sesion,
+    id: string,
+    cuerpo: unknown,
+  ): Promise<{ id: string; revisado_en: Date }> {
+    const datos = validarRevisionNormativa(cuerpo);
+    for (let intento = 1; ; intento++) {
+      try {
+        return await this.cuentas.operar(
+          sesion,
+          { tipo: 'establecimiento', perfiles: PERFILES },
+          async (db) => {
+            const actual = await db
+              .query<{ estado: string }>(
+                'SELECT estado FROM convi.situaciones WHERE id = $1 FOR UPDATE',
+                [id],
+              )
+              .catch((error: unknown) => {
+                if (esCambioSimultaneo(error))
+                  throw new ConflictException(CAMBIO_SIMULTANEO);
+                throw error;
+              });
+            const fila = actual.rows[0];
+            if (!fila) throw new NotFoundException(NO_EXISTE);
+            if (fila.estado === 'NUEVA')
+              throw new ConflictException(
+                'Inicia la revisión antes de registrar lo que indica la normativa.',
+              );
+            if (
+              !['EN_REVISION', 'INFORMACION_SOLICITADA'].includes(fila.estado)
+            )
+              throw new ConflictException(
+                'La revisión de esta situación ya terminó; no se agregan más revisiones normativas.',
+              );
+
+            const errores = await comprobarNormativaVigente(db, datos);
+            if (Object.keys(errores).length > 0)
+              throw new BadRequestException({
+                mensaje:
+                  'Revisa los datos marcados. No se guardó la revisión normativa.',
+                errores,
+              });
+            return insertarRevisionNormativa(db, id, datos);
+          },
+        );
+      } catch (error) {
+        const reintentar =
+          error instanceof ConflictException &&
+          error.message === CAMBIO_SIMULTANEO &&
+          intento < 2;
+        if (!reintentar) throw error;
+      }
+    }
   }
 
   // PB-045 (HU-038): Convivencia pide información al profesor que registró la

@@ -7,6 +7,7 @@ import {
 } from './nueva-situacion.js';
 import { validarRespuesta } from './respuesta-aclaracion.js';
 import { validarCambioResponsable } from './responsable-revision.js';
+import { validarRevisionNormativa } from './revision-normativa.js';
 
 // PB-140 (HU-119 CA1): las reglas viven en el servidor. Estas pruebas envían
 // directamente a las validaciones datos que la pantalla nunca mandaría, para
@@ -271,6 +272,90 @@ describe('Responsable de revisión (PB-046, HU-039)', () => {
         }),
       ),
     ).toEqual(['responsable_id']);
+  });
+});
+
+describe('Revisión normativa (PB-155, HU-134)', () => {
+  const PROTOCOLO = '66666666-6666-4666-8666-666666666666';
+  const DOCUMENTO = '77777777-7777-4777-8777-777777777777';
+
+  it('exige aplicabilidad y fundamento, y deja el modo en manual (CA1 y CA3)', () => {
+    expect(
+      camposConError(() => validarRevisionNormativa({ fundamento: ' ' })),
+    ).toEqual(['aplicabilidad', 'fundamento']);
+    expect(
+      validarRevisionNormativa({
+        aplicabilidad: 'POR_CONFIRMAR',
+        fundamento: ' El RICE no lo menciona. ',
+      }),
+    ).toEqual({
+      aplicabilidad: 'POR_CONFIRMAR',
+      modo_revision: 'MANUAL',
+      fundamento: 'El RICE no lo menciona.',
+      version_protocolo_id: null,
+      referencias: [],
+    });
+  });
+
+  it('acepta protocolo y páginas consultadas (CA1 y CA2)', () => {
+    const revision = validarRevisionNormativa({
+      aplicabilidad: 'APLICABLE',
+      modo_revision: 'ASISTIDA_IA',
+      fundamento: 'Aplica el protocolo de agresiones.',
+      version_protocolo_id: PROTOCOLO,
+      referencias: [
+        {
+          version_documento_id: DOCUMENTO,
+          pagina_desde: '12',
+          pagina_hasta: '13',
+        },
+        { version_documento_id: DOCUMENTO, titulo_seccion: ' Título IV ' },
+      ],
+    });
+    expect(revision.modo_revision).toBe('ASISTIDA_IA');
+    expect(revision.referencias).toEqual([
+      {
+        version_documento_id: DOCUMENTO,
+        pagina_desde: 12,
+        pagina_hasta: 13,
+        titulo_seccion: null,
+      },
+      {
+        version_documento_id: DOCUMENTO,
+        pagina_desde: null,
+        pagina_hasta: null,
+        titulo_seccion: 'Título IV',
+      },
+    ]);
+  });
+
+  it('rechaza un protocolo cuando la norma no es aplicable', () => {
+    expect(
+      camposConError(() =>
+        validarRevisionNormativa({
+          aplicabilidad: 'NO_APLICABLE',
+          fundamento: 'No corresponde.',
+          version_protocolo_id: PROTOCOLO,
+        }),
+      ),
+    ).toEqual(['version_protocolo_id']);
+  });
+
+  it('rechaza páginas mal indicadas o sin documento (CA2)', () => {
+    const base = { aplicabilidad: 'APLICABLE', fundamento: 'Ver RICE.' };
+    for (const referencia of [
+      { pagina_desde: 3 },
+      { version_documento_id: DOCUMENTO },
+      { version_documento_id: DOCUMENTO, pagina_desde: 0 },
+      { version_documento_id: DOCUMENTO, pagina_desde: 9, pagina_hasta: 4 },
+      { version_documento_id: DOCUMENTO, pagina_hasta: 4 },
+    ]) {
+      expect(
+        camposConError(() =>
+          validarRevisionNormativa({ ...base, referencias: [referencia] }),
+        ),
+      ).toEqual(['referencias']);
+    }
   });
 });
 

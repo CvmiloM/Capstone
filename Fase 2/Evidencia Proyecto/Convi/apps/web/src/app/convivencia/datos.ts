@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 
-// Datos del portal de Convivencia (PB-043, PB-044, PB-045 y PB-046). Se piden a la API desde el
+// Datos del portal de Convivencia (PB-043, PB-044, PB-045, PB-046 y PB-155). Se piden a la API desde el
 // servidor de Next con el token de la sesión; la API exige el perfil
 // CONVIVENCIA con segundo factor en cada petición (PB-127 y PB-009).
 
@@ -64,6 +64,31 @@ export type DetalleConvivencia = SituacionBandeja & {
   }[];
   /** PB-046 (HU-039 CA1): cuentas de Convivencia activas que pueden revisar. */
   opciones_responsable: { id: string; nombre: string; propia: boolean }[];
+  /** PB-155 (HU-134): lo que se registró del reglamento o protocolo. */
+  revisiones_normativas: RevisionNormativa[];
+  /** PB-155: versiones publicadas y vigentes que se pueden citar. */
+  opciones_normativa: {
+    protocolos: { id: string; nombre: string }[];
+    documentos: { id: string; nombre: string }[];
+  };
+};
+
+/** Misma forma que devuelve apps/api/src/modules/situaciones/revision-normativa.ts. */
+export type RevisionNormativa = {
+  id: string;
+  revisado_en: string;
+  revisado_por: string;
+  aplicabilidad: string;
+  modo_revision: string;
+  fundamento: string;
+  protocolo: string | null;
+  referencias: {
+    documento: string;
+    version: string;
+    pagina_desde: number | null;
+    pagina_hasta: number | null;
+    titulo_seccion: string | null;
+  }[];
 };
 
 /** "sin-permiso": la API rechazó la petición (403) o el registro no existe o no es válido (400 y 404). */
@@ -205,6 +230,15 @@ export function enviarCambioResponsable(
     "PATCH",
     `/convivencia/situaciones/${encodeURIComponent(id)}/responsable`,
     cambio,
+  );
+}
+
+/** HU-134: revisión normativa; la API vuelve a validar todo. */
+export function enviarRevisionNormativa(id: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/situaciones/${encodeURIComponent(id)}/revisiones-normativas`,
+    cuerpo,
   );
 }
 

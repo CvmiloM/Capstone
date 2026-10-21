@@ -1,25 +1,31 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   AvisoError,
   claseBotonPrimario,
   claseBotonSecundario,
 } from "@/app/components/formulario";
 import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
+import { APLICABILIDAD, MODO_REVISION } from "./opciones";
 import {
   asignarResponsable,
   cambiarUrgencia,
   iniciarRevision,
   pedirAclaracion,
+  registrarRevisionNormativa,
   type EstadoAccion,
 } from "./acciones";
 
 const estadoInicial: EstadoAccion = {};
 
-// Mismos límites que valida la API (cambio-urgencia.ts y nueva-aclaracion.ts).
+// Mismos límites que valida la API (cambio-urgencia.ts, nueva-aclaracion.ts
+// y revision-normativa.ts).
 const LARGO_MAXIMO_MOTIVO = 500;
 const LARGO_MAXIMO_PREGUNTA = 2000;
+const LARGO_MAXIMO_FUNDAMENTO = 4000;
+const LARGO_MAXIMO_SECCION = 220;
+const MAXIMO_REFERENCIAS = 10;
 
 const claseControl =
   "mt-1.5 block w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/15";
@@ -298,6 +304,244 @@ export function FormularioAclaracion({
       </div>
       <button type="submit" disabled={pendiente} className={claseBotonSecundario}>
         {pendiente ? "Enviando…" : "Pedir aclaración"}
+      </button>
+    </form>
+  );
+}
+
+// HU-134: lo que indica el reglamento o el protocolo, antes de decidir. No
+// cambia el estado de la situación (CA4) y no se edita después (CA5).
+export function FormularioRevisionNormativa({
+  situacionId,
+  protocolos,
+  documentos,
+}: {
+  situacionId: string;
+  protocolos: { id: string; nombre: string }[];
+  documentos: { id: string; nombre: string }[];
+}) {
+  const [estado, accion, pendiente] = useActionState(
+    registrarRevisionNormativa,
+    estadoInicial,
+  );
+  const valores = estado.valores ?? {};
+  const errores = estado.errores ?? {};
+  // Si hubo un error se conservan las filas que se habían agregado.
+  const filasEnviadas = Object.keys(valores).filter((campo) =>
+    campo.startsWith("ref_documento_"),
+  ).length;
+  const [filas, setFilas] = useState<number | null>(null);
+  const cantidad = filas ?? filasEnviadas;
+
+  return (
+    <form action={accion} noValidate className="space-y-5">
+      <input type="hidden" name="situacion_id" value={situacionId} />
+      {estado.mensaje && !estado.errores && (
+        <AvisoError>{estado.mensaje}</AvisoError>
+      )}
+
+      <fieldset
+        aria-describedby={errores.aplicabilidad ? "aplicabilidad-error" : undefined}
+      >
+        <legend className="text-sm font-medium">¿La norma es aplicable?</legend>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2">
+          {Object.entries(APLICABILIDAD).map(([valor, texto]) => (
+            <label key={valor} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="aplicabilidad"
+                value={valor}
+                defaultChecked={valores.aplicabilidad === valor}
+                className="accent-primary"
+              />
+              {texto}
+            </label>
+          ))}
+        </div>
+        {errores.aplicabilidad && (
+          <p id="aplicabilidad-error" className="mt-1.5 text-sm text-destructive">
+            {errores.aplicabilidad}
+          </p>
+        )}
+      </fieldset>
+
+      <div>
+        <label htmlFor="fundamento" className="block text-sm font-medium">
+          Qué indica la normativa
+        </label>
+        <textarea
+          id="fundamento"
+          name="fundamento"
+          rows={4}
+          maxLength={LARGO_MAXIMO_FUNDAMENTO}
+          defaultValue={valores.fundamento}
+          aria-invalid={errores.fundamento ? true : undefined}
+          aria-describedby={errores.fundamento ? "fundamento-error" : "fundamento-ayuda"}
+          className={`${claseControl} ${errores.fundamento ? "border-destructive" : "border-input"}`}
+        />
+        {errores.fundamento ? (
+          <p id="fundamento-error" className="mt-1.5 text-sm text-destructive">
+            {errores.fundamento}
+          </p>
+        ) : (
+          <p id="fundamento-ayuda" className="mt-1.5 text-sm text-muted-foreground">
+            Resume lo que dice el reglamento o el protocolo y por qué aplica o no.
+            Queda registrado y no se puede editar después.
+          </p>
+        )}
+      </div>
+
+      {protocolos.length > 0 ? (
+        <div>
+          <label htmlFor="version_protocolo_id" className="block text-sm font-medium">
+            Protocolo aplicable (opcional)
+          </label>
+          <select
+            id="version_protocolo_id"
+            name="version_protocolo_id"
+            defaultValue={valores.version_protocolo_id ?? ""}
+            aria-invalid={errores.version_protocolo_id ? true : undefined}
+            aria-describedby={
+              errores.version_protocolo_id ? "version_protocolo_id-error" : undefined
+            }
+            className={`${claseControl} ${errores.version_protocolo_id ? "border-destructive" : "border-input"}`}
+          >
+            <option value="">Sin protocolo</option>
+            {protocolos.map((protocolo) => (
+              <option key={protocolo.id} value={protocolo.id}>
+                {protocolo.nombre}
+              </option>
+            ))}
+          </select>
+          {errores.version_protocolo_id && (
+            <p
+              id="version_protocolo_id-error"
+              className="mt-1.5 text-sm text-destructive"
+            >
+              {errores.version_protocolo_id}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Todavía no hay protocolos publicados en la escuela para elegir uno.
+        </p>
+      )}
+
+      {documentos.length > 0 ? (
+        <fieldset
+          aria-describedby={errores.referencias ? "referencias-error" : undefined}
+        >
+          <legend className="text-sm font-medium">
+            Páginas consultadas (opcional)
+          </legend>
+          {Array.from({ length: cantidad }, (_, n) => (
+            <div
+              key={n}
+              className="mt-3 grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-6"
+            >
+              <label className="text-xs text-muted-foreground sm:col-span-4">
+                Documento y versión
+                <select
+                  name={`ref_documento_${n}`}
+                  defaultValue={valores[`ref_documento_${n}`] ?? ""}
+                  className={`${claseControl} border-input text-foreground`}
+                >
+                  <option value="">Elige un documento</option>
+                  {documentos.map((documento) => (
+                    <option key={documento.id} value={documento.id}>
+                      {documento.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Desde la página
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  name={`ref_desde_${n}`}
+                  defaultValue={valores[`ref_desde_${n}`]}
+                  className={`${claseControl} border-input text-foreground`}
+                />
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Hasta la página
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  name={`ref_hasta_${n}`}
+                  defaultValue={valores[`ref_hasta_${n}`]}
+                  className={`${claseControl} border-input text-foreground`}
+                />
+              </label>
+              <label className="text-xs text-muted-foreground sm:col-span-6">
+                Sección (obligatoria si no indicas la página)
+                <input
+                  type="text"
+                  maxLength={LARGO_MAXIMO_SECCION}
+                  name={`ref_seccion_${n}`}
+                  defaultValue={valores[`ref_seccion_${n}`]}
+                  className={`${claseControl} border-input text-foreground`}
+                />
+              </label>
+            </div>
+          ))}
+          {errores.referencias && (
+            <p id="referencias-error" className="mt-1.5 text-sm text-destructive">
+              {errores.referencias}
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {cantidad < MAXIMO_REFERENCIAS && (
+              <button
+                type="button"
+                onClick={() => setFilas(cantidad + 1)}
+                className={claseBotonSecundario}
+              >
+                Agregar página consultada
+              </button>
+            )}
+            {cantidad > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilas(cantidad - 1)}
+                className={claseBotonSecundario}
+              >
+                Quitar la última
+              </button>
+            )}
+          </div>
+        </fieldset>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Todavía no hay reglamentos ni documentos publicados para citar sus
+          páginas: escribe la referencia en el texto.
+        </p>
+      )}
+
+      <fieldset>
+        <legend className="text-sm font-medium">¿Cómo hiciste la revisión?</legend>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2">
+          {Object.entries(MODO_REVISION).map(([valor, texto]) => (
+            <label key={valor} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="modo_revision"
+                value={valor}
+                defaultChecked={(valores.modo_revision || "MANUAL") === valor}
+                className="accent-primary"
+              />
+              {texto}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
+        {pendiente ? "Guardando…" : "Guardar revisión normativa"}
       </button>
     </form>
   );

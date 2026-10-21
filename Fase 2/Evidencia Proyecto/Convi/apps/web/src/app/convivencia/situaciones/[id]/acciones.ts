@@ -6,6 +6,7 @@ import {
   enviarCambioResponsable,
   enviarCambioUrgencia,
   enviarInicioRevision,
+  enviarRevisionNormativa,
 } from "../../datos";
 
 export type EstadoAccion = {
@@ -82,6 +83,49 @@ export async function asignarResponsable(
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
   redirect(`/convivencia/situaciones/${id}?aviso=responsable`);
+}
+
+// Mismo tope de páginas consultadas que valida la API (revision-normativa.ts).
+// Un archivo "use server" solo exporta funciones, por eso no se exporta.
+const MAXIMO_REFERENCIAS = 10;
+
+// PB-155 (HU-134): registra lo que indica el reglamento o el protocolo. Cada
+// página consultada llega como ref_documento_N, ref_desde_N, ref_hasta_N y
+// ref_seccion_N; las filas vacías se ignoran. La situación no cambia de estado.
+export async function registrarRevisionNormativa(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const id = leerTexto(formData, "situacion_id");
+  const valores: Record<string, string> = {};
+  for (const [campo, valor] of formData.entries()) {
+    if (typeof valor === "string" && !campo.startsWith("$")) {
+      valores[campo] = valor.trim();
+    }
+  }
+  if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
+
+  const referencias = [];
+  for (let n = 0; n < MAXIMO_REFERENCIAS; n++) {
+    const fila = {
+      version_documento_id: valores[`ref_documento_${n}`] ?? "",
+      pagina_desde: valores[`ref_desde_${n}`] ?? "",
+      pagina_hasta: valores[`ref_hasta_${n}`] ?? "",
+      titulo_seccion: valores[`ref_seccion_${n}`] ?? "",
+    };
+    if (Object.values(fila).some(Boolean)) referencias.push(fila);
+  }
+  const resultado = await enviarRevisionNormativa(id, {
+    aplicabilidad: valores.aplicabilidad ?? "",
+    modo_revision: valores.modo_revision ?? "",
+    fundamento: valores.fundamento ?? "",
+    version_protocolo_id: valores.version_protocolo_id ?? "",
+    referencias,
+  });
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  redirect(`/convivencia/situaciones/${id}?aviso=normativa`);
 }
 
 // PB-045 (HU-038): pide información al profesor que registró la situación.

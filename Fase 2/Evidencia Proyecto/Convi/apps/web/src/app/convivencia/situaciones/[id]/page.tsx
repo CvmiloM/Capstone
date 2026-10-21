@@ -16,8 +16,10 @@ import {
   FormularioAclaracion,
   FormularioResponsable,
   FormularioRevision,
+  FormularioRevisionNormativa,
   FormularioUrgencia,
 } from "./formularios";
+import { APLICABILIDAD, MODO_REVISION } from "./opciones";
 
 export const metadata: Metadata = { title: "Revisión de la situación" };
 
@@ -32,12 +34,15 @@ const AVISOS: Record<string, string> = {
     "Enviaste la pregunta al profesor. La situación quedó en Información solicitada hasta que responda.",
   responsable:
     "Guardaste el responsable de la revisión. El cambio quedó registrado en la auditoría y el estado no cambió.",
+  normativa:
+    "Guardaste la revisión normativa. Quedó en el historial de la situación y su estado no cambió.",
 };
 
 // PB-044 (HU-037): detalle de una situación para revisarla. Abrirlo no cambia
 // su estado: la revisión empieza con el botón Iniciar revisión (CA2).
 // PB-045 (HU-038): durante la revisión se puede pedir una aclaración al
-// profesor que la registró. PB-046 (HU-039): mientras siga abierta se asigna
+// profesor que la registró. PB-155 (HU-134): también se registra lo que
+// indica la normativa antes de decidir. PB-046 (HU-039): mientras siga abierta se asigna
 // a quien la revisa, sin cambiar su estado.
 export default async function PaginaRevisionSituacion({
   params,
@@ -237,6 +242,67 @@ export default async function PaginaRevisionSituacion({
             )}
           </Seccion>
         </div>
+
+        {/* PB-155 (HU-134): lo que indica la normativa, antes de decidir. */}
+        <Seccion titulo="Revisión normativa" className="lg:col-span-3">
+          {situacion.revisiones_normativas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Todavía no se registra lo que indica el reglamento o el protocolo.
+            </p>
+          ) : (
+            <ul className="space-y-4">
+              {situacion.revisiones_normativas.map((r) => (
+                <li key={r.id} className="rounded-xl border border-border p-4 text-sm">
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                      {APLICABILIDAD[r.aplicabilidad] ?? r.aplicabilidad}
+                    </span>
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                      {MODO_REVISION[r.modo_revision] ?? r.modo_revision}
+                    </span>
+                  </div>
+                  <p className="mt-2 whitespace-pre-line">{r.fundamento}</p>
+                  {r.protocolo && (
+                    <p className="mt-2 text-muted-foreground">
+                      Protocolo: <span className="text-foreground">{r.protocolo}</span>
+                    </p>
+                  )}
+                  {r.referencias.length > 0 && (
+                    <ul className="mt-2 list-inside list-disc text-muted-foreground">
+                      {r.referencias.map((ref, n) => (
+                        <li key={n}>
+                          {ref.documento} ({ref.version})
+                          {ref.pagina_desde &&
+                            (ref.pagina_hasta && ref.pagina_hasta !== ref.pagina_desde
+                              ? `, páginas ${ref.pagina_desde} a ${ref.pagina_hasta}`
+                              : `, página ${ref.pagina_desde}`)}
+                          {ref.titulo_seccion && `, ${ref.titulo_seccion}`}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Registrada por {r.revisado_por} el {formatearFecha(r.revisado_en)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {["EN_REVISION", "INFORMACION_SOLICITADA"].includes(situacion.estado) && (
+            <div className="mt-4 border-t border-border pt-4">
+              <FormularioRevisionNormativa
+                situacionId={situacion.id}
+                protocolos={situacion.opciones_normativa.protocolos}
+                documentos={situacion.opciones_normativa.documentos}
+              />
+            </div>
+          )}
+          {situacion.estado === "NUEVA" && (
+            <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
+              Inicia la revisión para registrar lo que indica la normativa.
+            </p>
+          )}
+        </Seccion>
       </div>
     </>
   );

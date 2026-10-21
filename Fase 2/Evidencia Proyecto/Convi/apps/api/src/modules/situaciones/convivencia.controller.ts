@@ -15,7 +15,7 @@ import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 import { ConvivenciaService } from './convivencia.service.js';
 
-// PB-043, PB-044, PB-045 y PB-046: rutas del portal de Convivencia. El decorador de la clase aplica a
+// PB-043, PB-044, PB-045, PB-046 y PB-155: rutas del portal de Convivencia. El decorador de la clase aplica a
 // todas: solo entra una cuenta CONVIVENCIA activa con segundo factor (PB-009).
 @Controller('convivencia')
 @PerfilesPermitidos('CONVIVENCIA')
@@ -84,6 +84,21 @@ export class ConvivenciaController {
     @Body() cuerpo: unknown,
   ) {
     return this.convivencia.asignarResponsable(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-155: el cuerpo trae { aplicabilidad, modo_revision, fundamento,
+  // version_protocolo_id, referencias }; responde 201 con la revisión creada.
+  @Post('situaciones/:id/revisiones-normativas')
+  registrarRevisionNormativa(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.convivencia.registrarRevisionNormativa(
+      peticion.sesion,
+      id,
+      cuerpo,
+    );
   }
 
   // PB-045: el cuerpo trae { pregunta }; responde 201 con la aclaración creada.
