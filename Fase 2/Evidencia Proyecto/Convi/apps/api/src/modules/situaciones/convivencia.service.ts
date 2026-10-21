@@ -21,6 +21,7 @@ import {
   matriculasAlOcurrir,
   type SituacionRegistrada,
 } from './registro-situacion.js';
+import { validarCambioResponsable } from './responsable-revision.js';
 
 // PB-044 (HU-037): bandeja y revisión inicial del equipo de Convivencia.
 // La seguridad por fila de la base separa por escuela y Convivencia ve todas
@@ -55,6 +56,9 @@ export type SituacionBandeja = {
   reportado_por: string;
   /** Quién informó, cuando la registró Convivencia por otro canal (HU-036). */
   informante: string | null;
+  /** PB-046 (HU-039): membresía y nombre de quien revisa, si ya se asignó. */
+  responsable_id: string | null;
+  responsable: string | null;
   estudiantes: number;
   aclaraciones_pendientes: number;
 };
@@ -88,6 +92,14 @@ export type DetalleConvivencia = SituacionBandeja & {
     respuesta: string | null;
     respondido_en: Date | null;
   }[];
+  /** PB-046 (HU-039 CA1): cuentas de Convivencia activas que pueden revisar. */
+  opciones_responsable: { id: string; nombre: string; propia: boolean }[];
+};
+
+export type ResponsableAsignado = {
+  id: string;
+  estado: string;
+  responsable_id: string;
 };
 
 // PB-043 (HU-036 CA1): cómo se comprueba que el informante sea del origen indicado.
@@ -102,6 +114,9 @@ const CONSULTA_INFORMANTE = {
 const NO_EXISTE = 'La situación no existe.';
 const CAMBIO_SIMULTANEO =
   'Otra persona cambió esta situación al mismo tiempo. Recarga la página para ver su estado actual.';
+const RESPONSABLE_SIMULTANEO =
+  'Otra persona cambió al responsable mientras mirabas la situación. Recarga la página para ver quién quedó a cargo.';
+const PRIMERA_ASIGNACION = 'Primera asignación del responsable de la revisión.';
 
 type EstudianteOpcion = {
   id: string;
@@ -160,6 +175,8 @@ const COLUMNAS_BANDEJA = `
   s.tipo_origen, c.nombre AS curso, cat.nombre AS categoria,
   p.nombres || ' ' || p.apellidos AS reportado_por,
   po.nombres || ' ' || po.apellidos AS informante,
+  s.asignado_a_membresia_id AS responsable_id,
+  pr.nombres || ' ' || pr.apellidos AS responsable,
   (SELECT count(*) FROM convi.participaciones pa
     JOIN convi.estudiantes e ON e.persona_id = pa.persona_id
     WHERE pa.situacion_id = s.id AND pa.activo_hasta IS NULL)::int AS estudiantes,
@@ -171,6 +188,8 @@ const DESDE_BANDEJA = `
   JOIN convi.membresias_establecimiento m ON m.id = s.reportado_por_membresia_id
   JOIN convi.personas p ON p.id = m.persona_id
   LEFT JOIN convi.personas po ON po.id = s.persona_origen_id
+  LEFT JOIN convi.membresias_establecimiento mr ON mr.id = s.asignado_a_membresia_id
+  LEFT JOIN convi.personas pr ON pr.id = mr.persona_id
   LEFT JOIN convi.cursos c ON c.id = s.curso_contexto_id
   LEFT JOIN convi.categorias_convivencia cat ON cat.id = s.categoria_id`;
 
@@ -271,10 +290,22 @@ export class ConvivenciaService {
            ORDER BY a.solicitado_en`,
           [id],
         );
+        // PB-144: el selector solo necesita la membresía y el nombre.
+        const responsables = await db.query<
+          DetalleConvivencia['opciones_responsable'][number]
+        >(
+          `SELECT m.id, p.nombres || ' ' || p.apellidos AS nombre,
+                  m.id = convi.membresia_actual() AS propia
+           FROM convi.membresias_establecimiento m
+           JOIN convi.personas p ON p.id = m.persona_id
+           WHERE m.codigo_perfil = 'CONVIVENCIA' AND m.estado = 'ACTIVO'
+           ORDER BY p.apellidos, p.nombres`,
+        );
         return {
           ...situacion,
           participantes: participantes.rows,
           aclaraciones: aclaraciones.rows,
+          opciones_responsable: responsables.rows,
         };
       },
     );
@@ -370,6 +401,72 @@ export class ConvivenciaService {
           `UPDATE convi.situaciones SET urgencia = $2
            WHERE id = $1 RETURNING id, urgencia`,
           [id, cambio.urgencia],
+        );
+        return resultado.rows[0];
+      },
+    );
+  }
+
+  // PB-046 (HU-039): asigna o cambia a quien revisa la situación. El estado no
+  // cambia (CA4). Se indica el responsable que se veía: si otra persona lo
+  // cambió entretanto, se rechaza en vez de reemplazarlo en silencio (CA2).
+  // El trigger de auditoría guarda el antes, el después, quién y el motivo (CA3).
+  asignarResponsable(
+    sesion: Sesion,
+    id: string,
+    cuerpo: unknown,
+  ): Promise<ResponsableAsignado> {
+    const cambio = validarCambioResponsable(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const actual = await db
+          .query<{ estado: string; responsable_id: string | null }>(
+            `SELECT estado, asignado_a_membresia_id AS responsable_id
+             FROM convi.situaciones WHERE id = $1 FOR UPDATE`,
+            [id],
+          )
+          .catch((error: unknown) => {
+            if (esCambioSimultaneo(error))
+              throw new ConflictException(RESPONSABLE_SIMULTANEO);
+            throw error;
+          });
+        const fila = actual.rows[0];
+        if (!fila) throw new NotFoundException(NO_EXISTE);
+        if (fila.responsable_id !== cambio.responsable_anterior_id)
+          throw new ConflictException(RESPONSABLE_SIMULTANEO);
+        if (!ESTADOS_ABIERTOS.includes(fila.estado))
+          throw new ConflictException(
+            'La revisión de esta situación ya terminó; su responsable no se cambia.',
+          );
+
+        // CA1: una cuenta de Convivencia activa. La seguridad por fila ya deja
+        // fuera las cuentas de otras escuelas.
+        const elegido = await db.query(
+          `SELECT 1 FROM convi.membresias_establecimiento
+           WHERE id = $1 AND codigo_perfil = 'CONVIVENCIA' AND estado = 'ACTIVO'`,
+          [cambio.responsable_id],
+        );
+        if (elegido.rowCount === 0)
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. El responsable no cambió.',
+            errores: {
+              responsable_id:
+                'Elige a una persona activa del equipo de Convivencia.',
+            },
+          });
+
+        // validar_integracion exige app.motivo_cambio en cualquier cambio del
+        // responsable, también en el primero.
+        await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
+          cambio.motivo ?? PRIMERA_ASIGNACION,
+        ]);
+        const resultado = await db.query<ResponsableAsignado>(
+          `UPDATE convi.situaciones SET asignado_a_membresia_id = $2
+           WHERE id = $1
+           RETURNING id, estado, asignado_a_membresia_id AS responsable_id`,
+          [id, cambio.responsable_id],
         );
         return resultado.rows[0];
       },

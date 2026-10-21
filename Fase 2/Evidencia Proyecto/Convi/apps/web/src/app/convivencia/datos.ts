@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 
-// Datos del portal de Convivencia (PB-043, PB-044 y PB-045). Se piden a la API desde el
+// Datos del portal de Convivencia (PB-043, PB-044, PB-045 y PB-046). Se piden a la API desde el
 // servidor de Next con el token de la sesión; la API exige el perfil
 // CONVIVENCIA con segundo factor en cada petición (PB-127 y PB-009).
 
@@ -27,6 +27,9 @@ export type SituacionBandeja = {
   reportado_por: string;
   /** Quién informó, cuando la registró Convivencia por otro canal (HU-036). */
   informante: string | null;
+  /** PB-046 (HU-039): membresía y nombre de quien revisa, si ya se asignó. */
+  responsable_id: string | null;
+  responsable: string | null;
   estudiantes: number;
   aclaraciones_pendientes: number;
 };
@@ -59,6 +62,8 @@ export type DetalleConvivencia = SituacionBandeja & {
     respuesta: string | null;
     respondido_en: string | null;
   }[];
+  /** PB-046 (HU-039 CA1): cuentas de Convivencia activas que pueden revisar. */
+  opciones_responsable: { id: string; nombre: string; propia: boolean }[];
 };
 
 /** "sin-permiso": la API rechazó la petición (403) o el registro no existe o no es válido (400 y 404). */
@@ -183,6 +188,22 @@ export function enviarCambioUrgencia(
   return enviar(
     "PATCH",
     `/convivencia/situaciones/${encodeURIComponent(id)}/urgencia`,
+    cambio,
+  );
+}
+
+/** HU-039: asigna o cambia a quien revisa; se envía el responsable que se veía (CA2). */
+export function enviarCambioResponsable(
+  id: string,
+  cambio: {
+    responsable_id: string;
+    responsable_anterior_id: string;
+    motivo: string;
+  },
+) {
+  return enviar(
+    "PATCH",
+    `/convivencia/situaciones/${encodeURIComponent(id)}/responsable`,
     cambio,
   );
 }

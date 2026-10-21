@@ -6,6 +6,7 @@ import {
   validarSituacionConvivencia,
 } from './nueva-situacion.js';
 import { validarRespuesta } from './respuesta-aclaracion.js';
+import { validarCambioResponsable } from './responsable-revision.js';
 
 // PB-140 (HU-119 CA1): las reglas viven en el servidor. Estas pruebas envían
 // directamente a las validaciones datos que la pantalla nunca mandaría, para
@@ -205,6 +206,71 @@ describe('Cambio de urgencia (PB-044, HU-037 CA3)', () => {
       urgencia_anterior: 'NORMAL',
       motivo: 'El apoderado informó una lesión.',
     });
+  });
+});
+
+describe('Responsable de revisión (PB-046, HU-039)', () => {
+  const RESPONSABLE_1 = '44444444-4444-4444-8444-444444444444';
+  const RESPONSABLE_2 = '55555555-5555-4555-8555-555555555555';
+
+  it('acepta la primera asignación sin motivo', () => {
+    expect(
+      validarCambioResponsable({
+        responsable_id: RESPONSABLE_1,
+        responsable_anterior_id: null,
+      }),
+    ).toEqual({
+      responsable_id: RESPONSABLE_1,
+      responsable_anterior_id: null,
+      motivo: null,
+    });
+  });
+
+  it('exige motivo para cambiar a un responsable ya asignado (CA3)', () => {
+    expect(
+      camposConError(() =>
+        validarCambioResponsable({
+          responsable_id: RESPONSABLE_2,
+          responsable_anterior_id: RESPONSABLE_1,
+          motivo: ' ',
+        }),
+      ),
+    ).toEqual(['motivo']);
+    expect(
+      validarCambioResponsable({
+        responsable_id: RESPONSABLE_2,
+        responsable_anterior_id: RESPONSABLE_1,
+        motivo: ' Licencia médica. ',
+      }).motivo,
+    ).toBe('Licencia médica.');
+  });
+
+  it('exige el responsable que se veía, para no reemplazarlo en silencio (CA2)', () => {
+    expect(
+      camposConError(() =>
+        validarCambioResponsable({ responsable_id: RESPONSABLE_1 }),
+      ),
+    ).toEqual(['responsable_id']);
+  });
+
+  it('rechaza un responsable vacío o igual al actual', () => {
+    expect(
+      camposConError(() =>
+        validarCambioResponsable({
+          responsable_id: 'no-es-un-id',
+          responsable_anterior_id: '',
+        }),
+      ),
+    ).toEqual(['responsable_id']);
+    expect(
+      camposConError(() =>
+        validarCambioResponsable({
+          responsable_id: RESPONSABLE_1,
+          responsable_anterior_id: RESPONSABLE_1,
+          motivo: 'Sin cambio',
+        }),
+      ),
+    ).toEqual(['responsable_id']);
   });
 });
 

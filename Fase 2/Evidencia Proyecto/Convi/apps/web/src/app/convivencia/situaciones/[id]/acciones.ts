@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import {
   enviarAclaracion,
+  enviarCambioResponsable,
   enviarCambioUrgencia,
   enviarInicioRevision,
 } from "../../datos";
@@ -58,6 +59,29 @@ export async function cambiarUrgencia(
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
   redirect(`/convivencia/situaciones/${id}?aviso=urgencia`);
+}
+
+// PB-046 (HU-039): asigna o cambia a quien revisa la situación. Se envía
+// también el responsable que se veía, para que la API rechace el cambio si
+// otra persona lo modificó entretanto (CA2). El estado no cambia (CA4).
+export async function asignarResponsable(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const id = leerTexto(formData, "situacion_id");
+  const valores = {
+    responsable_id: leerTexto(formData, "responsable_id"),
+    motivo: leerTexto(formData, "motivo"),
+  };
+  if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
+  const resultado = await enviarCambioResponsable(id, {
+    ...valores,
+    responsable_anterior_id: leerTexto(formData, "responsable_anterior_id"),
+  });
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  redirect(`/convivencia/situaciones/${id}?aviso=responsable`);
 }
 
 // PB-045 (HU-038): pide información al profesor que registró la situación.
