@@ -14,6 +14,7 @@ import {
 } from "../../datos";
 import {
   FormularioAclaracion,
+  FormularioResponsable,
   FormularioRevision,
   FormularioUrgencia,
 } from "./formularios";
@@ -29,12 +30,15 @@ const AVISOS: Record<string, string> = {
     "Cambiaste la urgencia. El cambio y su motivo quedaron registrados en la auditoría.",
   aclaracion:
     "Enviaste la pregunta al profesor. La situación quedó en Información solicitada hasta que responda.",
+  responsable:
+    "Guardaste el responsable de la revisión. El cambio quedó registrado en la auditoría y el estado no cambió.",
 };
 
 // PB-044 (HU-037): detalle de una situación para revisarla. Abrirlo no cambia
 // su estado: la revisión empieza con el botón Iniciar revisión (CA2).
 // PB-045 (HU-038): durante la revisión se puede pedir una aclaración al
-// profesor que la registró.
+// profesor que la registró. PB-046 (HU-039): mientras siga abierta se asigna
+// a quien la revisa, sin cambiar su estado.
 export default async function PaginaRevisionSituacion({
   params,
   searchParams,
@@ -198,18 +202,41 @@ export default async function PaginaRevisionSituacion({
           )}
         </Seccion>
 
-        <Seccion titulo="Urgencia">
-          {ESTADOS_ABIERTOS.includes(situacion.estado) ? (
-            <FormularioUrgencia
-              situacionId={situacion.id}
-              urgenciaActual={situacion.urgencia}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              La revisión de esta situación terminó; su urgencia ya no se cambia.
+        <div className="space-y-4">
+          <Seccion titulo="Responsable de la revisión">
+            <p className="mb-4 text-sm">
+              {situacion.responsable ? (
+                <span className="font-medium">{situacion.responsable}</span>
+              ) : (
+                <span className="text-muted-foreground">Sin responsable asignado</span>
+              )}
             </p>
-          )}
-        </Seccion>
+            {ESTADOS_ABIERTOS.includes(situacion.estado) ? (
+              <FormularioResponsable
+                situacionId={situacion.id}
+                responsableActual={situacion.responsable_id}
+                opciones={situacion.opciones_responsable}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                La revisión de esta situación terminó; su responsable ya no se cambia.
+              </p>
+            )}
+          </Seccion>
+
+          <Seccion titulo="Urgencia">
+            {ESTADOS_ABIERTOS.includes(situacion.estado) ? (
+              <FormularioUrgencia
+                situacionId={situacion.id}
+                urgenciaActual={situacion.urgencia}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                La revisión de esta situación terminó; su urgencia ya no se cambia.
+              </p>
+            )}
+          </Seccion>
+        </div>
       </div>
     </>
   );

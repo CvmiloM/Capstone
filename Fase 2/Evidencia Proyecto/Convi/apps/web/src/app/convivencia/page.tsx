@@ -7,6 +7,7 @@ import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
 import { AvisoNoDisponible } from "./aviso-no-disponible";
 import {
   ESTADOS,
+  ESTADOS_ABIERTOS,
   NOMBRE_ESTADO,
   obtenerBandeja,
   quienInformo,
@@ -140,6 +141,12 @@ export default async function PaginaBandeja({
                           : null,
                         `Registró ${situacion.reportado_por}`,
                         `Ocurrió el ${formatearFecha(situacion.ocurrido_en)}`,
+                        // PB-046 (HU-039): para repartir el trabajo se ve quién revisa cada una.
+                        situacion.responsable
+                          ? `Responsable: ${situacion.responsable}`
+                          : ESTADOS_ABIERTOS.includes(situacion.estado)
+                            ? "Sin responsable"
+                            : null,
                       ]
                         .filter(Boolean)
                         .join(" · ")}
