@@ -5,7 +5,7 @@ import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { LARGO_MAXIMO, LARGO_MINIMO_CONTRASENA } from "../limites";
 
 export type EstadoRecuperacion = {
-  paso?: "codigo" | "contrasena" | "invalido" | "completado";
+  paso?: "codigo" | "contrasena" | "invalido";
   mensaje?: string;
   errores?: Record<string, string>;
   correo?: string;
@@ -116,6 +116,7 @@ export async function restablecerContrasena(
     errores.confirmacion = "Las contraseñas no coinciden.";
   if (Object.keys(errores).length) return { errores };
 
+  let destino: string;
   try {
     const actual = await comprobarRecuperacion();
     if (!actual) return { paso: "invalido", mensaje: ENLACE_INVALIDO };
@@ -145,7 +146,14 @@ export async function restablecerContrasena(
       password: contrasena as string,
     });
     if (cambio.error) {
-      if (["weak_password", "same_password"].includes(cambio.error.code ?? ""))
+      if (cambio.error.code === "same_password")
+        return {
+          paso: "contrasena",
+          errores: {
+            contrasena: "La nueva contraseña debe ser diferente de la actual.",
+          },
+        };
+      if (cambio.error.code === "weak_password")
         return {
           paso: "contrasena",
           errores: { contrasena: "Elige una contraseña nueva y más segura." },
@@ -163,13 +171,12 @@ export async function restablecerContrasena(
     } catch {
       // La contraseña ya cambió: un fallo de salida no debe anunciar lo contrario.
     }
-    return {
-      paso: "completado",
-      mensaje: sesionCerrada
-        ? "Tu contraseña se cambió. Inicia sesión con la nueva contraseña."
-        : "Tu contraseña se cambió. No pudimos cerrar esta sesión; ciérrala antes de volver a ingresar.",
-    };
+    destino = sesionCerrada
+      ? "/restablecer-contrasena?resultado=actualizada"
+      : "/restablecer-contrasena?resultado=actualizada&salida=pendiente";
   } catch {
     return { mensaje: SIN_CONEXION };
   }
+  // La confirmación no depende de una sesión que acabamos de cerrar.
+  redirect(destino);
 }
