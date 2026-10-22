@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   Inject,
   Injectable,
   Logger,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -26,9 +28,12 @@ export type CuentaEscuela = {
   correo: string;
   perfil: string;
   estado: string;
+  es_propia: boolean;
   invitado_por: string | null;
   invitado_en: Date | null;
   activado_en: Date | null;
+  suspendido_en: Date | null;
+  reactivado_en: Date | null;
 };
 
 export type InvitacionEnviada = {
@@ -60,15 +65,112 @@ export class CuentasService {
         const resultado = await db.query<CuentaEscuela>(
           `SELECT m.id, p.nombres, p.apellidos, m.correo_invitacion AS correo,
                   m.codigo_perfil AS perfil, m.estado,
+                  m.id = convi.membresia_actual() AS es_propia,
                   pi.nombres || ' ' || pi.apellidos AS invitado_por,
-                  m.invitado_en, m.activado_en
+                  m.invitado_en, m.activado_en,
+                  cambios.suspendido_en, cambios.reactivado_en
            FROM convi.membresias_establecimiento m
            JOIN convi.personas p ON p.id = m.persona_id
            LEFT JOIN convi.membresias_establecimiento mi ON mi.id = m.invitado_por
            LEFT JOIN convi.personas pi ON pi.id = mi.persona_id
+           LEFT JOIN (
+             SELECT recurso_id,
+               max(ocurrido_en) FILTER (
+                 WHERE metadatos->'despues'->>'estado' = 'SUSPENDIDO'
+               ) AS suspendido_en,
+               max(ocurrido_en) FILTER (
+                 WHERE metadatos->'antes'->>'estado' = 'SUSPENDIDO'
+                   AND metadatos->'despues'->>'estado' = 'ACTIVO'
+               ) AS reactivado_en
+             FROM convi.eventos_auditoria
+             WHERE establecimiento_id = convi.establecimiento_actual()
+               AND tipo_recurso = 'membresias_establecimiento'
+               AND codigo_accion = 'MODIFICACION'
+               AND metadatos->'antes'->>'estado'
+                   IS DISTINCT FROM metadatos->'despues'->>'estado'
+             GROUP BY recurso_id
+           ) cambios ON cambios.recurso_id = m.id
            ORDER BY m.estado = 'PENDIENTE' DESC, p.apellidos, p.nombres`,
         );
         return resultado.rows;
+      },
+    );
+  }
+
+  // PB-007: solo cambia la membresía; Auth y los registros históricos se conservan.
+  suspender(sesion: Sesion, id: string) {
+    return this.cambiarEstado(sesion, id, 'SUSPENDIDO');
+  }
+
+  // PB-153: el motivo queda en el mismo evento que registra el cambio de estado
+  reactivar(sesion: Sesion, id: string, cuerpo: unknown) {
+    const valor = (cuerpo as { motivo?: unknown } | null)?.motivo;
+    const motivo = typeof valor === 'string' ? valor.trim() : '';
+    if (!motivo || motivo.length > 500)
+      throw new BadRequestException(
+        'Indica el motivo de reactivación, hasta 500 caracteres',
+      );
+    return this.cambiarEstado(sesion, id, 'ACTIVO', motivo);
+  }
+
+  private cambiarEstado(
+    sesion: Sesion,
+    id: string,
+    destino: 'ACTIVO' | 'SUSPENDIDO',
+    motivo?: string,
+  ) {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        if (
+          destino === 'SUSPENDIDO' &&
+          id.toLowerCase() === sesion.membresia_id.toLowerCase()
+        )
+          throw new ForbiddenException('No puedes suspender tu propia cuenta');
+        try {
+          // RLS oculta otras escuelas; el bloqueo evita dos cambios sobre la misma cuenta.
+          const resultado = await db.query<{ estado: string }>(
+            `SELECT estado FROM convi.membresias_establecimiento
+             WHERE id = $1 FOR UPDATE`,
+            [id],
+          );
+          const cuenta = resultado.rows[0];
+          if (!cuenta) throw new NotFoundException('La cuenta no existe');
+          if (destino === 'SUSPENDIDO' && cuenta.estado === 'SUSPENDIDO')
+            return { id, estado: destino };
+          if (
+            cuenta.estado !==
+            (destino === 'SUSPENDIDO' ? 'ACTIVO' : 'SUSPENDIDO')
+          )
+            throw new ConflictException(
+              destino === 'SUSPENDIDO'
+                ? 'Solo puedes suspender una cuenta activa'
+                : 'Solo puedes reactivar una cuenta suspendida',
+            );
+          if (motivo)
+            await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
+              motivo,
+            ]);
+          // El trigger existente registra actor, fecha y estados anterior/nuevo.
+          await db.query(
+            `UPDATE convi.membresias_establecimiento SET estado = $2
+             WHERE id = $1`,
+            [id, destino],
+          );
+          return { id, estado: destino };
+        } catch (error) {
+          // Otra suspensión puede haber cambiado la cuenta mientras esperaba el bloqueo.
+          if (
+            ['40001', '40P01'].includes(
+              (error as { code?: string })?.code ?? '',
+            )
+          )
+            throw new ConflictException(
+              'La cuenta cambió mientras la revisabas, actualiza la página e inténtalo nuevamente',
+            );
+          throw error;
+        }
       },
     );
   }

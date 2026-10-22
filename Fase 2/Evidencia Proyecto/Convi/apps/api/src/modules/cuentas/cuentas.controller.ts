@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Inject,
   Param,
   ParseUUIDPipe,
@@ -23,6 +24,25 @@ export class CuentasController {
   @Get()
   listar(@Req() peticion: PeticionConSesion) {
     return this.cuentas.listar(peticion.sesion);
+  }
+
+  @Post(':id/suspender')
+  @HttpCode(200)
+  suspender(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.cuentas.suspender(peticion.sesion, id);
+  }
+
+  @Post(':id/reactivar')
+  @HttpCode(200)
+  reactivar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.cuentas.reactivar(peticion.sesion, id, cuerpo);
   }
 
   // El cuerpo trae { nombres, apellidos, correo, perfil }; responde 201.
