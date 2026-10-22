@@ -1,7 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { enviarInvitacion, reenviarInvitacion } from "./datos";
+import { redirect } from "next/navigation";
+import {
+  enviarInvitacion,
+  reenviarInvitacion,
+  suspenderCuenta,
+  reactivarCuenta,
+} from "./datos";
+import { NOMBRE_PERFIL } from "./opciones";
 
 export type EstadoInvitacion = {
   /** Error general del formulario. */
@@ -47,4 +54,40 @@ export async function reenviarCuenta(id: string): Promise<EstadoReenvio> {
   if (!resultado.ok) return { mensaje: resultado.mensaje };
   revalidatePath("/admin/usuarios");
   return { reenviado: true };
+}
+
+export type EstadoSuspension = { mensaje?: string };
+
+export async function suspenderUsuario(
+  id: string,
+  _anterior: EstadoSuspension,
+  formData: FormData,
+): Promise<EstadoSuspension> {
+  const resultado = await suspenderCuenta(id);
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  revalidatePath("/admin/usuarios");
+  // La cuenta suspendida deja de mostrar el formulario: confirmar en una página nueva.
+  redirect(destinoUsuarios(formData, "suspension"));
+}
+
+export async function reactivarUsuario(
+  id: string,
+  _anterior: EstadoSuspension,
+  formData: FormData,
+): Promise<EstadoSuspension> {
+  const resultado = await reactivarCuenta(id, leerTexto(formData, "motivo"));
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  revalidatePath("/admin/usuarios");
+  redirect(destinoUsuarios(formData, "reactivacion"));
+}
+
+function destinoUsuarios(
+  formData: FormData,
+  resultado: "suspension" | "reactivacion",
+) {
+  const consulta = new URLSearchParams({ [resultado]: "realizada" });
+  const perfil = leerTexto(formData, "perfil");
+  if (Object.hasOwn(NOMBRE_PERFIL, perfil)) consulta.set("perfil", perfil);
+  if (formData.get("suspendidas") === "1") consulta.set("suspendidas", "1");
+  return `/admin/usuarios?${consulta}`;
 }

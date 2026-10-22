@@ -21,10 +21,13 @@ export type CuentaEscuela = {
   correo: string;
   perfil: string;
   estado: string;
+  es_propia: boolean;
   /** Nombre de quien invitó; null en la cuenta del primer administrador. */
   invitado_por: string | null;
   invitado_en: string | null;
   activado_en: string | null;
+  suspendido_en: string | null;
+  reactivado_en: string | null;
 };
 
 export type ResultadoInvitacion =
@@ -32,7 +35,7 @@ export type ResultadoInvitacion =
   | { ok: false; mensaje: string; errores?: Record<string, string> };
 
 const SIN_CONEXION =
-  "No pudimos enviar la invitación. Inténtalo de nuevo en unos minutos.";
+  "No pudimos enviar la invitación, inténtalo de nuevo en unos minutos";
 
 async function tokenDeSesion() {
   const supabase = await crearClienteServidor();
@@ -69,6 +72,59 @@ export async function reenviarInvitacion(
   id: string,
 ): Promise<ResultadoInvitacion> {
   return enviar(`/admin/cuentas/${encodeURIComponent(id)}/reenviar-invitacion`);
+}
+
+export async function suspenderCuenta(
+  id: string,
+): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  return cambiarEstado(id, "suspender");
+}
+
+export async function reactivarCuenta(id: string, motivo: string) {
+  return cambiarEstado(id, "reactivar", motivo);
+}
+
+async function cambiarEstado(
+  id: string,
+  accion: "suspender" | "reactivar",
+  motivo?: string,
+): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  const token = await tokenDeSesion();
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(
+      `${URL_API}/admin/cuentas/${encodeURIComponent(id)}/${accion}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: motivo === undefined ? undefined : JSON.stringify({ motivo }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      },
+    );
+  } catch {
+    return {
+      ok: false,
+      mensaje:
+        "No pudimos confirmar el cambio, actualiza la lista antes de intentarlo nuevamente",
+    };
+  }
+  if (respuesta.status === 401) redirect("/login");
+  if (respuesta.ok) return { ok: true };
+  const datos = await respuesta.json().catch(() => null);
+  return {
+    ok: false,
+    mensaje:
+      [400, 403, 404, 409].includes(respuesta.status) &&
+      typeof datos?.message === "string"
+        ? datos.message
+        : respuesta.status === 400 && typeof datos?.errores?.motivo === "string"
+          ? datos.errores.motivo
+          : "No pudimos cambiar el estado de la cuenta, inténtalo nuevamente",
+  };
 }
 
 // Ambos envíos conservan el mismo manejo de sesión, conexión y errores de la API.
