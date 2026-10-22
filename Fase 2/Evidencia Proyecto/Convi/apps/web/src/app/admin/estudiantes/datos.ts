@@ -111,6 +111,31 @@ export function obtenerFicha(id: string) {
   return pedir<FichaEstudiante>(`/admin/estudiantes/${encodeURIComponent(id)}`);
 }
 
+export type PersonaApoderada = {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  rut: string | null;
+  correo: string | null;
+  telefono: string | null;
+};
+
+export type VinculoApoderado = PersonaApoderada & {
+  persona_apoderado_id: string;
+  tipo_relacion: string | null;
+  es_principal: boolean;
+  puede_ser_contactado: boolean;
+  activo_desde: string | null;
+  activo_hasta: string | null;
+  vigencia: "VIGENTE" | "FUTURO" | "TERMINADO";
+};
+
+export function obtenerApoderados(id: string, buscar: string) {
+  return pedir<{ vinculos: VinculoApoderado[]; personas: PersonaApoderada[] }>(
+    `/admin/estudiantes/${encodeURIComponent(id)}/apoderados?${new URLSearchParams({ buscar })}`,
+  );
+}
+
 /**
  * Envía un cambio a la API, que vuelve a validar todo. Los errores se
  * devuelven en vez de lanzarse, para que el formulario no pierda lo escrito.

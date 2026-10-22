@@ -100,6 +100,24 @@ export default async function PaginaEstudiante({
 
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
+          <section
+            className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
+            aria-labelledby="titulo-apoderados"
+          >
+            <h2 id="titulo-apoderados" className="text-lg font-semibold">
+              Apoderados y contactos
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Registra quién representa al estudiante, su relación y las
+              condiciones de contacto
+            </p>
+            <Link
+              href={`/admin/estudiantes/${ficha.id}/apoderados`}
+              className={`mt-3 inline-block text-sm ${claseEnlace}`}
+            >
+              Administrar vínculos →
+            </Link>
+          </section>
           <section aria-labelledby="titulo-matriculas">
             <h2 id="titulo-matriculas" className="mb-3 text-lg font-semibold">
               Matrículas
