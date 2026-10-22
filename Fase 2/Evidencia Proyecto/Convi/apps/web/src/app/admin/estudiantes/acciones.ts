@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { enviarCambio } from "./datos";
+import { enviarCambio, obtenerApoderados } from "./datos";
 
 export type EstadoFormulario = {
   /** Error general del formulario. */
@@ -90,4 +90,97 @@ export async function matricularEstudiante(
   revalidatePath("/admin/estudiantes", "layout");
   revalidatePath("/admin/cursos", "layout");
   return { listo: "Matriculaste al estudiante." };
+}
+
+export async function vincularApoderado(
+  estudianteId: string,
+  _anterior: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const campos = [
+    "modo",
+    "persona_apoderado_id",
+    "nombres",
+    "apellidos",
+    "rut",
+    "correo",
+    "telefono",
+    "direccion",
+    "tipo_relacion",
+    "activo_desde",
+    "activo_hasta",
+  ];
+  const valores = Object.fromEntries(
+    campos.map((campo) => [campo, leerTexto(formData, campo)]),
+  );
+  valores.es_principal = formData.get("es_principal") === "on" ? "1" : "0";
+  valores.puede_ser_contactado =
+    formData.get("puede_ser_contactado") === "on" ? "1" : "0";
+  const existente = valores.modo === "existente";
+  if (existente && !valores.persona_apoderado_id)
+    return {
+      valores,
+      errores: { persona_apoderado_id: "Busca y selecciona una persona" },
+      mensaje: "No se guardó el vínculo",
+    };
+  const resultado = await enviarCambio(
+    "POST",
+    `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados`,
+    {
+      persona_apoderado_id: existente
+        ? valores.persona_apoderado_id
+        : undefined,
+      persona: existente ? undefined : valores,
+      tipo_relacion: valores.tipo_relacion,
+      es_principal: valores.es_principal === "1",
+      puede_ser_contactado: valores.puede_ser_contactado === "1",
+      activo_desde: valores.activo_desde,
+      activo_hasta: valores.activo_hasta,
+    },
+  );
+  if (!resultado.ok)
+    return { valores, mensaje: resultado.mensaje, errores: resultado.errores };
+  revalidatePath(`/admin/estudiantes/${estudianteId}`, "layout");
+  redirect(
+    `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados?vinculo=creado`,
+  );
+}
+
+export async function buscarPersonasApoderadas(
+  estudianteId: string,
+  buscar: string,
+) {
+  const texto = typeof buscar === "string" ? buscar.trim() : "";
+  if (texto.length < 2 || texto.length > 100)
+    return {
+      ok: false as const,
+      mensaje: "Escribe entre 2 y 100 caracteres para buscar",
+    };
+  const datos = await obtenerApoderados(estudianteId, texto);
+  if (!datos)
+    return {
+      ok: false as const,
+      mensaje: "No encontramos ese estudiante en tu escuela",
+    };
+  return { ok: true as const, personas: datos.personas };
+}
+
+export async function terminarVinculo(
+  estudianteId: string,
+  vinculoId: string,
+  _anterior: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const valores = { activo_hasta: leerTexto(formData, "activo_hasta") };
+  const resultado = await enviarCambio(
+    "PATCH",
+    `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados/${encodeURIComponent(vinculoId)}/termino`,
+    valores,
+  );
+  if (!resultado.ok)
+    return { valores, mensaje: resultado.mensaje, errores: resultado.errores };
+  revalidatePath(`/admin/estudiantes/${estudianteId}`, "layout");
+  redirect(
+    `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados?vinculo=terminado`,
+  );
 }
