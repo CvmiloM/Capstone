@@ -83,6 +83,8 @@ export type DetalleConvivencia = SituacionBandeja & {
   lugar: string | null;
   descripcion: string;
   participantes: {
+    /** PB-074: para abrir su historial; null si no es estudiante. */
+    estudiante_id: string | null;
     nombres: string;
     apellidos: string;
     codigo_estudiante: string | null;
@@ -272,8 +274,8 @@ export class ConvivenciaService {
           // PB-076 (HU-066 CA2): el curso del día del hecho y, aparte, el
           // actual. Un estudiante tiene a lo sumo una matrícula activa: sin
           // fecha de término chocaría con cualquier otra.
-          `SELECT p.nombres, p.apellidos, e.codigo_estudiante,
-                  pa.rol_contextual AS rol,
+          `SELECT e.id AS estudiante_id, p.nombres, p.apellidos,
+                  e.codigo_estudiante, pa.rol_contextual AS rol,
                   cm.nombre || ' (' || am.anio || ')' AS curso_matricula,
                   ca.nombre || ' (' || aa.anio || ')' AS curso_actual
            FROM convi.participaciones pa

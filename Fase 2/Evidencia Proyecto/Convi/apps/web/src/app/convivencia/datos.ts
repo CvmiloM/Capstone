@@ -44,6 +44,8 @@ export type DetalleConvivencia = SituacionBandeja & {
   lugar: string | null;
   descripcion: string;
   participantes: {
+    /** PB-074: para abrir su historial; null si no es estudiante. */
+    estudiante_id: string | null;
     nombres: string;
     apellidos: string;
     codigo_estudiante: string | null;
@@ -103,7 +105,8 @@ async function tokenDeSesion() {
   return token;
 }
 
-async function pedir<T>(ruta: string): Promise<Respuesta<T>> {
+// PB-074: el historial de estudiantes (estudiantes/datos.ts) también la usa.
+export async function pedir<T>(ruta: string): Promise<Respuesta<T>> {
   const token = await tokenDeSesion();
   const respuesta = await fetch(`${URL_API}${ruta}`, {
     headers: { Authorization: `Bearer ${token}` },

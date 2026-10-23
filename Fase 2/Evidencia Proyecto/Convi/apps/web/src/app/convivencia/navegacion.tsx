@@ -16,6 +16,12 @@ const SECCIONES: SeccionMenu[] = [
         texto: "Registrar situación",
         icono: "info",
       },
+      // PB-074 (Camilo): historial de cada estudiante (/convivencia/estudiantes/...)
+      {
+        href: "/convivencia/estudiantes",
+        texto: "Historial de estudiantes",
+        icono: "estudiantes",
+      },
       // PB-030 (Camilo): catálogo de categorías, el mismo del portal de administración
       {
         href: "/convivencia/categorias",
