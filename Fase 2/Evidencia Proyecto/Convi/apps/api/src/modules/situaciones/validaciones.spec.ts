@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
+import { validarDecision } from './decision-situacion.js';
 import { validarPregunta } from './nueva-aclaracion.js';
 import {
   validarNuevaSituacion,
@@ -356,6 +357,101 @@ describe('Revisión normativa (PB-155, HU-134)', () => {
         ),
       ).toEqual(['referencias']);
     }
+  });
+});
+
+describe('Decisiones: antecedente y descarte (PB-047, PB-048 y PB-051)', () => {
+  const ANTERIOR = '88888888-8888-4888-8888-888888888888';
+
+  it('guarda la conclusión del antecedente (HU-040 CA1 y CA2)', () => {
+    expect(
+      camposConError(() =>
+        validarDecision({
+          resultado: 'ANTECEDENTE',
+          fundamento: ' ',
+          revision_anterior_id: null,
+        }),
+      ),
+    ).toEqual(['fundamento']);
+    expect(
+      validarDecision({
+        resultado: 'ANTECEDENTE',
+        fundamento: ' Se conversó con ambos estudiantes. ',
+        revision_anterior_id: ANTERIOR,
+      }),
+    ).toEqual({
+      resultado: 'ANTECEDENTE',
+      fundamento: 'Se conversó con ambos estudiantes.',
+      codigo_original: null,
+      revision_anterior_id: ANTERIOR,
+    });
+  });
+
+  it('exige el motivo del descarte y lo deja al inicio (HU-041)', () => {
+    expect(
+      camposConError(() =>
+        validarDecision({
+          resultado: 'DESCARTADA',
+          fundamento: 'Error',
+          revision_anterior_id: ANTERIOR,
+        }),
+      ),
+    ).toEqual(['motivo_descarte']);
+    expect(
+      validarDecision({
+        resultado: 'DESCARTADA',
+        motivo_descarte: 'FUERA_DE_ALCANCE',
+        fundamento: 'Ocurrió fuera del colegio.',
+        revision_anterior_id: '',
+      }),
+    ).toEqual({
+      resultado: 'DESCARTADA',
+      fundamento:
+        'Descartada por estar fuera de alcance. Ocurrió fuera del colegio.',
+      codigo_original: null,
+      revision_anterior_id: null,
+    });
+  });
+
+  it('un duplicado indica el código de la situación original (HU-044)', () => {
+    const base = {
+      resultado: 'DESCARTADA',
+      motivo_descarte: 'DUPLICADO',
+      fundamento: 'Mismo hecho.',
+      revision_anterior_id: ANTERIOR,
+    };
+    expect(camposConError(() => validarDecision(base))).toEqual([
+      'codigo_original',
+    ]);
+    expect(
+      camposConError(() =>
+        validarDecision({ ...base, codigo_original: 'SIT-12' }),
+      ),
+    ).toEqual(['codigo_original']);
+    expect(
+      validarDecision({ ...base, codigo_original: ' sit-2026-00012 ' })
+        .codigo_original,
+    ).toBe('SIT-2026-00012');
+  });
+
+  it('rechaza un resultado que no cierra la revisión', () => {
+    expect(
+      camposConError(() =>
+        validarDecision({
+          resultado: 'VINCULADA_CASO',
+          fundamento: 'x',
+          revision_anterior_id: null,
+        }),
+      ),
+    ).toEqual(['resultado']);
+  });
+
+  it('exige la última revisión que se veía (PB-139)', () => {
+    expect(
+      camposConError(() =>
+        validarDecision({ resultado: 'ANTECEDENTE', fundamento: 'Cerrado.' }),
+      ),
+    ).toEqual(['resultado']);
   });
 });
 

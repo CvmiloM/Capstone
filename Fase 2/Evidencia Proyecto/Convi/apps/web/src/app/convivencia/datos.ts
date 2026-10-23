@@ -73,6 +73,18 @@ export type DetalleConvivencia = SituacionBandeja & {
     protocolos: { id: string; nombre: string }[];
     documentos: { id: string; nombre: string }[];
   };
+  /** PB-047, PB-048 y PB-051: decisiones tomadas, sin editar ni borrar. */
+  decisiones: {
+    id: string;
+    resultado: string;
+    fundamento: string;
+    revisado_por: string;
+    revisado_en: string;
+    /** Código de la situación original, si se descartó por duplicado. */
+    duplicada_de: string | null;
+  }[];
+  /** PB-139: la última revisión que se ve; decidir sobre otra se rechaza. */
+  ultima_revision_id: string | null;
 };
 
 /** Misma forma que devuelve apps/api/src/modules/situaciones/revision-normativa.ts. */
@@ -233,6 +245,15 @@ export function enviarCambioResponsable(
     "PATCH",
     `/convivencia/situaciones/${encodeURIComponent(id)}/responsable`,
     cambio,
+  );
+}
+
+/** HU-040, HU-041 y HU-044: antecedente o descarte; la API vuelve a validar todo. */
+export function enviarDecision(id: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/situaciones/${encodeURIComponent(id)}/decisiones`,
+    cuerpo,
   );
 }
 

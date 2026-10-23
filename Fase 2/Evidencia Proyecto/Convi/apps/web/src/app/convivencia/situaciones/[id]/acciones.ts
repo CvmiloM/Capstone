@@ -5,6 +5,7 @@ import {
   enviarAclaracion,
   enviarCambioResponsable,
   enviarCambioUrgencia,
+  enviarDecision,
   enviarInicioRevision,
   enviarRevisionNormativa,
 } from "../../datos";
@@ -24,6 +25,33 @@ const NO_VALIDA = "La situación no es válida. Vuelve a la bandeja.";
 function leerTexto(formData: FormData, campo: string) {
   const valor = formData.get(campo);
   return typeof valor === "string" ? valor.trim() : "";
+}
+
+// PB-047, PB-048 y PB-051: guarda la situación como antecedente o la
+// descarta. Se envía también la última revisión que se veía, para que la API
+// rechace la decisión si otra persona agregó una entretanto (PB-139).
+export async function registrarDecision(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const id = leerTexto(formData, "situacion_id");
+  const valores = {
+    resultado: leerTexto(formData, "resultado"),
+    motivo_descarte: leerTexto(formData, "motivo_descarte"),
+    codigo_original: leerTexto(formData, "codigo_original"),
+    fundamento: leerTexto(formData, "fundamento_decision"),
+  };
+  if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
+  const resultado = await enviarDecision(id, {
+    ...valores,
+    revision_anterior_id: leerTexto(formData, "revision_anterior_id"),
+  });
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  redirect(
+    `/convivencia/situaciones/${id}?aviso=${valores.resultado === "DESCARTADA" ? "descartada" : "antecedente"}`,
+  );
 }
 
 // PB-044 (HU-037 CA2): pasa una situación Nueva a En revisión. La API

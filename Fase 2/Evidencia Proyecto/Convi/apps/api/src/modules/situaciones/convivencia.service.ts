@@ -8,6 +8,13 @@ import {
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
+import {
+  decisionesDeSituacion,
+  insertarDecision,
+  ultimaRevision,
+  validarDecision,
+  type DecisionRegistrada,
+} from './decision-situacion.js';
 import { validarPregunta } from './nueva-aclaracion.js';
 import {
   guardarComoAntecedente,
@@ -113,6 +120,10 @@ export type DetalleConvivencia = SituacionBandeja & {
   revisiones_normativas: RevisionNormativa[];
   /** PB-155: versiones publicadas y vigentes que se pueden citar. */
   opciones_normativa: OpcionesNormativa;
+  /** PB-047, PB-048 y PB-051: decisiones tomadas, sin editar ni borrar. */
+  decisiones: DecisionRegistrada[];
+  /** PB-139: la última revisión que se ve; decidir sobre otra se rechaza. */
+  ultima_revision_id: string | null;
 };
 
 export type ResponsableAsignado = {
@@ -136,6 +147,8 @@ const CAMBIO_SIMULTANEO =
 const RESPONSABLE_SIMULTANEO =
   'Otra persona cambió al responsable mientras mirabas la situación. Recarga la página para ver quién quedó a cargo.';
 const PRIMERA_ASIGNACION = 'Primera asignación del responsable de la revisión.';
+const DECISION_DESACTUALIZADA =
+  'Otra persona registró una revisión o una decisión mientras mirabas la situación. Recarga la página para verla antes de decidir.';
 
 type EstudianteOpcion = {
   id: string;
@@ -327,6 +340,8 @@ export class ConvivenciaService {
           opciones_responsable: responsables.rows,
           revisiones_normativas: await revisionesNormativas(db, id),
           opciones_normativa: await opcionesNormativa(db),
+          decisiones: await decisionesDeSituacion(db, id),
+          ultima_revision_id: await ultimaRevision(db, id),
         };
       },
     );
@@ -551,6 +566,71 @@ export class ConvivenciaService {
         if (!reintentar) throw error;
       }
     }
+  }
+
+  // PB-047 (HU-040), PB-048 (HU-041) y PB-051 (HU-044): Convivencia cierra la
+  // revisión guardando la situación como antecedente o descartándola, sin
+  // abrir un caso. Solo se decide En revisión: una Nueva todavía no se revisa
+  // y con una aclaración pendiente se espera al profesor. Se indica la última
+  // revisión que se veía; si otra persona agregó una, se rechaza (PB-139).
+  registrarDecision(
+    sesion: Sesion,
+    id: string,
+    cuerpo: unknown,
+  ): Promise<{ id: string; estado: string }> {
+    const datos = validarDecision(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const actual = await db
+          .query<{ estado: string }>(
+            'SELECT estado FROM convi.situaciones WHERE id = $1 FOR UPDATE',
+            [id],
+          )
+          .catch((error: unknown) => {
+            if (esCambioSimultaneo(error))
+              throw new ConflictException(DECISION_DESACTUALIZADA);
+            throw error;
+          });
+        const fila = actual.rows[0];
+        if (!fila) throw new NotFoundException(NO_EXISTE);
+        if (fila.estado === 'NUEVA')
+          throw new ConflictException('Inicia la revisión antes de decidir.');
+        if (fila.estado === 'INFORMACION_SOLICITADA')
+          throw new ConflictException(
+            'Espera la respuesta del profesor a la aclaración antes de decidir.',
+          );
+        if (fila.estado !== 'EN_REVISION')
+          throw new ConflictException(
+            'Esta situación ya tiene una decisión. Para cambiarla hay que reconsiderarla.',
+          );
+        if ((await ultimaRevision(db, id)) !== datos.revision_anterior_id)
+          throw new ConflictException(DECISION_DESACTUALIZADA);
+
+        // HU-044 CA2: la original se busca por su código dentro de la escuela
+        // (la seguridad por fila oculta las demás) y no puede ser la misma.
+        let originalId: string | null = null;
+        if (datos.codigo_original) {
+          const original = await db.query<{ id: string }>(
+            'SELECT id FROM convi.situaciones WHERE codigo = $1',
+            [datos.codigo_original],
+          );
+          originalId = original.rows[0]?.id ?? null;
+          const error = !originalId
+            ? 'No hay una situación con ese código en tu escuela.'
+            : originalId === id
+              ? 'Una situación no puede ser duplicado de sí misma.'
+              : null;
+          if (error)
+            throw new BadRequestException({
+              mensaje: 'Revisa los datos marcados. No se guardó la decisión.',
+              errores: { codigo_original: error },
+            });
+        }
+        return insertarDecision(db, id, datos, originalId);
+      },
+    );
   }
 
   // PB-045 (HU-038): Convivencia pide información al profesor que registró la
