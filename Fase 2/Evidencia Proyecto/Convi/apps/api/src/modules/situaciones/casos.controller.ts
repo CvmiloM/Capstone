@@ -44,4 +44,15 @@ export class CasosController {
   ) {
     return this.casos.crearDesdeSituacion(peticion.sesion, id, cuerpo);
   }
+
+  // PB-052: el cuerpo trae { caso_id, fundamento, revision_anterior_id };
+  // responde 201 con el id y el código del caso al que quedó vinculada.
+  @Post('situaciones/:id/vinculacion')
+  vincularSituacion(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.casos.vincularSituacion(peticion.sesion, id, cuerpo);
+  }
 }

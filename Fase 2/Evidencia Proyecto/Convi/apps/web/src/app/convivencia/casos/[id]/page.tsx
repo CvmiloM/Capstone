@@ -13,6 +13,8 @@ export const metadata: Metadata = { title: "Caso" };
 const AVISOS: Record<string, string> = {
   creado:
     "Abriste el caso. Quedó En análisis con su código, y la situación de origen y sus estudiantes quedaron vinculados.",
+  vinculada:
+    "Vinculaste la situación al caso. Quedó en sus situaciones vinculadas con tu nombre, la fecha y el fundamento, y los estudiantes que faltaban se sumaron al caso.",
 };
 
 // PB-053 (HU-046): detalle de un caso con sus estudiantes y las situaciones
@@ -145,10 +147,16 @@ export default async function PaginaCaso({
                     <span className="font-mono">{s.codigo}</span>
                   </Link>{" "}
                   · {s.categoria ?? "Sin categoría"}
+                  {/* PB-052 (HU-045 CA2): quién la vinculó, cuándo y por qué. */}
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     Ocurrió el {formatearFecha(s.ocurrido_en)} · vinculada el{" "}
-                    {formatearFecha(s.vinculado_a_caso_en)}
+                    {formatearFecha(s.vinculado_a_caso_en)} por {s.vinculado_por}
                   </p>
+                  {s.fundamento_vinculacion && (
+                    <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                      {s.fundamento_vinculacion}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

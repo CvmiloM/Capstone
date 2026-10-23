@@ -85,9 +85,14 @@ export type DetalleConvivencia = SituacionBandeja & {
   }[];
   /** PB-139: la última revisión que se ve; decidir sobre otra se rechaza. */
   ultima_revision_id: string | null;
-  /** PB-053: el caso al que quedó vinculada, si ya tiene uno. */
-  caso_vinculado: { id: string; codigo: string } | null;
-  /** PB-053: lo que necesita el formulario para abrir un caso. */
+  /** PB-053: el caso al que quedó vinculada, quién y cuándo (HU-045 CA2). */
+  caso_vinculado: {
+    id: string;
+    codigo: string;
+    vinculado_por: string;
+    vinculado_en: string;
+  } | null;
+  /** PB-053 y PB-052: lo que necesitan los formularios de la sección Caso. */
   opciones_caso: {
     categorias: { id: string; nombre: string }[];
     categoria_sugerida_id: string | null;
@@ -278,6 +283,15 @@ export function enviarCaso(id: string, cuerpo: unknown) {
   return enviar(
     "POST",
     `/convivencia/situaciones/${encodeURIComponent(id)}/caso`,
+    cuerpo,
+  );
+}
+
+/** HU-045: vincula la situación a un caso existente; responde con el id del caso. */
+export function enviarVinculacion(id: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/situaciones/${encodeURIComponent(id)}/vinculacion`,
     cuerpo,
   );
 }

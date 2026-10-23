@@ -10,6 +10,7 @@ import {
 import { validarRespuesta } from './respuesta-aclaracion.js';
 import { validarCambioResponsable } from './responsable-revision.js';
 import { validarRevisionNormativa } from './revision-normativa.js';
+import { validarVinculacion } from './vinculacion-caso.js';
 
 // PB-140 (HU-119 CA1): las reglas viven en el servidor. Estas pruebas envían
 // directamente a las validaciones datos que la pantalla nunca mandaría, para
@@ -496,6 +497,48 @@ describe('Creación de casos (PB-053, HU-046)', () => {
     const { revision_anterior_id: _sinRevision, ...sinRevision } = caso;
     expect(camposConError(() => validarNuevoCaso(sinRevision))).toEqual([
       'titulo',
+    ]);
+  });
+});
+
+describe('Vinculación a un caso existente (PB-052, HU-045)', () => {
+  const CASO = '88888888-8888-4888-8888-888888888888';
+  const vinculacion = {
+    caso_id: CASO.toUpperCase(),
+    fundamento: ' Mismos estudiantes y el mismo conflicto. ',
+    revision_anterior_id: null,
+  };
+
+  it('exige elegir el caso y el fundamento (CA1 y CA2)', () => {
+    expect(
+      camposConError(() => validarVinculacion({ revision_anterior_id: null })),
+    ).toEqual(['caso_id', 'fundamento']);
+  });
+
+  it('acepta la vinculación y limpia los textos', () => {
+    expect(validarVinculacion(vinculacion)).toEqual({
+      caso_id: CASO,
+      fundamento: 'Mismos estudiantes y el mismo conflicto.',
+      revision_anterior_id: null,
+    });
+  });
+
+  it('rechaza un caso que no es un identificador y un fundamento largo', () => {
+    expect(
+      camposConError(() =>
+        validarVinculacion({
+          ...vinculacion,
+          caso_id: 'CASO-2026-00001',
+          fundamento: 'x'.repeat(2001),
+        }),
+      ),
+    ).toEqual(['caso_id', 'fundamento']);
+  });
+
+  it('exige la última revisión que se veía (PB-139)', () => {
+    const { revision_anterior_id: _sinRevision, ...sinRevision } = vinculacion;
+    expect(camposConError(() => validarVinculacion(sinRevision))).toEqual([
+      'caso_id',
     ]);
   });
 });
