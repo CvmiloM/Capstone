@@ -84,7 +84,7 @@ const DESDE_NOMINA = `
 
 // El nombre se busca sin tildes ni diéresis, para que "perez" encuentre a
 // "Pérez"; la ñ se mantiene.
-const sinTildes = (sql: string) =>
+export const sinTildes = (sql: string) =>
   `translate(${sql}, 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')`;
 
 // $1 texto con comodines, $2 RUT sin guion con comodín ('' si no parece RUT)
@@ -273,7 +273,7 @@ async function revisarNacimiento(db: PoolClient, datos: DatosEstudiante) {
 
 // Si lo buscado parece un RUT (solo números, puntos, guion y K), se compara
 // sin puntos ni guion desde el inicio. Con menos de 3 números no se usa.
-function normalizarParcial(buscar: string) {
+export function normalizarParcial(buscar: string) {
   const limpio = buscar.replace(/[.\s-]/g, '').toUpperCase();
   if (!/^[0-9]{3,}K?$/.test(limpio)) return '';
   const completo = normalizarRut(buscar);

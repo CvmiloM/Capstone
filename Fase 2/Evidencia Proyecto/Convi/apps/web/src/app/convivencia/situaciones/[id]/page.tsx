@@ -132,12 +132,24 @@ export default async function PaginaRevisionSituacion({
           <ul className="divide-y divide-border text-sm">
             {situacion.participantes.map((p) => (
               <li
-                key={`${p.codigo_estudiante ?? ""}-${p.apellidos}-${p.nombres}-${p.rol}`}
+                key={`${p.estudiante_id ?? ""}-${p.apellidos}-${p.nombres}-${p.rol}`}
                 className="flex flex-wrap items-center justify-between gap-2 py-2.5"
               >
                 <div>
                   <p className="font-medium">
-                    {p.apellidos}, {p.nombres}
+                    {/* PB-074: desde aquí se abre el historial de cada estudiante. */}
+                    {p.estudiante_id ? (
+                      <Link
+                        href={`/convivencia/estudiantes/${p.estudiante_id}`}
+                        className={claseEnlace}
+                      >
+                        {p.apellidos}, {p.nombres}
+                      </Link>
+                    ) : (
+                      <>
+                        {p.apellidos}, {p.nombres}
+                      </>
+                    )}
                     {p.codigo_estudiante && (
                       <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
                         {p.codigo_estudiante}
