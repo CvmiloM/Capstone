@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
 import { validarNuevoCaso } from './caso-nuevo.js';
 import { validarDecision } from './decision-situacion.js';
+import { validarCambioEstado, validarCierre } from './estado-caso.js';
 import { validarPregunta } from './nueva-aclaracion.js';
 import {
   validarNuevaSituacion,
@@ -539,6 +540,89 @@ describe('Vinculación a un caso existente (PB-052, HU-045)', () => {
     const { revision_anterior_id: _sinRevision, ...sinRevision } = vinculacion;
     expect(camposConError(() => validarVinculacion(sinRevision))).toEqual([
       'caso_id',
+    ]);
+  });
+});
+
+describe('Cambio de estado del caso (PB-152, HU-131)', () => {
+  const cambio = {
+    estado_nuevo: 'EN_INTERVENCION',
+    motivo: ' Se acordó un plan con la familia. ',
+    movimiento_anterior_id: null,
+  };
+
+  it('exige el estado nuevo y el motivo (CA1)', () => {
+    expect(
+      camposConError(() =>
+        validarCambioEstado({ movimiento_anterior_id: null }),
+      ),
+    ).toEqual(['estado_nuevo', 'motivo']);
+  });
+
+  it('acepta un estado intermedio y limpia el motivo', () => {
+    expect(validarCambioEstado(cambio)).toEqual({
+      estado_nuevo: 'EN_INTERVENCION',
+      motivo: 'Se acordó un plan con la familia.',
+      movimiento_anterior_id: null,
+    });
+  });
+
+  it('no deja cerrar ni reabrir por esta vía (CA4 y CA5)', () => {
+    for (const estado of ['CERRADO', 'REABIERTO', 'OTRO'])
+      expect(
+        camposConError(() =>
+          validarCambioEstado({ ...cambio, estado_nuevo: estado }),
+        ),
+      ).toEqual(['estado_nuevo']);
+  });
+
+  it('exige el último movimiento que se veía (CA3)', () => {
+    const { movimiento_anterior_id: _sinMovimiento, ...sinMovimiento } = cambio;
+    expect(camposConError(() => validarCambioEstado(sinMovimiento))).toEqual([
+      'estado_nuevo',
+    ]);
+  });
+});
+
+describe('Cierre del caso (PB-054, HU-047)', () => {
+  const cierre = {
+    motivo: ' Objetivos cumplidos ',
+    resumen_cierre: ' Se realizaron dos mediaciones y no hubo nuevos hechos. ',
+    movimiento_anterior_id: null,
+  };
+
+  it('exige motivo y resumen de cierre (CA1)', () => {
+    expect(
+      camposConError(() => validarCierre({ movimiento_anterior_id: null })),
+    ).toEqual(['motivo', 'resumen_cierre']);
+  });
+
+  it('acepta el cierre sin justificación ni acta y limpia los textos', () => {
+    expect(validarCierre(cierre)).toEqual({
+      motivo: 'Objetivos cumplidos',
+      resumen_cierre: 'Se realizaron dos mediaciones y no hubo nuevos hechos.',
+      justificacion_pendientes: null,
+      evidencia_cierre_id: null,
+      movimiento_anterior_id: null,
+    });
+  });
+
+  it('rechaza un acta que no es un identificador y textos muy largos', () => {
+    expect(
+      camposConError(() =>
+        validarCierre({
+          ...cierre,
+          evidencia_cierre_id: 'acta.pdf',
+          justificacion_pendientes: 'x'.repeat(2001),
+        }),
+      ),
+    ).toEqual(['evidencia_cierre_id', 'justificacion_pendientes']);
+  });
+
+  it('exige el último movimiento que se veía (CA3)', () => {
+    const { movimiento_anterior_id: _sinMovimiento, ...sinMovimiento } = cierre;
+    expect(camposConError(() => validarCierre(sinMovimiento))).toEqual([
+      'motivo',
     ]);
   });
 });

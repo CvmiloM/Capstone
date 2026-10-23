@@ -296,6 +296,24 @@ export function enviarVinculacion(id: string, cuerpo: unknown) {
   );
 }
 
+/** HU-131: mueve el caso a otra etapa con un motivo; la API vuelve a validar todo. */
+export function enviarCambioEstadoCaso(id: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/casos/${encodeURIComponent(id)}/estado`,
+    cuerpo,
+  );
+}
+
+/** HU-047: cierra el caso con motivo y resumen; la API vuelve a validar todo. */
+export function enviarCierreCaso(id: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/casos/${encodeURIComponent(id)}/cierre`,
+    cuerpo,
+  );
+}
+
 /** HU-134: revisión normativa; la API vuelve a validar todo. */
 export function enviarRevisionNormativa(id: string, cuerpo: unknown) {
   return enviar(
