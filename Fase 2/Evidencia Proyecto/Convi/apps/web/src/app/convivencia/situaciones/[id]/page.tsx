@@ -14,12 +14,13 @@ import {
 } from "../../datos";
 import {
   FormularioAclaracion,
+  FormularioDecision,
   FormularioResponsable,
   FormularioRevision,
   FormularioRevisionNormativa,
   FormularioUrgencia,
 } from "./formularios";
-import { APLICABILIDAD, MODO_REVISION } from "./opciones";
+import { APLICABILIDAD, MODO_REVISION, NOMBRE_DECISION } from "./opciones";
 
 export const metadata: Metadata = { title: "Revisión de la situación" };
 
@@ -36,6 +37,10 @@ const AVISOS: Record<string, string> = {
     "Guardaste el responsable de la revisión. El cambio quedó registrado en la auditoría y el estado no cambió.",
   normativa:
     "Guardaste la revisión normativa. Quedó en el historial de la situación y su estado no cambió.",
+  antecedente:
+    "Guardaste la situación como antecedente. Quedó en el historial de sus estudiantes, sin abrir un caso.",
+  descartada:
+    "Descartaste la situación. Se conserva con el motivo del descarte y ya no queda pendiente en la bandeja.",
 };
 
 // PB-044 (HU-037): detalle de una situación para revisarla. Abrirlo no cambia
@@ -312,6 +317,45 @@ export default async function PaginaRevisionSituacion({
           {situacion.estado === "NUEVA" && (
             <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
               Inicia la revisión para registrar lo que indica la normativa.
+            </p>
+          )}
+        </Seccion>
+
+        {/* PB-047, PB-048 y PB-051: decisiones que cierran la revisión. */}
+        <Seccion titulo="Decisión" className="lg:col-span-3">
+          {situacion.decisiones.length > 0 && (
+            <ul className="mb-4 space-y-4">
+              {situacion.decisiones.map((d) => (
+                <li key={d.id} className="rounded-xl border border-border p-4 text-sm">
+                  <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                    {NOMBRE_DECISION[d.resultado] ?? d.resultado}
+                  </span>
+                  <p className="mt-2 whitespace-pre-line">{d.fundamento}</p>
+                  {d.duplicada_de && (
+                    <p className="mt-2 text-muted-foreground">
+                      Duplicado de{" "}
+                      <span className="font-mono text-foreground">{d.duplicada_de}</span>
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Decidida por {d.revisado_por} el {formatearFecha(d.revisado_en)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {situacion.estado === "EN_REVISION" ? (
+            <FormularioDecision
+              situacionId={situacion.id}
+              ultimaRevisionId={situacion.ultima_revision_id}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {situacion.estado === "NUEVA"
+                ? "Inicia la revisión para poder decidir."
+                : situacion.estado === "INFORMACION_SOLICITADA"
+                  ? "Espera la respuesta del profesor a la aclaración antes de decidir."
+                  : "La revisión de esta situación terminó. Para cambiar la decisión hay que reconsiderarla."}
             </p>
           )}
         </Seccion>

@@ -7,23 +7,25 @@ import {
   claseBotonSecundario,
 } from "@/app/components/formulario";
 import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
-import { APLICABILIDAD, MODO_REVISION } from "./opciones";
+import { APLICABILIDAD, MODO_REVISION, MOTIVOS_DESCARTE } from "./opciones";
 import {
   asignarResponsable,
   cambiarUrgencia,
   iniciarRevision,
   pedirAclaracion,
+  registrarDecision,
   registrarRevisionNormativa,
   type EstadoAccion,
 } from "./acciones";
 
 const estadoInicial: EstadoAccion = {};
 
-// Mismos límites que valida la API (cambio-urgencia.ts, nueva-aclaracion.ts
-// y revision-normativa.ts).
+// Mismos límites que valida la API (cambio-urgencia.ts, nueva-aclaracion.ts,
+// revision-normativa.ts y decision-situacion.ts).
 const LARGO_MAXIMO_MOTIVO = 500;
 const LARGO_MAXIMO_PREGUNTA = 2000;
 const LARGO_MAXIMO_FUNDAMENTO = 4000;
+const LARGO_MAXIMO_FUNDAMENTO_DECISION = 2000;
 const LARGO_MAXIMO_SECCION = 220;
 const MAXIMO_REFERENCIAS = 10;
 
@@ -542,6 +544,204 @@ export function FormularioRevisionNormativa({
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Guardar revisión normativa"}
+      </button>
+    </form>
+  );
+}
+
+// HU-040, HU-041 y HU-044: cierra la revisión sin abrir un caso. La decisión
+// no se edita después; cambiarla es una reconsideración (HU-043).
+export function FormularioDecision({
+  situacionId,
+  ultimaRevisionId,
+}: {
+  situacionId: string;
+  ultimaRevisionId: string | null;
+}) {
+  const [estado, accion, pendiente] = useActionState(
+    registrarDecision,
+    estadoInicial,
+  );
+  const valores = estado.valores ?? {};
+  const errores = estado.errores ?? {};
+  // Lo elegido se conserva para mostrar los campos que corresponden.
+  const [elegido, setElegido] = useState<string | null>(null);
+  const [motivoElegido, setMotivoElegido] = useState<string | null>(null);
+  const resultado = elegido ?? valores.resultado ?? "";
+  const motivo = motivoElegido ?? valores.motivo_descarte ?? "";
+  const descarta = resultado === "DESCARTADA";
+
+  return (
+    <form action={accion} noValidate className="space-y-5">
+      <input type="hidden" name="situacion_id" value={situacionId} />
+      <input
+        type="hidden"
+        name="revision_anterior_id"
+        value={ultimaRevisionId ?? ""}
+      />
+      {estado.mensaje && !estado.errores && (
+        <AvisoError>{estado.mensaje}</AvisoError>
+      )}
+
+      <fieldset
+        aria-describedby={errores.resultado ? "resultado-error" : undefined}
+      >
+        <legend className="text-sm font-medium">¿Qué decides?</legend>
+        <div className="mt-2 space-y-2">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="resultado"
+              value="ANTECEDENTE"
+              checked={resultado === "ANTECEDENTE"}
+              onChange={() => setElegido("ANTECEDENTE")}
+              className="mt-0.5 accent-primary"
+            />
+            <span>
+              Guardar como antecedente
+              <span className="block text-muted-foreground">
+                Es válida y queda en el historial del estudiante, sin abrir un caso.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="resultado"
+              value="DESCARTADA"
+              checked={resultado === "DESCARTADA"}
+              onChange={() => setElegido("DESCARTADA")}
+              className="mt-0.5 accent-primary"
+            />
+            <span>
+              Descartar
+              <span className="block text-muted-foreground">
+                Es un duplicado, un error o está fuera de alcance. No se borra.
+              </span>
+            </span>
+          </label>
+        </div>
+        {errores.resultado && (
+          <p id="resultado-error" className="mt-1.5 text-sm text-destructive">
+            {errores.resultado}
+          </p>
+        )}
+      </fieldset>
+
+      {descarta && (
+        <fieldset
+          aria-describedby={
+            errores.motivo_descarte ? "motivo_descarte-error" : undefined
+          }
+        >
+          <legend className="text-sm font-medium">Motivo del descarte</legend>
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2">
+            {MOTIVOS_DESCARTE.map((opcion) => (
+              <label key={opcion.valor} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="motivo_descarte"
+                  value={opcion.valor}
+                  checked={motivo === opcion.valor}
+                  onChange={() => setMotivoElegido(opcion.valor)}
+                  className="accent-primary"
+                />
+                {opcion.texto}
+              </label>
+            ))}
+          </div>
+          {errores.motivo_descarte && (
+            <p
+              id="motivo_descarte-error"
+              className="mt-1.5 text-sm text-destructive"
+            >
+              {errores.motivo_descarte}
+            </p>
+          )}
+        </fieldset>
+      )}
+
+      {descarta && motivo === "DUPLICADO" && (
+        <div>
+          <label htmlFor="codigo_original" className="block text-sm font-medium">
+            Código de la situación original
+          </label>
+          <input
+            id="codigo_original"
+            name="codigo_original"
+            type="text"
+            placeholder="SIT-2026-00012"
+            defaultValue={valores.codigo_original}
+            aria-invalid={errores.codigo_original ? true : undefined}
+            aria-describedby={
+              errores.codigo_original
+                ? "codigo_original-error"
+                : "codigo_original-ayuda"
+            }
+            className={`${claseControl} font-mono sm:w-60 ${errores.codigo_original ? "border-destructive" : "border-input"}`}
+          />
+          {errores.codigo_original ? (
+            <p
+              id="codigo_original-error"
+              className="mt-1.5 text-sm text-destructive"
+            >
+              {errores.codigo_original}
+            </p>
+          ) : (
+            <p
+              id="codigo_original-ayuda"
+              className="mt-1.5 text-sm text-muted-foreground"
+            >
+              La situación que sí sigue su curso. Debe ser de tu escuela y
+              distinta de esta.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="fundamento_decision" className="block text-sm font-medium">
+          {descarta ? "Por qué se descarta" : "Conclusión de la revisión"}
+        </label>
+        <textarea
+          id="fundamento_decision"
+          name="fundamento_decision"
+          rows={4}
+          maxLength={LARGO_MAXIMO_FUNDAMENTO_DECISION}
+          defaultValue={valores.fundamento}
+          aria-invalid={errores.fundamento ? true : undefined}
+          aria-describedby={
+            errores.fundamento
+              ? "fundamento_decision-error"
+              : "fundamento_decision-ayuda"
+          }
+          className={`${claseControl} ${errores.fundamento ? "border-destructive" : "border-input"}`}
+        />
+        {errores.fundamento ? (
+          <p
+            id="fundamento_decision-error"
+            className="mt-1.5 text-sm text-destructive"
+          >
+            {errores.fundamento}
+          </p>
+        ) : (
+          <p
+            id="fundamento_decision-ayuda"
+            className="mt-1.5 text-sm text-muted-foreground"
+          >
+            Queda registrada con tu nombre y la fecha. Después no se puede editar.
+          </p>
+        )}
+      </div>
+
+      <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
+        {pendiente
+          ? "Guardando…"
+          : descarta
+            ? "Descartar situación"
+            : resultado === "ANTECEDENTE"
+              ? "Guardar como antecedente"
+              : "Guardar decisión"}
       </button>
     </form>
   );
