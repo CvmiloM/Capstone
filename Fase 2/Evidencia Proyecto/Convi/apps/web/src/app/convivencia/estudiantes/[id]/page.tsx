@@ -96,8 +96,12 @@ export default async function PaginaHistorialEstudiante({
         <p className="mt-3 text-sm text-muted-foreground">
           {situaciones === 0 && casos === 0
             ? "No tiene situaciones ni casos registrados."
-            : `${situaciones === 1 ? "1 situación" : `${situaciones} situaciones`} y ${casos === 1 ? "1 caso" : `${casos} casos`} en su historial.`}
+                        : `${situaciones === 1 ? "1 situación" : `${situaciones} situaciones`} y ${casos === 1 ? "1 caso" : `${casos} casos`} en su historial.`}
         </p>
+        {/* PB-075: situaciones de años anteriores que faltan en el historial. */}
+        <Link href="/convivencia/historico" className={`mt-2 inline-block text-sm ${claseEnlace}`}>
+          Agregar un registro histórico
+        </Link>
       </div>
 
       <Form

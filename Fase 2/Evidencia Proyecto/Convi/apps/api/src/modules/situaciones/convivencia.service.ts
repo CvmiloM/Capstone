@@ -10,6 +10,10 @@ import { CuentaService } from '../../database/cuenta.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
 import { validarPregunta } from './nueva-aclaracion.js';
 import {
+  guardarComoAntecedente,
+  validarRegistroHistorico,
+} from './registro-historico.js';
+import {
   errorDeCampos,
   URGENCIAS,
   validarSituacionConvivencia,
@@ -744,9 +748,18 @@ export class ConvivenciaService {
   // PB-043 (HU-036): Convivencia registra una situación que llegó por otro
   // canal. Igual que el registro del profesor, todo se guarda en una sola
   // transacción y llega Nueva con su código (CA3); el autor es la cuenta de
-  // la sesión y el informante queda aparte (CA2).
-  registrar(sesion: Sesion, cuerpo: unknown): Promise<SituacionRegistrada> {
-    const datos = validarSituacionConvivencia(cuerpo);
+  // la sesión y el informante queda aparte (CA2). PB-075 (HU-065): con
+  // historico, es una situación de un año anterior que queda marcada como
+  // registro histórico y como antecedente con su conclusión.
+  registrar(
+    sesion: Sesion,
+    cuerpo: unknown,
+    { historico = false }: { historico?: boolean } = {},
+  ): Promise<SituacionRegistrada> {
+    const registroHistorico = historico
+      ? validarRegistroHistorico(cuerpo)
+      : null;
+    const datos = registroHistorico ?? validarSituacionConvivencia(cuerpo);
     return conReintentosDeCodigo(() =>
       this.cuentas.operar(
         sesion,
@@ -796,7 +809,7 @@ export class ConvivenciaService {
             ocurridoEn,
           );
 
-          return insertarSituacion(
+          const registrada = await insertarSituacion(
             db,
             {
               curso_id: datos.curso_id,
@@ -807,12 +820,23 @@ export class ConvivenciaService {
               descripcion: datos.descripcion,
               categoria_id: datos.categoria_id,
               urgencia: datos.urgencia,
+              registro_historico: historico,
             },
             datos.participantes.map((p) => ({
               rol: p.rol,
               ...alOcurrir.get(p.estudiante_id)!,
             })),
           );
+          // PB-075: en la misma transacción queda como antecedente.
+          if (registroHistorico) {
+            await guardarComoAntecedente(
+              db,
+              registrada.id,
+              registroHistorico.conclusion,
+            );
+            return { ...registrada, estado: 'ANTECEDENTE' };
+          }
+          return registrada;
         },
       ),
     );

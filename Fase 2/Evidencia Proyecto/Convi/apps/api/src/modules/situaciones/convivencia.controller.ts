@@ -38,6 +38,18 @@ export class ConvivenciaController {
     return this.convivencia.registrar(peticion.sesion, cuerpo);
   }
 
+    // PB-075 (Camilo): situación de un año anterior, con los mismos datos y una
+  // conclusión; queda como antecedente y responde 201 con el código.
+  @Post('situaciones/historicas')
+  registrarHistorica(
+    @Req() peticion: PeticionConSesion,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.convivencia.registrar(peticion.sesion, cuerpo, {
+      historico: true,
+    });
+  }
+
   // ?estado=NUEVA&urgencia=URGENTE; ambos opcionales.
   @Get('situaciones')
   bandeja(

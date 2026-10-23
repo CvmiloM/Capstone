@@ -287,6 +287,11 @@ export function enviarSituacion(cuerpo: unknown) {
   return enviar("POST", "/convivencia/situaciones", cuerpo);
 }
 
+/** PB-075 (HU-065): situación de un año anterior; queda como antecedente. */
+export function enviarSituacionHistorica(cuerpo: unknown) {
+  return enviar("POST", "/convivencia/situaciones/historicas", cuerpo);
+}
+
 /** HU-036 CA2: quién informó, separado de quién la registró. */
 export function quienInformo(situacion: {
   tipo_origen: string;

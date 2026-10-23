@@ -16,6 +16,12 @@ const SECCIONES: SeccionMenu[] = [
         texto: "Registrar situación",
         icono: "info",
       },
+            // PB-075 (Camilo): situaciones de años anteriores
+      {
+        href: "/convivencia/historico",
+        texto: "Registro histórico",
+        icono: "anios",
+      },
       // PB-074 (Camilo): historial de cada estudiante (/convivencia/estudiantes/...)
       {
         href: "/convivencia/estudiantes",

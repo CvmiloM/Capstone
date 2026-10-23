@@ -8,6 +8,8 @@ import {
   ROLES_EN_SITUACION,
 } from "@/app/profesor/situacion-opciones";
 import type { OpcionesRegistro } from "../datos";
+import { registrarHistorico } from "../historico/acciones";
+import { LARGO_MAXIMO_CONCLUSION } from "../historico/opciones";
 import { registrarSituacion, type EstadoRegistro } from "./acciones";
 import { ORIGENES } from "./opciones";
 
@@ -23,9 +25,17 @@ function borde(error?: string) {
 
 // PB-043 (HU-036): formulario de Convivencia. La API vuelve a validar cada
 // dato; aquí solo se muestran sus mensajes junto al campo correspondiente.
-export function FormularioRegistro({ opciones }: { opciones: OpcionesRegistro }) {
+// PB-075 (HU-065): con historico registra una situación de un año anterior,
+// sin urgencia ni curso y con la conclusión con que queda como antecedente.
+export function FormularioRegistro({
+  opciones,
+  historico = false,
+}: {
+  opciones: OpcionesRegistro;
+  historico?: boolean;
+}) {
   const [estado, accion, pendiente] = useActionState(
-    registrarSituacion,
+    historico ? registrarHistorico : registrarSituacion,
     estadoInicial,
   );
   const valores = estado.valores ?? {};
@@ -148,6 +158,11 @@ export function FormularioRegistro({ opciones }: { opciones: OpcionesRegistro })
             required
             defaultValue={valores.ocurrido_en}
             error={errores.ocurrido_en}
+            ayuda={
+              historico
+                ? "Puede ser de un año anterior, y el curso de cada estudiante se toma de su matrícula de ese día."
+                : undefined
+            }
           />
           <Campo
             name="lugar"
@@ -183,56 +198,60 @@ export function FormularioRegistro({ opciones }: { opciones: OpcionesRegistro })
             </select>
             <Mensaje id="categoria_id" error={errores.categoria_id} />
           </div>
-          <div>
-            <label htmlFor="curso_id" className="block text-sm font-medium">
-              Curso del hecho (opcional)
-            </label>
-            <select
-              id="curso_id"
-              name="curso_id"
-              defaultValue={valores.curso_id ?? ""}
-              aria-invalid={errores.curso_id ? true : undefined}
-              aria-describedby={errores.curso_id ? "curso_id-error" : undefined}
-              className={`mt-1.5 ${claseControl} ${borde(errores.curso_id)}`}
-            >
-              <option value="">Sin curso o varios cursos</option>
-              {opciones.cursos.map((curso) => (
-                <option key={curso.id} value={curso.id}>
-                  {curso.nombre}
-                </option>
-              ))}
-            </select>
-            <Mensaje id="curso_id" error={errores.curso_id} />
-          </div>
+          {!historico && (
+            <div>
+              <label htmlFor="curso_id" className="block text-sm font-medium">
+                Curso del hecho (opcional)
+              </label>
+              <select
+                id="curso_id"
+                name="curso_id"
+                defaultValue={valores.curso_id ?? ""}
+                aria-invalid={errores.curso_id ? true : undefined}
+                aria-describedby={errores.curso_id ? "curso_id-error" : undefined}
+                className={`mt-1.5 ${claseControl} ${borde(errores.curso_id)}`}
+              >
+                <option value="">Sin curso o varios cursos</option>
+                {opciones.cursos.map((curso) => (
+                  <option key={curso.id} value={curso.id}>
+                    {curso.nombre}
+                  </option>
+                ))}
+              </select>
+              <Mensaje id="curso_id" error={errores.curso_id} />
+            </div>
+          )}
         </div>
 
-        <fieldset
-          aria-describedby={errores.urgencia ? "urgencia-error" : "urgencia-ayuda"}
-        >
-          <legend className="text-sm font-medium">Urgencia</legend>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            {OPCIONES_URGENCIA.map((opcion) => (
-              <label
-                key={opcion.valor}
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm transition-colors has-[:checked]:border-primary has-[:checked]:bg-accent has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring"
-              >
-                <input
-                  type="radio"
-                  name="urgencia"
-                  value={opcion.valor}
-                  defaultChecked={urgencia === opcion.valor}
-                  className="accent-primary"
-                />
-                {opcion.texto}
-              </label>
-            ))}
-          </div>
-          <Mensaje
-            id="urgencia"
-            error={errores.urgencia}
-            ayuda="Queda en Normal salvo que la marques como Urgente o Inmediata."
-          />
-        </fieldset>
+        {!historico && (
+          <fieldset
+            aria-describedby={errores.urgencia ? "urgencia-error" : "urgencia-ayuda"}
+          >
+            <legend className="text-sm font-medium">Urgencia</legend>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {OPCIONES_URGENCIA.map((opcion) => (
+                <label
+                  key={opcion.valor}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm transition-colors has-[:checked]:border-primary has-[:checked]:bg-accent has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring"
+                >
+                  <input
+                    type="radio"
+                    name="urgencia"
+                    value={opcion.valor}
+                    defaultChecked={urgencia === opcion.valor}
+                    className="accent-primary"
+                  />
+                  {opcion.texto}
+                </label>
+              ))}
+            </div>
+            <Mensaje
+              id="urgencia"
+              error={errores.urgencia}
+              ayuda="Queda en Normal salvo que la marques como Urgente o Inmediata."
+            />
+          </fieldset>
+        )}
 
         <div>
           <label htmlFor="descripcion" className="block text-sm font-medium">
@@ -326,8 +345,38 @@ export function FormularioRegistro({ opciones }: { opciones: OpcionesRegistro })
         </fieldset>
       </Bloque>
 
-      <BotonEnviar pendiente={pendiente} textoPendiente="Registrando…">
-        Registrar situación
+      {historico && (
+        <Bloque titulo="Cómo terminó">
+          <div>
+            <label htmlFor="conclusion" className="block text-sm font-medium">
+              Conclusión
+            </label>
+            <textarea
+              id="conclusion"
+              name="conclusion"
+              rows={4}
+              maxLength={LARGO_MAXIMO_CONCLUSION}
+              defaultValue={valores.conclusion}
+              aria-invalid={errores.conclusion ? true : undefined}
+              aria-describedby={
+                errores.conclusion ? "conclusion-error" : "conclusion-ayuda"
+              }
+              className={`mt-1.5 ${claseControl} ${borde(errores.conclusion)}`}
+            />
+            <Mensaje
+              id="conclusion"
+              error={errores.conclusion}
+              ayuda="La situación queda como antecedente con esta conclusión y después no se puede editar."
+            />
+          </div>
+        </Bloque>
+      )}
+
+      <BotonEnviar
+        pendiente={pendiente}
+        textoPendiente={historico ? "Guardando…" : "Registrando…"}
+      >
+        {historico ? "Guardar registro histórico" : "Registrar situación"}
       </BotonEnviar>
     </form>
   );
