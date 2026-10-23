@@ -125,9 +125,14 @@ export type DetalleConvivencia = SituacionBandeja & {
   decisiones: DecisionRegistrada[];
   /** PB-139: la última revisión que se ve; decidir sobre otra se rechaza. */
   ultima_revision_id: string | null;
-  /** PB-053: el caso al que quedó vinculada, si ya tiene uno. */
-  caso_vinculado: { id: string; codigo: string } | null;
-  /** PB-053: lo que necesita el formulario para abrir un caso. */
+  /** PB-053: el caso al que quedó vinculada, quién y cuándo (HU-045 CA2). */
+  caso_vinculado: {
+    id: string;
+    codigo: string;
+    vinculado_por: string;
+    vinculado_en: Date;
+  } | null;
+  /** PB-053 y PB-052: lo que necesitan los formularios de la sección Caso. */
   opciones_caso: OpcionesCaso;
 };
 
@@ -349,9 +354,14 @@ export class ConvivenciaService {
           ultima_revision_id: await ultimaRevision(db, id),
           caso_vinculado:
             (
-              await db.query<{ id: string; codigo: string }>(
-                `SELECT c.id, c.codigo FROM convi.situaciones s
-                 JOIN convi.casos c ON c.id = s.caso_id WHERE s.id = $1`,
+              await db.query<NonNullable<DetalleConvivencia['caso_vinculado']>>(
+                `SELECT c.id, c.codigo, s.vinculado_a_caso_en AS vinculado_en,
+                        p.nombres || ' ' || p.apellidos AS vinculado_por
+                 FROM convi.situaciones s
+                 JOIN convi.casos c ON c.id = s.caso_id
+                 JOIN convi.membresias_establecimiento m ON m.id = s.vinculado_a_caso_por
+                 JOIN convi.personas p ON p.id = m.persona_id
+                 WHERE s.id = $1`,
                 [id],
               )
             ).rows[0] ?? null,

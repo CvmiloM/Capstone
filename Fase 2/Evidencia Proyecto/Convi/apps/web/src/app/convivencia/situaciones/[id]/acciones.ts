@@ -9,6 +9,7 @@ import {
   enviarDecision,
   enviarInicioRevision,
   enviarRevisionNormativa,
+  enviarVinculacion,
 } from "../../datos";
 
 export type EstadoAccion = {
@@ -56,6 +57,29 @@ export async function abrirCaso(
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
   redirect(`/convivencia/casos/${resultado.id}?aviso=creado`);
+}
+
+// PB-052 (HU-045): vincula la situación al caso que se eligió y confirmó.
+// La API registra la decisión Vinculada a caso con su fundamento y la
+// situación aparece en el caso, que se abre al terminar.
+export async function vincularCaso(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const id = leerTexto(formData, "situacion_id");
+  const valores = {
+    caso_id: leerTexto(formData, "caso_id"),
+    fundamento: leerTexto(formData, "fundamento_vinculacion"),
+  };
+  if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
+  const resultado = await enviarVinculacion(id, {
+    ...valores,
+    revision_anterior_id: leerTexto(formData, "revision_anterior_id"),
+  });
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  redirect(`/convivencia/casos/${resultado.id}?aviso=vinculada`);
 }
 
 // PB-047, PB-048 y PB-051: guarda la situación como antecedente o la

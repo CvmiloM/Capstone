@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import {
   AvisoError,
   claseBotonPrimario,
   claseBotonSecundario,
+  claseEnlace,
 } from "@/app/components/formulario";
 import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
 import { APLICABILIDAD, MODO_REVISION, MOTIVOS_DESCARTE } from "./opciones";
@@ -16,6 +18,7 @@ import {
   pedirAclaracion,
   registrarDecision,
   registrarRevisionNormativa,
+  vincularCaso,
   type EstadoAccion,
 } from "./acciones";
 
@@ -33,6 +36,8 @@ const LARGO_MAXIMO_RESUMEN = 4000;
 const LARGO_MAXIMO_JUSTIFICACION = 2000;
 const LARGO_MAXIMO_SECCION = 220;
 const MAXIMO_REFERENCIAS = 10;
+// vinculacion-caso.ts
+const LARGO_MAXIMO_FUNDAMENTO_VINCULACION = 2000;
 
 const claseControl =
   "mt-1.5 block w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/15";
@@ -748,6 +753,166 @@ export function FormularioDecision({
               ? "Guardar como antecedente"
               : "Guardar decisión"}
       </button>
+    </form>
+  );
+}
+
+// HU-045: vincula la situación a un caso activo que comparte estudiantes con
+// ella (CA1). Antes de enviar se pide confirmar; al cancelar no se envía nada
+// y la situación no cambia (CA3).
+export function FormularioVinculacion({
+  situacionId,
+  codigoSituacion,
+  ultimaRevisionId,
+  casos,
+}: {
+  situacionId: string;
+  codigoSituacion: string;
+  ultimaRevisionId: string | null;
+  casos: { id: string; codigo: string; titulo: string; estado: string }[];
+}) {
+  const [estado, accion, pendiente] = useActionState(vincularCaso, estadoInicial);
+  const valores = estado.valores ?? {};
+  const [casoElegido, setCasoElegido] = useState<string | null>(null);
+  // La confirmación y lo que falta completar valen para la respuesta que se
+  // veía al pedirlos; una respuesta nueva de la API los reemplaza.
+  const [paso, setPaso] = useState<{
+    para: EstadoAccion;
+    faltan: Record<string, string>;
+  } | null>(null);
+  const actual = paso?.para === estado ? paso : null;
+  const errores = actual?.faltan ?? estado.errores ?? {};
+  const casoId = casoElegido ?? valores.caso_id ?? "";
+  const caso = casos.find((c) => c.id === casoId);
+  const confirmando =
+    actual !== null && Object.keys(actual.faltan).length === 0 && caso;
+
+  function pedirConfirmacion(formulario: HTMLFormElement | null) {
+    if (!formulario) return;
+    const datos = new FormData(formulario);
+    const faltan: Record<string, string> = {};
+    if (!datos.get("caso_id")) faltan.caso_id = "Elige el caso al que la vinculas.";
+    if (!String(datos.get("fundamento_vinculacion") ?? "").trim())
+      faltan.fundamento = "Explica por qué esta situación se sigue en ese caso.";
+    setPaso({ para: estado, faltan });
+  }
+
+  return (
+    <form action={accion} noValidate className="space-y-4">
+      <input type="hidden" name="situacion_id" value={situacionId} />
+      <input
+        type="hidden"
+        name="revision_anterior_id"
+        value={ultimaRevisionId ?? ""}
+      />
+      {estado.mensaje && !estado.errores && (
+        <AvisoError>{estado.mensaje}</AvisoError>
+      )}
+
+      <fieldset aria-describedby={errores.caso_id ? "caso_id-error" : undefined}>
+        <legend className="text-sm font-medium">Caso</legend>
+        <ul className="mt-2 space-y-2">
+          {casos.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-start justify-between gap-2">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="caso_id"
+                  value={c.id}
+                  checked={casoId === c.id}
+                  onChange={() => setCasoElegido(c.id)}
+                  className="mt-0.5 accent-primary"
+                />
+                <span>
+                  <span className="font-mono">{c.codigo}</span> · {c.titulo}
+                  <span className="block text-muted-foreground">{c.estado}</span>
+                </span>
+              </label>
+              <Link
+                href={`/convivencia/casos/${c.id}`}
+                target="_blank"
+                className={`text-sm ${claseEnlace}`}
+              >
+                Ver caso
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {errores.caso_id && (
+          <p id="caso_id-error" className="mt-1.5 text-sm text-destructive">
+            {errores.caso_id}
+          </p>
+        )}
+      </fieldset>
+
+      <div>
+        <label htmlFor="fundamento_vinculacion" className="block text-sm font-medium">
+          Por qué se sigue en ese caso
+        </label>
+        <textarea
+          id="fundamento_vinculacion"
+          name="fundamento_vinculacion"
+          rows={3}
+          maxLength={LARGO_MAXIMO_FUNDAMENTO_VINCULACION}
+          defaultValue={valores.fundamento}
+          aria-invalid={errores.fundamento ? true : undefined}
+          aria-describedby={
+            errores.fundamento
+              ? "fundamento_vinculacion-error"
+              : "fundamento_vinculacion-ayuda"
+          }
+          className={`${claseControl} ${errores.fundamento ? "border-destructive" : "border-input"}`}
+        />
+        {errores.fundamento ? (
+          <p
+            id="fundamento_vinculacion-error"
+            className="mt-1.5 text-sm text-destructive"
+          >
+            {errores.fundamento}
+          </p>
+        ) : (
+          <p
+            id="fundamento_vinculacion-ayuda"
+            className="mt-1.5 text-sm text-muted-foreground"
+          >
+            Queda como la decisión de esta situación, con tu nombre y la fecha.
+          </p>
+        )}
+      </div>
+
+      {confirmando ? (
+        <div className="rounded-xl border border-naranjo/40 bg-naranjo/10 p-4 text-sm">
+          <p className="font-medium">
+            ¿Vincular {codigoSituacion} al caso {caso.codigo}?
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            La situación pasa a la cronología del caso y los estudiantes que
+            faltan se suman a él. Después no se traslada a otro caso ni se
+            desvincula.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
+              {pendiente ? "Vinculando…" : "Confirmar vinculación"}
+            </button>
+            <button
+              type="button"
+              disabled={pendiente}
+              onClick={() => setPaso(null)}
+              className={claseBotonSecundario}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={(evento) => pedirConfirmacion(evento.currentTarget.form)}
+          className={claseBotonPrimario}
+        >
+          Vincular al caso
+        </button>
+      )}
     </form>
   );
 }

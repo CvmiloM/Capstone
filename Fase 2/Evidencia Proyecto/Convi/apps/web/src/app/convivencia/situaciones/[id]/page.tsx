@@ -12,6 +12,7 @@ import {
   obtenerSituacion,
   quienInformo,
 } from "../../datos";
+import { NOMBRE_ESTADO_CASO } from "../../casos/datos";
 import {
   FormularioAclaracion,
   FormularioCaso,
@@ -20,6 +21,7 @@ import {
   FormularioRevision,
   FormularioRevisionNormativa,
   FormularioUrgencia,
+  FormularioVinculacion,
 } from "./formularios";
 import { APLICABILIDAD, MODO_REVISION, NOMBRE_DECISION } from "./opciones";
 
@@ -356,43 +358,58 @@ export default async function PaginaRevisionSituacion({
                 ? "Inicia la revisión para poder decidir."
                 : situacion.estado === "INFORMACION_SOLICITADA"
                   ? "Espera la respuesta del profesor a la aclaración antes de decidir."
-                  : "La revisión de esta situación terminó. Para cambiar la decisión hay que reconsiderarla."}
+                  : situacion.estado === "VINCULADA_CASO"
+                    ? "La revisión de esta situación terminó: quedó vinculada a un caso, que no se cambia ni se deshace."
+                    : "La revisión de esta situación terminó. Para cambiar la decisión hay que reconsiderarla."}
             </p>
           )}
         </Seccion>
 
-        {/* PB-053 (HU-046): abrir un caso desde la situación. */}
+        {/* PB-053 (HU-046): abrir un caso desde la situación. PB-052 (HU-045):
+            o vincularla a un caso activo que comparte estudiantes con ella. */}
         <Seccion titulo="Caso" className="lg:col-span-3">
           {situacion.caso_vinculado ? (
-            <p className="text-sm">
-              Esta situación está vinculada al caso{" "}
-              <Link
-                href={`/convivencia/casos/${situacion.caso_vinculado.id}`}
-                className={`font-mono ${claseEnlace}`}
-              >
-                {situacion.caso_vinculado.codigo}
-              </Link>
-              .
-            </p>
+            <>
+              <p className="text-sm">
+                Esta situación está vinculada al caso{" "}
+                <Link
+                  href={`/convivencia/casos/${situacion.caso_vinculado.id}`}
+                  className={`font-mono ${claseEnlace}`}
+                >
+                  {situacion.caso_vinculado.codigo}
+                </Link>
+                .
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Vinculada por {situacion.caso_vinculado.vinculado_por} el{" "}
+                {formatearFecha(situacion.caso_vinculado.vinculado_en)}. No se
+                traslada a otro caso ni se desvincula.
+              </p>
+            </>
           ) : situacion.estado === "EN_REVISION" ? (
             <>
               {situacion.opciones_caso.casos_relacionados.length > 0 && (
-                <div className="mb-4 rounded-xl border border-naranjo/40 bg-naranjo/10 p-4 text-sm">
-                  <p className="font-medium">Ya hay casos activos con estos estudiantes:</p>
-                  <ul className="mt-2 space-y-1">
-                    {situacion.opciones_caso.casos_relacionados.map((c) => (
-                      <li key={c.id}>
-                        <Link
-                          href={`/convivencia/casos/${c.id}`}
-                          className={`font-mono ${claseEnlace}`}
-                        >
-                          {c.codigo}
-                        </Link>{" "}
-                        · {c.titulo}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="mb-6 border-b border-border pb-6">
+                  <h3 className="text-sm font-semibold">Vincular a un caso activo</h3>
+                  <p className="mt-1 mb-4 text-sm text-muted-foreground">
+                    Ya hay casos activos con estos estudiantes. Puedes sumar esta
+                    situación a uno de ellos.
+                  </p>
+                  <FormularioVinculacion
+                    situacionId={situacion.id}
+                    codigoSituacion={situacion.codigo}
+                    ultimaRevisionId={situacion.ultima_revision_id}
+                    casos={situacion.opciones_caso.casos_relacionados.map((c) => ({
+                      id: c.id,
+                      codigo: c.codigo,
+                      titulo: c.titulo,
+                      estado: NOMBRE_ESTADO_CASO[c.estado_actual] ?? c.estado_actual,
+                    }))}
+                  />
                 </div>
+              )}
+              {situacion.opciones_caso.casos_relacionados.length > 0 && (
+                <h3 className="mb-4 text-sm font-semibold">O abrir un caso nuevo</h3>
               )}
               <FormularioCaso
                 situacionId={situacion.id}

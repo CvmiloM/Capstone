@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import {
@@ -14,10 +15,12 @@ import {
   type NuevoCaso,
 } from './caso-nuevo.js';
 import { ultimaRevision } from './decision-situacion.js';
+import { validarVinculacion } from './vinculacion-caso.js';
 
 // PB-053 (HU-046): casos de convivencia. Solo Convivencia los abre y los ve;
 // la seguridad por fila separa por escuela y CuentaService.operar exige el
-// segundo factor. Los cambios de estado y el cierre vienen en PB-152 y PB-054.
+// segundo factor. PB-052 (HU-045): una situación también se suma a un caso
+// existente. Los cambios de estado y el cierre vienen en PB-152 y PB-054.
 const PERFILES: Perfil[] = ['CONVIVENCIA'];
 
 /** Tope de filas de la lista de casos. */
@@ -26,7 +29,7 @@ export const MAXIMO_CASOS = 200;
 const NO_EXISTE = 'El caso no existe.';
 const NO_EXISTE_SITUACION = 'La situación no existe.';
 const DECISION_DESACTUALIZADA =
-  'Otra persona registró una revisión o una decisión mientras mirabas la situación. Recarga la página para verla antes de abrir el caso.';
+  'Otra persona registró una revisión o una decisión mientras mirabas la situación. Recarga la página para verla antes de continuar.';
 const CASO_SIMULTANEO =
   'Se abrió otro caso al mismo tiempo. Envía el formulario nuevamente.';
 const INTENTOS_CASO = 5;
@@ -66,6 +69,9 @@ export type DetalleCaso = CasoLista & {
     categoria: string | null;
     ocurrido_en: Date;
     vinculado_a_caso_en: Date;
+    /** HU-045 CA2: quién la vinculó y con qué fundamento. */
+    vinculado_por: string;
+    fundamento_vinculacion: string | null;
   }[];
 };
 
@@ -159,9 +165,16 @@ export class CasosService {
           DetalleCaso['situaciones_vinculadas'][number]
         >(
           `SELECT s.id, s.codigo, cat.nombre AS categoria, s.ocurrido_en,
-                  s.vinculado_a_caso_en
+                  s.vinculado_a_caso_en,
+                  pv.nombres || ' ' || pv.apellidos AS vinculado_por,
+                  (SELECT r.fundamento FROM convi.revisiones_convivencia r
+                   WHERE r.situacion_id = s.id AND r.resultado = 'VINCULADA_CASO'
+                     AND r.caso_destino_id = s.caso_id
+                   ORDER BY r.revisado_en DESC LIMIT 1) AS fundamento_vinculacion
            FROM convi.situaciones s
            LEFT JOIN convi.categorias_convivencia cat ON cat.id = s.categoria_id
+           JOIN convi.membresias_establecimiento mv ON mv.id = s.vinculado_a_caso_por
+           JOIN convi.personas pv ON pv.id = mv.persona_id
            WHERE s.caso_id = $1
            ORDER BY s.ocurrido_en, s.codigo`,
           [id],
@@ -210,34 +223,12 @@ export class CasosService {
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
-        const actual = await db
-          .query<{ estado: string }>(
-            'SELECT estado FROM convi.situaciones WHERE id = $1 FOR UPDATE',
-            [situacionId],
-          )
-          .catch((error: unknown) => {
-            if (esChoque(error))
-              throw new ConflictException(DECISION_DESACTUALIZADA);
-            throw error;
-          });
-        const fila = actual.rows[0];
-        if (!fila) throw new NotFoundException(NO_EXISTE_SITUACION);
-        if (fila.estado === 'NUEVA')
-          throw new ConflictException(
-            'Inicia la revisión antes de abrir un caso.',
-          );
-        if (fila.estado === 'INFORMACION_SOLICITADA')
-          throw new ConflictException(
-            'Espera la respuesta del profesor a la aclaración antes de abrir un caso.',
-          );
-        if (fila.estado !== 'EN_REVISION')
-          throw new ConflictException(
-            'Esta situación ya tiene una decisión. Para cambiarla hay que reconsiderarla.',
-          );
-        if (
-          (await ultimaRevision(db, situacionId)) !== datos.revision_anterior_id
-        )
-          throw new ConflictException(DECISION_DESACTUALIZADA);
+        await situacionEnRevision(
+          db,
+          situacionId,
+          datos.revision_anterior_id,
+          'abrir un caso',
+        );
 
         const errores: Record<string, string> = {};
         // CA1: el responsable es una cuenta de Convivencia activa de la escuela.
@@ -337,4 +328,132 @@ export class CasosService {
       },
     );
   }
+
+  // HU-045: suma la situación En revisión a un caso activo que comparte
+  // estudiantes con ella. La decisión Vinculada a caso deja en la situación el
+  // caso, quién y cuándo (CA2); después no se traslada ni se desvincula (CA4).
+  // Responde con el id y el código del caso.
+  vincularSituacion(
+    sesion: Sesion,
+    situacionId: string,
+    cuerpo: unknown,
+  ): Promise<{ id: string; codigo: string }> {
+    const datos = validarVinculacion(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        await situacionEnRevision(
+          db,
+          situacionId,
+          datos.revision_anterior_id,
+          'vincularla a un caso',
+        );
+
+        // FOR SHARE impide que el caso se cierre mientras se vincula.
+        const caso = await db
+          .query<{ id: string; codigo: string }>(
+            'SELECT id, codigo FROM convi.casos WHERE id = $1 FOR SHARE',
+            [datos.caso_id],
+          )
+          .catch((error: unknown) => {
+            if (esChoque(error))
+              throw new ConflictException(
+                'El caso cambió mientras lo elegías. Recarga la página e inténtalo nuevamente.',
+              );
+            throw error;
+          });
+        // CA1: solo un caso de la escuela que comparte un estudiante con la
+        // situación. Decisión del PO (por defecto): un caso cerrado no recibe
+        // situaciones nuevas, igual que en la lista de casos relacionados.
+        const permitidos = await casosRelacionados(db, situacionId);
+        const elegido = caso.rows[0];
+        if (!elegido || !permitidos.some((c) => c.id === elegido.id))
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. No se vinculó la situación.',
+            errores: {
+              caso_id:
+                'Elige uno de los casos activos que comparten estudiantes con esta situación.',
+            },
+          });
+
+        // Primero la decisión, para que la base compruebe el estudiante en
+        // común con lo que el caso ya tenía; el trigger aplicar_revision deja
+        // la situación Vinculada a caso con quién y cuándo.
+        await db.query(
+          `INSERT INTO convi.revisiones_convivencia
+             (establecimiento_id, situacion_id, tipo_revision, resultado,
+              fundamento, revisado_por, revision_anterior_id, caso_destino_id)
+           VALUES (convi.establecimiento_actual(), $1, 'DECISION',
+                   'VINCULADA_CASO', $2, convi.membresia_actual(), $3, $4)`,
+          [
+            situacionId,
+            datos.fundamento,
+            datos.revision_anterior_id,
+            elegido.id,
+          ],
+        );
+
+        // Decisión del PO (por defecto): quienes participan en la situación y
+        // no estaban en el caso pasan a él con la matrícula que tenían al
+        // ocurrir el hecho (HU-066); quienes ya estaban conservan su rol.
+        await db.query(
+          `INSERT INTO convi.participaciones
+             (establecimiento_id, persona_id, caso_id, rol_contextual,
+              matricula_contexto_id)
+           SELECT convi.establecimiento_actual(), pa.persona_id, $1,
+                  pa.rol_contextual, pa.matricula_contexto_id
+           FROM convi.participaciones pa
+           WHERE pa.situacion_id = $2 AND pa.activo_hasta IS NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM convi.participaciones pc
+               WHERE pc.caso_id = $1 AND pc.persona_id = pa.persona_id
+                 AND pc.activo_hasta IS NULL)`,
+          [elegido.id, situacionId],
+        );
+        return elegido;
+      },
+    );
+  }
+}
+
+/**
+ * Bloquea la situación y comprueba que siga En revisión y que nadie haya
+ * agregado una revisión desde que se abrió el formulario (PB-139). Abrir un
+ * caso y vincularla a uno existente son decisiones que terminan la revisión.
+ */
+async function situacionEnRevision(
+  db: PoolClient,
+  situacionId: string,
+  revisionAnteriorId: string | null,
+  para: string,
+) {
+  const actual = await db
+    .query<{ estado: string }>(
+      'SELECT estado FROM convi.situaciones WHERE id = $1 FOR UPDATE',
+      [situacionId],
+    )
+    .catch((error: unknown) => {
+      if (esChoque(error)) throw new ConflictException(DECISION_DESACTUALIZADA);
+      throw error;
+    });
+  const fila = actual.rows[0];
+  if (!fila) throw new NotFoundException(NO_EXISTE_SITUACION);
+  if (fila.estado === 'NUEVA')
+    throw new ConflictException(`Inicia la revisión antes de ${para}.`);
+  if (fila.estado === 'INFORMACION_SOLICITADA')
+    throw new ConflictException(
+      `Espera la respuesta del profesor a la aclaración antes de ${para}.`,
+    );
+  // HU-045 CA4: una situación vinculada no se traslada ni se desvincula.
+  if (fila.estado === 'VINCULADA_CASO')
+    throw new ConflictException(
+      'Esta situación ya está vinculada a un caso. No se traslada a otro ni se desvincula.',
+    );
+  if (fila.estado !== 'EN_REVISION')
+    throw new ConflictException(
+      'Esta situación ya tiene una decisión. Para cambiarla hay que reconsiderarla.',
+    );
+  if ((await ultimaRevision(db, situacionId)) !== revisionAnteriorId)
+    throw new ConflictException(DECISION_DESACTUALIZADA);
 }

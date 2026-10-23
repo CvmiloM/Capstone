@@ -40,6 +40,9 @@ export type DetalleCaso = CasoLista & {
     categoria: string | null;
     ocurrido_en: string;
     vinculado_a_caso_en: string;
+    /** HU-045 CA2: quién la vinculó y con qué fundamento. */
+    vinculado_por: string;
+    fundamento_vinculacion: string | null;
   }[];
 };
 
