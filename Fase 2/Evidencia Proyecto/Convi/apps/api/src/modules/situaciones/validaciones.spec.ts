@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
+import { validarNuevoCaso } from './caso-nuevo.js';
 import { validarDecision } from './decision-situacion.js';
 import { validarPregunta } from './nueva-aclaracion.js';
 import {
@@ -452,6 +453,50 @@ describe('Decisiones: antecedente y descarte (PB-047, PB-048 y PB-051)', () => {
         validarDecision({ resultado: 'ANTECEDENTE', fundamento: 'Cerrado.' }),
       ),
     ).toEqual(['resultado']);
+  });
+});
+
+describe('Creación de casos (PB-053, HU-046)', () => {
+  const RESPONSABLE = '99999999-9999-4999-8999-999999999999';
+  const caso = {
+    titulo: ' Agresiones reiteradas en 1° A ',
+    resumen: ' Tres hechos en dos semanas. ',
+    fecha_inicio: '2026-10-20',
+    responsable_id: RESPONSABLE,
+    revision_anterior_id: null,
+  };
+
+  it('exige título, resumen, fecha de inicio y responsable (CA1)', () => {
+    expect(
+      camposConError(() => validarNuevoCaso({ revision_anterior_id: null })),
+    ).toEqual(['fecha_inicio', 'responsable_id', 'resumen', 'titulo']);
+  });
+
+  it('acepta un caso sin protocolo ni categoría y limpia los textos', () => {
+    expect(validarNuevoCaso(caso)).toEqual({
+      titulo: 'Agresiones reiteradas en 1° A',
+      resumen: 'Tres hechos en dos semanas.',
+      fecha_inicio: '2026-10-20',
+      categoria_principal_id: null,
+      responsable_id: RESPONSABLE,
+      justificacion_independiente: null,
+      revision_anterior_id: null,
+    });
+  });
+
+  it('rechaza una fecha que no existe', () => {
+    expect(
+      camposConError(() =>
+        validarNuevoCaso({ ...caso, fecha_inicio: '2026-02-30' }),
+      ),
+    ).toEqual(['fecha_inicio']);
+  });
+
+  it('exige la última revisión que se veía (PB-139)', () => {
+    const { revision_anterior_id: _sinRevision, ...sinRevision } = caso;
+    expect(camposConError(() => validarNuevoCaso(sinRevision))).toEqual([
+      'titulo',
+    ]);
   });
 });
 

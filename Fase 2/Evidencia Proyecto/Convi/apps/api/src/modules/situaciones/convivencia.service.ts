@@ -8,6 +8,7 @@ import {
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
+import { opcionesCaso, type OpcionesCaso } from './caso-nuevo.js';
 import {
   decisionesDeSituacion,
   insertarDecision,
@@ -124,6 +125,10 @@ export type DetalleConvivencia = SituacionBandeja & {
   decisiones: DecisionRegistrada[];
   /** PB-139: la última revisión que se ve; decidir sobre otra se rechaza. */
   ultima_revision_id: string | null;
+  /** PB-053: el caso al que quedó vinculada, si ya tiene uno. */
+  caso_vinculado: { id: string; codigo: string } | null;
+  /** PB-053: lo que necesita el formulario para abrir un caso. */
+  opciones_caso: OpcionesCaso;
 };
 
 export type ResponsableAsignado = {
@@ -342,6 +347,15 @@ export class ConvivenciaService {
           opciones_normativa: await opcionesNormativa(db),
           decisiones: await decisionesDeSituacion(db, id),
           ultima_revision_id: await ultimaRevision(db, id),
+          caso_vinculado:
+            (
+              await db.query<{ id: string; codigo: string }>(
+                `SELECT c.id, c.codigo FROM convi.situaciones s
+                 JOIN convi.casos c ON c.id = s.caso_id WHERE s.id = $1`,
+                [id],
+              )
+            ).rows[0] ?? null,
+          opciones_caso: await opcionesCaso(db, id),
         };
       },
     );

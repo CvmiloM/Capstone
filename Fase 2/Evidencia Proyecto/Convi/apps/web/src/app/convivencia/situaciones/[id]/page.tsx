@@ -14,6 +14,7 @@ import {
 } from "../../datos";
 import {
   FormularioAclaracion,
+  FormularioCaso,
   FormularioDecision,
   FormularioResponsable,
   FormularioRevision,
@@ -356,6 +357,67 @@ export default async function PaginaRevisionSituacion({
                 : situacion.estado === "INFORMACION_SOLICITADA"
                   ? "Espera la respuesta del profesor a la aclaración antes de decidir."
                   : "La revisión de esta situación terminó. Para cambiar la decisión hay que reconsiderarla."}
+            </p>
+          )}
+        </Seccion>
+
+        {/* PB-053 (HU-046): abrir un caso desde la situación. */}
+        <Seccion titulo="Caso" className="lg:col-span-3">
+          {situacion.caso_vinculado ? (
+            <p className="text-sm">
+              Esta situación está vinculada al caso{" "}
+              <Link
+                href={`/convivencia/casos/${situacion.caso_vinculado.id}`}
+                className={`font-mono ${claseEnlace}`}
+              >
+                {situacion.caso_vinculado.codigo}
+              </Link>
+              .
+            </p>
+          ) : situacion.estado === "EN_REVISION" ? (
+            <>
+              {situacion.opciones_caso.casos_relacionados.length > 0 && (
+                <div className="mb-4 rounded-xl border border-naranjo/40 bg-naranjo/10 p-4 text-sm">
+                  <p className="font-medium">Ya hay casos activos con estos estudiantes:</p>
+                  <ul className="mt-2 space-y-1">
+                    {situacion.opciones_caso.casos_relacionados.map((c) => (
+                      <li key={c.id}>
+                        <Link
+                          href={`/convivencia/casos/${c.id}`}
+                          className={`font-mono ${claseEnlace}`}
+                        >
+                          {c.codigo}
+                        </Link>{" "}
+                        · {c.titulo}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <FormularioCaso
+                situacionId={situacion.id}
+                ultimaRevisionId={situacion.ultima_revision_id}
+                categorias={situacion.opciones_caso.categorias}
+                categoriaSugeridaId={situacion.opciones_caso.categoria_sugerida_id}
+                hoy={situacion.opciones_caso.hoy}
+                responsables={situacion.opciones_responsable}
+                responsableSugeridoId={
+                  situacion.responsable_id ??
+                  situacion.opciones_responsable.find((o) => o.propia)?.id ??
+                  null
+                }
+                hayCasosRelacionados={
+                  situacion.opciones_caso.casos_relacionados.length > 0
+                }
+              />
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {situacion.estado === "NUEVA"
+                ? "Inicia la revisión para poder abrir un caso."
+                : situacion.estado === "INFORMACION_SOLICITADA"
+                  ? "Espera la respuesta del profesor a la aclaración antes de abrir un caso."
+                  : "Esta situación ya tiene una decisión, así que no se abre un caso desde ella."}
             </p>
           )}
         </Seccion>
