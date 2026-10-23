@@ -44,6 +44,33 @@ export type DetalleCaso = CasoLista & {
     vinculado_por: string;
     fundamento_vinculacion: string | null;
   }[];
+  cerrado_en: string | null;
+  /** HU-131 CA1: historial de estados, del más antiguo al más reciente. */
+  movimientos: {
+    id: string;
+    estado_anterior: string | null;
+    estado_nuevo: string;
+    motivo: string;
+    cambiado_por: string;
+    cambiado_en: string;
+    resumen_cierre: string | null;
+    justificacion_pendientes: string | null;
+    acta: string | null;
+  }[];
+  /** HU-131 CA3: el último movimiento que se ve; cambiar sobre otro se rechaza. */
+  ultimo_movimiento_id: string | null;
+  /** HU-131 CA5: estados intermedios a los que puede pasar ahora. */
+  estados_permitidos: string[];
+  puede_cerrar: boolean;
+  /** HU-047 CA2: tareas sin terminar que obligan a justificar el cierre. */
+  pendientes: {
+    actuaciones: number;
+    compromisos: number;
+    acciones_plan: number;
+    pasos_protocolo: number;
+  };
+  /** HU-047 CA1: actas del caso que se pueden adjuntar al cierre. */
+  actas_cierre: { id: string; titulo: string; fecha_documento: string }[];
 };
 
 export function obtenerCasos() {

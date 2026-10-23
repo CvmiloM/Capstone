@@ -6,7 +6,13 @@ import { claseEnlace } from "@/app/components/formulario";
 import { formatearFecha } from "@/app/profesor/datos";
 import { NOMBRE_ROL_EN_SITUACION } from "@/app/profesor/situacion-opciones";
 import { AvisoNoDisponible } from "../../aviso-no-disponible";
-import { formatearDia, NOMBRE_ESTADO_CASO, obtenerCaso } from "../datos";
+import {
+  formatearDia,
+  NOMBRE_ESTADO_CASO,
+  obtenerCaso,
+  type DetalleCaso,
+} from "../datos";
+import { FormularioCierre, FormularioEstado } from "./formularios";
 
 export const metadata: Metadata = { title: "Caso" };
 
@@ -15,10 +21,48 @@ const AVISOS: Record<string, string> = {
     "Abriste el caso. Quedó En análisis con su código, y la situación de origen y sus estudiantes quedaron vinculados.",
   vinculada:
     "Vinculaste la situación al caso. Quedó en sus situaciones vinculadas con tu nombre, la fecha y el fundamento, y los estudiantes que faltaban se sumaron al caso.",
+  estado:
+    "Cambiaste el estado del caso. El cambio quedó en su historial con tu nombre, la fecha y el motivo.",
+  cerrado:
+    "Cerraste el caso. El cierre quedó en su historial con el resumen, y sus antecedentes se conservan.",
 };
 
+/** HU-047 CA2: las tareas sin terminar, en palabras. */
+function textosPendientes(pendientes: DetalleCaso["pendientes"]) {
+  const textos: string[] = [];
+  const agregar = (cantidad: number, uno: string, varios: string) => {
+    if (cantidad > 0) textos.push(`${cantidad} ${cantidad === 1 ? uno : varios}`);
+  };
+  agregar(
+    pendientes.actuaciones,
+    "actuación planificada o pospuesta",
+    "actuaciones planificadas o pospuestas",
+  );
+  agregar(
+    pendientes.compromisos,
+    "compromiso sin cumplir ni cancelar",
+    "compromisos sin cumplir ni cancelar",
+  );
+  agregar(
+    pendientes.acciones_plan,
+    "acción del plan de intervención sin terminar",
+    "acciones del plan de intervención sin terminar",
+  );
+  agregar(
+    pendientes.pasos_protocolo,
+    "paso del protocolo sin completar ni omitir",
+    "pasos del protocolo sin completar ni omitir",
+  );
+  return textos;
+}
+
+function nombreEstado(estado: string | null) {
+  return estado ? (NOMBRE_ESTADO_CASO[estado] ?? estado) : "Sin estado";
+}
+
 // PB-053 (HU-046): detalle de un caso con sus estudiantes y las situaciones
-// vinculadas. Los cambios de estado y el cierre vienen en PB-152 y PB-054.
+// vinculadas. PB-152 (HU-131) y PB-054 (HU-047): historial de estados, cambio
+// de estado y cierre. La reapertura de un caso cerrado es otro ítem (HU-051).
 export default async function PaginaCaso({
   params,
   searchParams,
@@ -88,6 +132,9 @@ export default async function PaginaCaso({
             <Dato nombre="Abierto">
               {formatearFecha(caso.abierto_en)} por {caso.abierto_por}
             </Dato>
+            {caso.cerrado_en && (
+              <Dato nombre="Cerrado">{formatearFecha(caso.cerrado_en)}</Dato>
+            )}
           </dl>
         </Seccion>
 
@@ -162,6 +209,90 @@ export default async function PaginaCaso({
             </ul>
           )}
         </Seccion>
+
+        {/* PB-152 (HU-131 CA1) y PB-054 (HU-047 CA4): cada cambio queda en el historial. */}
+        <Seccion titulo="Historial de estados" className="lg:col-span-2">
+          {caso.movimientos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              El caso sigue {nombreEstado(caso.estado_actual)}, el estado con que se
+              abrió.
+            </p>
+          ) : (
+            <ol className="space-y-4">
+              {caso.movimientos.map((m) => (
+                <li key={m.id} className="rounded-xl border border-border p-4 text-sm">
+                  <p className="font-medium">
+                    {nombreEstado(m.estado_anterior)} → {nombreEstado(m.estado_nuevo)}
+                  </p>
+                  <p className="mt-1 whitespace-pre-line">{m.motivo}</p>
+                  {m.resumen_cierre && (
+                    <div className="mt-3 border-l-2 border-verde pl-3">
+                      <p className="text-xs text-muted-foreground">Resumen de cierre</p>
+                      <p className="mt-0.5 whitespace-pre-line">{m.resumen_cierre}</p>
+                    </div>
+                  )}
+                  {m.justificacion_pendientes && (
+                    <div className="mt-3 border-l-2 border-naranjo pl-3">
+                      <p className="text-xs text-muted-foreground">
+                        Cómo se atenderán las tareas que quedaron sin terminar
+                      </p>
+                      <p className="mt-0.5 whitespace-pre-line">
+                        {m.justificacion_pendientes}
+                      </p>
+                    </div>
+                  )}
+                  {m.acta && (
+                    <p className="mt-2 text-muted-foreground">
+                      Acta de cierre: <span className="text-foreground">{m.acta}</span>
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Por {m.cambiado_por} el {formatearFecha(m.cambiado_en)}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Seccion>
+
+        <div className="space-y-4">
+          {caso.estado_actual === "CERRADO" ? (
+            <Seccion titulo="Caso cerrado">
+              <p className="text-sm text-muted-foreground">
+                Sus antecedentes se conservan y ya no cambia de estado. Un caso
+                cerrado solo se puede reabrir.
+              </p>
+            </Seccion>
+          ) : (
+            <>
+              {caso.estados_permitidos.length > 0 && (
+                <Seccion titulo="Cambiar estado">
+                  <FormularioEstado
+                    casoId={caso.id}
+                    ultimoMovimientoId={caso.ultimo_movimiento_id}
+                    opciones={caso.estados_permitidos.map((valor) => ({
+                      valor,
+                      texto: nombreEstado(valor),
+                    }))}
+                  />
+                </Seccion>
+              )}
+              {caso.puede_cerrar && (
+                <Seccion titulo="Cerrar caso">
+                  <FormularioCierre
+                    casoId={caso.id}
+                    ultimoMovimientoId={caso.ultimo_movimiento_id}
+                    pendientes={textosPendientes(caso.pendientes)}
+                    actas={caso.actas_cierre.map((acta) => ({
+                      id: acta.id,
+                      texto: `${acta.titulo} (${formatearFecha(acta.fecha_documento)})`,
+                    }))}
+                  />
+                </Seccion>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </>
   );

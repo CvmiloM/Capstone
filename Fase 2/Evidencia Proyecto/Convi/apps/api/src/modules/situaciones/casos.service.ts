@@ -15,12 +15,25 @@ import {
   type NuevoCaso,
 } from './caso-nuevo.js';
 import { ultimaRevision } from './decision-situacion.js';
+import {
+  actasDelCaso,
+  estadosPermitidos,
+  hayPendientes,
+  movimientosDelCaso,
+  pendientesDelCaso,
+  ultimoMovimiento,
+  validarCambioEstado,
+  validarCierre,
+  type ActaCaso,
+  type MovimientoEstado,
+  type PendientesCaso,
+} from './estado-caso.js';
 import { validarVinculacion } from './vinculacion-caso.js';
 
 // PB-053 (HU-046): casos de convivencia. Solo Convivencia los abre y los ve;
 // la seguridad por fila separa por escuela y CuentaService.operar exige el
 // segundo factor. PB-052 (HU-045): una situación también se suma a un caso
-// existente. Los cambios de estado y el cierre vienen en PB-152 y PB-054.
+// existente. PB-152 (HU-131) y PB-054 (HU-047): cambio de estado y cierre.
 const PERFILES: Perfil[] = ['CONVIVENCIA'];
 
 /** Tope de filas de la lista de casos. */
@@ -32,6 +45,8 @@ const DECISION_DESACTUALIZADA =
   'Otra persona registró una revisión o una decisión mientras mirabas la situación. Recarga la página para verla antes de continuar.';
 const CASO_SIMULTANEO =
   'Se abrió otro caso al mismo tiempo. Envía el formulario nuevamente.';
+const CASO_DESACTUALIZADO =
+  'Otra persona cambió el estado del caso mientras lo mirabas. Recarga la página para verlo antes de continuar.';
 const INTENTOS_CASO = 5;
 
 export type CasoLista = {
@@ -73,6 +88,18 @@ export type DetalleCaso = CasoLista & {
     vinculado_por: string;
     fundamento_vinculacion: string | null;
   }[];
+  cerrado_en: Date | null;
+  /** HU-131 CA1: historial de estados, del más antiguo al más reciente. */
+  movimientos: MovimientoEstado[];
+  /** HU-131 CA3: el último movimiento que se ve; cambiar sobre otro se rechaza. */
+  ultimo_movimiento_id: string | null;
+  /** HU-131 CA5: estados intermedios a los que puede pasar ahora. */
+  estados_permitidos: string[];
+  puede_cerrar: boolean;
+  /** HU-047 CA2: tareas sin terminar que obligan a justificar el cierre. */
+  pendientes: PendientesCaso;
+  /** HU-047 CA1: actas del caso que se pueden adjuntar al cierre. */
+  actas_cierre: ActaCaso[];
 };
 
 // 40001: otra transacción cambió la fila bloqueada; 23505 en el código: otro
@@ -131,12 +158,22 @@ export class CasosService {
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
         const base = await db.query<
-          Omit<DetalleCaso, 'participantes' | 'situaciones_vinculadas'>
+          Pick<DetalleCaso, keyof CasoLista> &
+            Pick<
+              DetalleCaso,
+              | 'resumen'
+              | 'abierto_por'
+              | 'abierto_en'
+              | 'plazo_cierre_dias_aplicado'
+              | 'justificacion_independiente'
+              | 'registro_historico'
+              | 'cerrado_en'
+            >
         >(
           `SELECT ${COLUMNAS_LISTA}, c.resumen, c.abierto_en,
                   pa.nombres || ' ' || pa.apellidos AS abierto_por,
                   c.plazo_cierre_dias_aplicado, c.justificacion_independiente,
-                  c.registro_historico
+                  c.registro_historico, c.cerrado_en
            ${DESDE_LISTA}
            JOIN convi.membresias_establecimiento ma ON ma.id = c.abierto_por
            JOIN convi.personas pa ON pa.id = ma.persona_id
@@ -179,11 +216,123 @@ export class CasosService {
            ORDER BY s.ocurrido_en, s.codigo`,
           [id],
         );
+        const permitidos = await estadosPermitidos(db, caso.estado_actual);
         return {
           ...caso,
           participantes: participantes.rows,
           situaciones_vinculadas: situaciones.rows,
+          movimientos: await movimientosDelCaso(db, id),
+          ultimo_movimiento_id: await ultimoMovimiento(db, id),
+          estados_permitidos: permitidos.intermedios,
+          puede_cerrar: permitidos.cierre,
+          pendientes: await pendientesDelCaso(db, id),
+          actas_cierre: await actasDelCaso(db, id),
         };
+      },
+    );
+  }
+
+  // HU-131: mueve el caso a otra etapa con un motivo. El movimiento guarda el
+  // estado anterior y el nuevo, quién y cuándo (CA1), y el trigger
+  // aplicar_estado actualiza el caso (CA2). Responde con el estado nuevo.
+  cambiarEstado(
+    sesion: Sesion,
+    casoId: string,
+    cuerpo: unknown,
+  ): Promise<{ id: string; estado: string }> {
+    const datos = validarCambioEstado(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const actual = await casoSinCambios(
+          db,
+          casoId,
+          datos.movimiento_anterior_id,
+        );
+        // CA5: solo los cambios del flujo; el cierre tiene su propio formulario.
+        const permitidos = await estadosPermitidos(db, actual);
+        if (!permitidos.intermedios.includes(datos.estado_nuevo))
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. El estado no cambió.',
+            errores: {
+              estado_nuevo:
+                datos.estado_nuevo === actual
+                  ? 'El caso ya está en ese estado. Elige otro.'
+                  : 'Desde el estado actual el caso no puede pasar a ese.',
+            },
+          });
+        await db.query(
+          `INSERT INTO convi.historial_estados_caso
+             (establecimiento_id, caso_id, estado_anterior, estado_nuevo,
+              cambiado_por, motivo)
+           VALUES (convi.establecimiento_actual(), $1, $2, $3,
+                   convi.membresia_actual(), $4)`,
+          [casoId, actual, datos.estado_nuevo, datos.motivo],
+        );
+        return { id: casoId, estado: datos.estado_nuevo };
+      },
+    );
+  }
+
+  // HU-047: cierra el caso con motivo y resumen (CA1). Si quedan tareas sin
+  // terminar hay que justificar cómo se atenderán (CA2). El cierre es otro
+  // movimiento del historial y no borra nada (CA4).
+  cerrar(
+    sesion: Sesion,
+    casoId: string,
+    cuerpo: unknown,
+  ): Promise<{ id: string; estado: string }> {
+    const datos = validarCierre(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const actual = await casoSinCambios(
+          db,
+          casoId,
+          datos.movimiento_anterior_id,
+        );
+        if (!(await estadosPermitidos(db, actual)).cierre)
+          throw new ConflictException(
+            'Desde el estado actual el caso no se puede cerrar.',
+          );
+
+        const errores: Record<string, string> = {};
+        const pendientes = await pendientesDelCaso(db, casoId);
+        if (hayPendientes(pendientes) && !datos.justificacion_pendientes)
+          errores.justificacion_pendientes =
+            'Quedan tareas sin terminar. Explica cómo se atenderán.';
+        if (
+          datos.evidencia_cierre_id &&
+          !(await actasDelCaso(db, casoId)).some(
+            (acta) => acta.id === datos.evidencia_cierre_id,
+          )
+        )
+          errores.evidencia_cierre_id = 'Elige un acta de este caso.';
+        if (Object.keys(errores).length > 0)
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. El caso no se cerró.',
+            errores,
+          });
+
+        await db.query(
+          `INSERT INTO convi.historial_estados_caso
+             (establecimiento_id, caso_id, estado_anterior, estado_nuevo,
+              cambiado_por, motivo, resumen_cierre, justificacion_pendientes,
+              evidencia_cierre_id)
+           VALUES (convi.establecimiento_actual(), $1, $2, 'CERRADO',
+                   convi.membresia_actual(), $3, $4, $5, $6)`,
+          [
+            casoId,
+            actual,
+            datos.motivo,
+            datos.resumen_cierre,
+            hayPendientes(pendientes) ? datos.justificacion_pendientes : null,
+            datos.evidencia_cierre_id,
+          ],
+        );
+        return { id: casoId, estado: 'CERRADO' };
       },
     );
   }
@@ -456,4 +605,35 @@ async function situacionEnRevision(
     );
   if ((await ultimaRevision(db, situacionId)) !== revisionAnteriorId)
     throw new ConflictException(DECISION_DESACTUALIZADA);
+}
+
+/**
+ * Bloquea el caso y comprueba que siga abierto y que nadie haya agregado un
+ * movimiento desde que se abrió el formulario (HU-131 CA3 y HU-047 CA3).
+ * Devuelve el estado actual.
+ */
+async function casoSinCambios(
+  db: PoolClient,
+  casoId: string,
+  movimientoAnteriorId: string | null,
+): Promise<string> {
+  const caso = await db
+    .query<{ estado_actual: string }>(
+      'SELECT estado_actual FROM convi.casos WHERE id = $1 FOR UPDATE',
+      [casoId],
+    )
+    .catch((error: unknown) => {
+      if (esChoque(error)) throw new ConflictException(CASO_DESACTUALIZADO);
+      throw error;
+    });
+  const fila = caso.rows[0];
+  if (!fila) throw new NotFoundException(NO_EXISTE);
+  // HU-131 CA4: un caso cerrado solo se reabre (HU-051, otro ítem).
+  if (fila.estado_actual === 'CERRADO')
+    throw new ConflictException(
+      'El caso está cerrado. Un caso cerrado solo se puede reabrir.',
+    );
+  if ((await ultimoMovimiento(db, casoId)) !== movimientoAnteriorId)
+    throw new ConflictException(CASO_DESACTUALIZADO);
+  return fila.estado_actual;
 }

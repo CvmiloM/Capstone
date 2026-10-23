@@ -33,6 +33,28 @@ export class CasosController {
     return this.casos.detalle(peticion.sesion, id);
   }
 
+  // PB-152: el cuerpo trae { estado_nuevo, motivo, movimiento_anterior_id };
+  // responde 201 con el id del caso y su estado nuevo.
+  @Post('casos/:id/estado')
+  cambiarEstado(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.casos.cambiarEstado(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-054: el cuerpo trae { motivo, resumen_cierre, justificacion_pendientes,
+  // evidencia_cierre_id, movimiento_anterior_id }; responde 201 con el id.
+  @Post('casos/:id/cierre')
+  cerrar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.casos.cerrar(peticion.sesion, id, cuerpo);
+  }
+
   // El cuerpo trae { titulo, resumen, fecha_inicio, categoria_principal_id,
   // responsable_id, justificacion_independiente, revision_anterior_id };
   // responde 201 con el id y el código del caso.
