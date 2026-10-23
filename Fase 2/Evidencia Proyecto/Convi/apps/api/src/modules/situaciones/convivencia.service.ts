@@ -16,6 +16,10 @@ import {
   validarDecision,
   type DecisionRegistrada,
 } from './decision-situacion.js';
+import {
+  evidenciasDeSituacion,
+  type EvidenciaRegistrada,
+} from './evidencias.service.js';
 import { validarPregunta } from './nueva-aclaracion.js';
 import {
   guardarComoAntecedente,
@@ -134,6 +138,8 @@ export type DetalleConvivencia = SituacionBandeja & {
   } | null;
   /** PB-053 y PB-052: lo que necesitan los formularios de la sección Caso. */
   opciones_caso: OpcionesCaso;
+  /** PB-066: evidencias de la situación y de las respuestas a sus aclaraciones. */
+  evidencias: EvidenciaRegistrada[];
 };
 
 export type ResponsableAsignado = {
@@ -366,6 +372,7 @@ export class ConvivenciaService {
               )
             ).rows[0] ?? null,
           opciones_caso: await opcionesCaso(db, id),
+          evidencias: await evidenciasDeSituacion(db, id),
         };
       },
     );

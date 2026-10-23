@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evidencia";
+import { ListaEvidencias } from "@/app/components/evidencias/lista-evidencias";
 import { claseEnlace } from "@/app/components/formulario";
 // Mismos estilos de urgencia, formato de fecha y nombres de rol que el portal del profesor.
 import { formatearFecha, URGENCIA } from "@/app/profesor/datos";
@@ -44,6 +46,8 @@ const AVISOS: Record<string, string> = {
     "Guardaste la situación como antecedente. Quedó en el historial de sus estudiantes, sin abrir un caso.",
   descartada:
     "Descartaste la situación. Se conserva con el motivo del descarte y ya no queda pendiente en la bandeja.",
+  evidencia:
+    "Adjuntaste la evidencia. Quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
 };
 
 // PB-044 (HU-037): detalle de una situación para revisarla. Abrirlo no cambia
@@ -437,6 +441,21 @@ export default async function PaginaRevisionSituacion({
                   : "Esta situación ya tiene una decisión, así que no se abre un caso desde ella."}
             </p>
           )}
+        </Seccion>
+
+        {/* PB-066 (HU-057): evidencias de la situación, en cualquier estado. */}
+        <Seccion titulo="Evidencias" className="lg:col-span-3">
+          <ListaEvidencias
+            evidencias={situacion.evidencias}
+            rutaDescarga="/convivencia/evidencias"
+            vacio="Todavía no hay evidencias en esta situación."
+          />
+          <div className="mt-4 border-t border-border pt-4">
+            <FormularioEvidencia
+              destino="convivencia-situacion"
+              registroId={situacion.id}
+            />
+          </div>
         </Seccion>
       </div>
     </>

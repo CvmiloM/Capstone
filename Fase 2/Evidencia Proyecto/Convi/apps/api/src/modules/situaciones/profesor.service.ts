@@ -70,6 +70,10 @@ export type DetalleSituacion = SituacionPropia & {
     tipo: string;
     creado_en: Date;
     archivo: string | null;
+    /** PB-066: para mostrarla y descargarla. */
+    descripcion: string | null;
+    tamano_bytes: number | null;
+    origen: string;
   }[];
   aclaraciones: {
     id: string;
@@ -310,7 +314,10 @@ export class ProfesorService {
           DetalleSituacion['evidencias'][number]
         >(
           `SELECT ev.id, ev.titulo, ev.tipo_evidencia AS tipo, ev.creado_en,
-                  ar.nombre_original AS archivo
+                  ar.nombre_original AS archivo, ev.descripcion,
+                  ar.tamano_bytes::int AS tamano_bytes,
+                  CASE WHEN ev.aclaracion_id IS NULL THEN 'Situación'
+                       ELSE 'Respuesta a una aclaración' END AS origen
            FROM convi.evidencias ev
            LEFT JOIN convi.archivos ar ON ar.id = ev.archivo_id
            WHERE ev.creado_por = convi.membresia_actual()

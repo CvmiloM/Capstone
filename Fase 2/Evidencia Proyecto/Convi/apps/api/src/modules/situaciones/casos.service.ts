@@ -28,6 +28,10 @@ import {
   type MovimientoEstado,
   type PendientesCaso,
 } from './estado-caso.js';
+import {
+  evidenciasDelCaso,
+  type EvidenciaRegistrada,
+} from './evidencias.service.js';
 import { validarVinculacion } from './vinculacion-caso.js';
 
 // PB-053 (HU-046): casos de convivencia. Solo Convivencia los abre y los ve;
@@ -100,6 +104,8 @@ export type DetalleCaso = CasoLista & {
   pendientes: PendientesCaso;
   /** HU-047 CA1: actas del caso que se pueden adjuntar al cierre. */
   actas_cierre: ActaCaso[];
+  /** PB-066: evidencias del caso y de sus situaciones vinculadas. */
+  evidencias: EvidenciaRegistrada[];
 };
 
 // 40001: otra transacción cambió la fila bloqueada; 23505 en el código: otro
@@ -227,6 +233,7 @@ export class CasosService {
           puede_cerrar: permitidos.cierre,
           pendientes: await pendientesDelCaso(db, id),
           actas_cierre: await actasDelCaso(db, id),
+          evidencias: await evidenciasDelCaso(db, id),
         };
       },
     );
