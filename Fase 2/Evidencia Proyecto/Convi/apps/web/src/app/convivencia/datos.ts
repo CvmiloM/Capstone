@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Evidencia } from "@/app/components/evidencias/opciones";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 
 // Datos del portal de Convivencia (PB-043, PB-044, PB-045, PB-046 y PB-155). Se piden a la API desde el
@@ -106,6 +107,8 @@ export type DetalleConvivencia = SituacionBandeja & {
       estado_actual: string;
     }[];
   };
+  /** PB-066: evidencias de la situación y de las respuestas a sus aclaraciones. */
+  evidencias: Evidencia[];
 };
 
 /** Misma forma que devuelve apps/api/src/modules/situaciones/revision-normativa.ts. */

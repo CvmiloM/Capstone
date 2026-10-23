@@ -34,9 +34,10 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       // PB-019: las importaciones suben archivos de hasta 5 MB por una acción
-      // de servidor (el límite por defecto es 1 MB). El margen cubre lo que
-      // agrega el formulario multipart.
-      bodySizeLimit: "6mb",
+      // de servidor (el límite por defecto es 1 MB). PB-066: las evidencias
+      // llegan hasta 25 MB (PB-130). El margen cubre lo que agrega el
+      // formulario multipart; la API vuelve a revisar cada archivo.
+      bodySizeLimit: "26mb",
     },
   },
   logging: {

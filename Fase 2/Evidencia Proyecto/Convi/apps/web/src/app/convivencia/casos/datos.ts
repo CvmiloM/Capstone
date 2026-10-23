@@ -1,3 +1,4 @@
+import type { Evidencia } from "@/app/components/evidencias/opciones";
 import { pedir } from "../datos";
 
 // PB-053 (HU-046): casos del portal de Convivencia. Mismas formas que devuelve
@@ -71,6 +72,8 @@ export type DetalleCaso = CasoLista & {
   };
   /** HU-047 CA1: actas del caso que se pueden adjuntar al cierre. */
   actas_cierre: { id: string; titulo: string; fecha_documento: string }[];
+  /** PB-066: evidencias del caso y de sus situaciones vinculadas. */
+  evidencias: Evidencia[];
 };
 
 export function obtenerCasos() {

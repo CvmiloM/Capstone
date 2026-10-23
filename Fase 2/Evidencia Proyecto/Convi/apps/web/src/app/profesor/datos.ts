@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Evidencia } from "@/app/components/evidencias/opciones";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 
 // Datos del portal del profesor (PB-041, PB-042 y PB-049). Se piden a la API desde el servidor
@@ -228,13 +229,8 @@ export type DetalleSituacion = SituacionPropia & {
     codigo_estudiante: string | null;
     rol: string;
   }[];
-  evidencias: {
-    id: string;
-    titulo: string;
-    tipo: string;
-    creado_en: string;
-    archivo: string | null;
-  }[];
+  /** PB-066: solo las que aportó el profesor, en la situación o al responder. */
+  evidencias: Evidencia[];
   aclaraciones: {
     id: string;
     pregunta: string;

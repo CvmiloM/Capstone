@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evidencia";
+import { ListaEvidencias } from "@/app/components/evidencias/lista-evidencias";
 import { claseEnlace } from "@/app/components/formulario";
 import { AvisoSinPermiso } from "../../aviso-sin-permiso";
 import {
@@ -18,14 +20,15 @@ export const metadata: Metadata = { title: "Detalle del registro" };
 // la API responde 403 y se muestra el aviso sin revelar su contenido.
 // PB-042: al llegar desde el formulario (?registrada=1) se confirma el registro.
 // PB-049: cada aclaración pendiente se responde aquí (?respondida=1 al enviar).
+// PB-066: también adjunta evidencias a la situación (?evidencia=1 al enviar).
 export default async function PaginaDetalleSituacion({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-    searchParams: Promise<{ registrada?: string; respondida?: string }>;
+    searchParams: Promise<{ registrada?: string; respondida?: string; evidencia?: string }>;
 }) {
-  const [{ id }, { registrada, respondida }] = await Promise.all([
+  const [{ id }, { registrada, respondida, evidencia }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -71,6 +74,16 @@ export default async function PaginaDetalleSituacion({
         >
           Enviaste tu respuesta. Convivencia la verá junto a su pregunta y
           continuará con la revisión.
+        </div>
+      )}
+
+      {evidencia === "1" && (
+        <div
+          role="status"
+          className="mt-4 rounded-lg border border-verde/30 bg-verde/10 px-4 py-3 text-sm"
+        >
+          Adjuntaste la evidencia. Convivencia la verá junto a la situación; no
+          se puede editar ni borrar.
         </div>
       )}
 
@@ -164,20 +177,16 @@ export default async function PaginaDetalleSituacion({
         </Seccion>
 
         <Seccion titulo="Evidencias que aportaste">
-          {situacion.evidencias.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No aportaste evidencias.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {situacion.evidencias.map((ev) => (
-                <li key={ev.id}>
-                  <p className="font-medium">{ev.titulo}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {[ev.archivo, formatearFecha(ev.creado_en)].filter(Boolean).join(" · ")}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <ListaEvidencias
+            evidencias={situacion.evidencias}
+            rutaDescarga="/profesor/evidencias"
+            vacio="No aportaste evidencias."
+          />
+        </Seccion>
+
+        {/* PB-066 (HU-057): el profesor adjunta evidencias a sus propias situaciones. */}
+        <Seccion titulo="Adjuntar evidencia" className="lg:col-span-3">
+          <FormularioEvidencia destino="profesor-situacion" registroId={situacion.id} />
         </Seccion>
       </div>
     </>

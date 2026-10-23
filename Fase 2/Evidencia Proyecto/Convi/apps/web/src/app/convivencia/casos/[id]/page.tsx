@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evidencia";
+import { ListaEvidencias } from "@/app/components/evidencias/lista-evidencias";
 import { claseEnlace } from "@/app/components/formulario";
 // Mismo formato de fecha y nombres de rol que el resto del portal.
 import { formatearFecha } from "@/app/profesor/datos";
@@ -25,6 +27,8 @@ const AVISOS: Record<string, string> = {
     "Cambiaste el estado del caso. El cambio quedó en su historial con tu nombre, la fecha y el motivo.",
   cerrado:
     "Cerraste el caso. El cierre quedó en su historial con el resumen, y sus antecedentes se conservan.",
+  evidencia:
+    "Adjuntaste la evidencia al caso. Quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
 };
 
 /** HU-047 CA2: las tareas sin terminar, en palabras. */
@@ -208,6 +212,24 @@ export default async function PaginaCaso({
               ))}
             </ul>
           )}
+        </Seccion>
+
+        {/* PB-066 (HU-057): evidencias del caso y de sus situaciones vinculadas. */}
+        <Seccion titulo="Evidencias del expediente" className="lg:col-span-3">
+          <ListaEvidencias
+            evidencias={caso.evidencias}
+            rutaDescarga="/convivencia/evidencias"
+            vacio="Todavía no hay evidencias en el caso ni en sus situaciones."
+          />
+          <div className="mt-4 border-t border-border pt-4">
+            {caso.estado_actual === "CERRADO" ? (
+              <p className="text-sm text-muted-foreground">
+                El caso está cerrado: conserva sus evidencias, pero no recibe nuevas.
+              </p>
+            ) : (
+              <FormularioEvidencia destino="convivencia-caso" registroId={caso.id} />
+            )}
+          </div>
         </Seccion>
 
         {/* PB-152 (HU-131 CA1) y PB-054 (HU-047 CA4): cada cambio queda en el historial. */}
