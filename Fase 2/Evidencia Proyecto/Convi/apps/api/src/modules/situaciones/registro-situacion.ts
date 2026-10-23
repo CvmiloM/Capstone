@@ -138,6 +138,7 @@ export async function insertarSituacion(
     descripcion: string;
     categoria_id: string | null;
     urgencia: string;
+    registro_historico?: boolean;
   },
   participantes: {
     persona_id: string;
@@ -150,9 +151,9 @@ export async function insertarSituacion(
       `INSERT INTO convi.situaciones
          (establecimiento_id, reportado_por_membresia_id, curso_contexto_id,
           tipo_origen, persona_origen_id, ocurrido_en, lugar, descripcion,
-          categoria_id, urgencia)
+          categoria_id, urgencia, registro_historico)
        VALUES (convi.establecimiento_actual(), convi.membresia_actual(), $1,
-               $2, $3, $4, $5, $6, $7, $8)
+               $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id, codigo, estado, reportado_en`,
       [
         situacion.curso_id,
@@ -163,6 +164,7 @@ export async function insertarSituacion(
         situacion.descripcion,
         situacion.categoria_id,
         situacion.urgencia,
+        situacion.registro_historico ?? false,
       ],
     )
     .catch((error: unknown) => {
