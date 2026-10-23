@@ -5,6 +5,7 @@ import {
   enviarAclaracion,
   enviarCambioResponsable,
   enviarCambioUrgencia,
+  enviarCaso,
   enviarDecision,
   enviarInicioRevision,
   enviarRevisionNormativa,
@@ -25,6 +26,36 @@ const NO_VALIDA = "La situación no es válida. Vuelve a la bandeja.";
 function leerTexto(formData: FormData, campo: string) {
   const valor = formData.get(campo);
   return typeof valor === "string" ? valor.trim() : "";
+}
+
+// PB-053 (HU-046): abre un caso desde la situación. La API lo crea En
+// análisis con su código, pasa los estudiantes al caso y deja la situación
+// vinculada, todo junto; al terminar se abre el caso nuevo.
+export async function abrirCaso(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const id = leerTexto(formData, "situacion_id");
+  const valores = {
+    titulo: leerTexto(formData, "titulo"),
+    resumen: leerTexto(formData, "resumen"),
+    fecha_inicio: leerTexto(formData, "fecha_inicio"),
+    categoria_principal_id: leerTexto(formData, "categoria_principal_id"),
+    responsable_id: leerTexto(formData, "responsable_caso_id"),
+    justificacion_independiente: leerTexto(
+      formData,
+      "justificacion_independiente",
+    ),
+  };
+  if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
+  const resultado = await enviarCaso(id, {
+    ...valores,
+    revision_anterior_id: leerTexto(formData, "revision_anterior_id"),
+  });
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  redirect(`/convivencia/casos/${resultado.id}?aviso=creado`);
 }
 
 // PB-047, PB-048 y PB-051: guarda la situación como antecedente o la

@@ -10,6 +10,12 @@ const SECCIONES: SeccionMenu[] = [
         icono: "documentos",
         tambien: ["/convivencia/situaciones"],
       },
+      // PB-053: casos abiertos desde una situación (/convivencia/casos/...)
+      {
+        href: "/convivencia/casos",
+        texto: "Casos",
+        icono: "escudo",
+      },
       // PB-043: situaciones que llegan por otros canales
       {
         href: "/convivencia/registrar",

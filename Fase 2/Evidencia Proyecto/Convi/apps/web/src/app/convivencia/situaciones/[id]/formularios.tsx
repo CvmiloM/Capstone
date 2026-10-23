@@ -9,6 +9,7 @@ import {
 import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
 import { APLICABILIDAD, MODO_REVISION, MOTIVOS_DESCARTE } from "./opciones";
 import {
+  abrirCaso,
   asignarResponsable,
   cambiarUrgencia,
   iniciarRevision,
@@ -26,6 +27,10 @@ const LARGO_MAXIMO_MOTIVO = 500;
 const LARGO_MAXIMO_PREGUNTA = 2000;
 const LARGO_MAXIMO_FUNDAMENTO = 4000;
 const LARGO_MAXIMO_FUNDAMENTO_DECISION = 2000;
+// caso-nuevo.ts
+const LARGO_MAXIMO_TITULO = 220;
+const LARGO_MAXIMO_RESUMEN = 4000;
+const LARGO_MAXIMO_JUSTIFICACION = 2000;
 const LARGO_MAXIMO_SECCION = 220;
 const MAXIMO_REFERENCIAS = 10;
 
@@ -742,6 +747,214 @@ export function FormularioDecision({
             : resultado === "ANTECEDENTE"
               ? "Guardar como antecedente"
               : "Guardar decisión"}
+      </button>
+    </form>
+  );
+}
+
+// HU-046: abre un caso desde la situación, sin exigir protocolo. Si ya hay
+// casos activos con los mismos estudiantes, se pide justificar uno nuevo (CA4).
+export function FormularioCaso({
+  situacionId,
+  ultimaRevisionId,
+  categorias,
+  categoriaSugeridaId,
+  hoy,
+  responsables,
+  responsableSugeridoId,
+  hayCasosRelacionados,
+}: {
+  situacionId: string;
+  ultimaRevisionId: string | null;
+  categorias: { id: string; nombre: string }[];
+  categoriaSugeridaId: string | null;
+  hoy: string;
+  responsables: { id: string; nombre: string; propia: boolean }[];
+  responsableSugeridoId: string | null;
+  hayCasosRelacionados: boolean;
+}) {
+  const [estado, accion, pendiente] = useActionState(abrirCaso, estadoInicial);
+  const valores = estado.valores ?? {};
+  const errores = estado.errores ?? {};
+  const categoriaInicial = categorias.some((c) => c.id === categoriaSugeridaId)
+    ? (categoriaSugeridaId ?? "")
+    : "";
+
+  function mensajeError(campo: string) {
+    return errores[campo] ? (
+      <p id={`${campo}-error`} className="mt-1.5 text-sm text-destructive">
+        {errores[campo]}
+      </p>
+    ) : null;
+  }
+  function borde(campo: string) {
+    return errores[campo] ? "border-destructive" : "border-input";
+  }
+
+  return (
+    <form action={accion} noValidate className="space-y-4">
+      <input type="hidden" name="situacion_id" value={situacionId} />
+      <input
+        type="hidden"
+        name="revision_anterior_id"
+        value={ultimaRevisionId ?? ""}
+      />
+      {estado.mensaje && !estado.errores && (
+        <AvisoError>{estado.mensaje}</AvisoError>
+      )}
+
+      <div>
+        <label htmlFor="titulo" className="block text-sm font-medium">
+          Título del caso
+        </label>
+        <input
+          id="titulo"
+          name="titulo"
+          type="text"
+          maxLength={LARGO_MAXIMO_TITULO}
+          defaultValue={valores.titulo}
+          aria-invalid={errores.titulo ? true : undefined}
+          aria-describedby={errores.titulo ? "titulo-error" : undefined}
+          className={`${claseControl} ${borde("titulo")}`}
+        />
+        {mensajeError("titulo")}
+      </div>
+
+      <div>
+        <label htmlFor="resumen" className="block text-sm font-medium">
+          Resumen
+        </label>
+        <textarea
+          id="resumen"
+          name="resumen"
+          rows={4}
+          maxLength={LARGO_MAXIMO_RESUMEN}
+          defaultValue={valores.resumen}
+          aria-invalid={errores.resumen ? true : undefined}
+          aria-describedby={errores.resumen ? "resumen-error" : undefined}
+          className={`${claseControl} ${borde("resumen")}`}
+        />
+        {mensajeError("resumen")}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label htmlFor="fecha_inicio" className="block text-sm font-medium">
+            Fecha de inicio
+          </label>
+          <input
+            id="fecha_inicio"
+            name="fecha_inicio"
+            type="date"
+            max={hoy || undefined}
+            defaultValue={valores.fecha_inicio ?? hoy}
+            aria-invalid={errores.fecha_inicio ? true : undefined}
+            aria-describedby={errores.fecha_inicio ? "fecha_inicio-error" : undefined}
+            className={`${claseControl} ${borde("fecha_inicio")}`}
+          />
+          {mensajeError("fecha_inicio")}
+        </div>
+
+        <div>
+          <label
+            htmlFor="categoria_principal_id"
+            className="block text-sm font-medium"
+          >
+            Categoría principal
+          </label>
+          <select
+            id="categoria_principal_id"
+            name="categoria_principal_id"
+            defaultValue={valores.categoria_principal_id ?? categoriaInicial}
+            aria-invalid={errores.categoria_principal_id ? true : undefined}
+            aria-describedby={
+              errores.categoria_principal_id
+                ? "categoria_principal_id-error"
+                : undefined
+            }
+            className={`${claseControl} ${borde("categoria_principal_id")}`}
+          >
+            <option value="">Sin categoría</option>
+            {categorias.map((categoria) => (
+              <option key={categoria.id} value={categoria.id}>
+                {categoria.nombre}
+              </option>
+            ))}
+          </select>
+          {mensajeError("categoria_principal_id")}
+        </div>
+
+        <div>
+          <label htmlFor="responsable_caso_id" className="block text-sm font-medium">
+            Responsable del caso
+          </label>
+          <select
+            id="responsable_caso_id"
+            name="responsable_caso_id"
+            defaultValue={valores.responsable_id ?? responsableSugeridoId ?? ""}
+            aria-invalid={errores.responsable_id ? true : undefined}
+            aria-describedby={
+              errores.responsable_id ? "responsable_id-error" : undefined
+            }
+            className={`${claseControl} ${borde("responsable_id")}`}
+          >
+            <option value="" disabled>
+              Elige a una persona de Convivencia
+            </option>
+            {responsables.map((opcion) => (
+              <option key={opcion.id} value={opcion.id}>
+                {opcion.propia ? `${opcion.nombre} (tú)` : opcion.nombre}
+              </option>
+            ))}
+          </select>
+          {mensajeError("responsable_id")}
+        </div>
+      </div>
+
+      {hayCasosRelacionados && (
+        <div>
+          <label
+            htmlFor="justificacion_independiente"
+            className="block text-sm font-medium"
+          >
+            Por qué abres un caso independiente
+          </label>
+          <textarea
+            id="justificacion_independiente"
+            name="justificacion_independiente"
+            rows={3}
+            maxLength={LARGO_MAXIMO_JUSTIFICACION}
+            defaultValue={valores.justificacion_independiente}
+            aria-invalid={errores.justificacion_independiente ? true : undefined}
+            aria-describedby={
+              errores.justificacion_independiente
+                ? "justificacion_independiente-error"
+                : "justificacion_independiente-ayuda"
+            }
+            className={`${claseControl} ${borde("justificacion_independiente")}`}
+          />
+          {errores.justificacion_independiente ? (
+            mensajeError("justificacion_independiente")
+          ) : (
+            <p
+              id="justificacion_independiente-ayuda"
+              className="mt-1.5 text-sm text-muted-foreground"
+            >
+              Ya hay casos activos con estos estudiantes. Es obligatorio
+              explicar por qué este hecho no se sigue en ellos.
+            </p>
+          )}
+        </div>
+      )}
+
+      <p className="text-sm text-muted-foreground">
+        El caso queda En análisis con su código, sin exigir un protocolo. Los
+        estudiantes de la situación pasan al caso y la situación queda
+        vinculada a él.
+      </p>
+
+      <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
+        {pendiente ? "Abriendo…" : "Abrir caso"}
       </button>
     </form>
   );

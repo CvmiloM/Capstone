@@ -85,6 +85,22 @@ export type DetalleConvivencia = SituacionBandeja & {
   }[];
   /** PB-139: la última revisión que se ve; decidir sobre otra se rechaza. */
   ultima_revision_id: string | null;
+  /** PB-053: el caso al que quedó vinculada, si ya tiene uno. */
+  caso_vinculado: { id: string; codigo: string } | null;
+  /** PB-053: lo que necesita el formulario para abrir un caso. */
+  opciones_caso: {
+    categorias: { id: string; nombre: string }[];
+    categoria_sugerida_id: string | null;
+    /** AAAA-MM-DD de hoy en la escuela. */
+    hoy: string;
+    /** Casos activos con los mismos estudiantes (HU-046 CA4). */
+    casos_relacionados: {
+      id: string;
+      codigo: string;
+      titulo: string;
+      estado_actual: string;
+    }[];
+  };
 };
 
 /** Misma forma que devuelve apps/api/src/modules/situaciones/revision-normativa.ts. */
@@ -253,6 +269,15 @@ export function enviarDecision(id: string, cuerpo: unknown) {
   return enviar(
     "POST",
     `/convivencia/situaciones/${encodeURIComponent(id)}/decisiones`,
+    cuerpo,
+  );
+}
+
+/** HU-046: abre un caso desde la situación; responde con el id del caso. */
+export function enviarCaso(id: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/situaciones/${encodeURIComponent(id)}/caso`,
     cuerpo,
   );
 }
