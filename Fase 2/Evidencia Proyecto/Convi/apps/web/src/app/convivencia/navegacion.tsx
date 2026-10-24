@@ -16,6 +16,14 @@ const SECCIONES: SeccionMenu[] = [
         texto: "Casos",
         icono: "escudo",
       },
+
+      // PB-077 (Camilo): situaciones y casos por código, estudiante, estado y período
+      {
+        href: "/convivencia/expedientes",
+        texto: "Buscar expedientes",
+        icono: "buscar",
+      },
+      
       // PB-081 y PB-083: protocolos de la escuela, que se aplican en los casos (PB-082)
       {
         href: "/convivencia/protocolos",

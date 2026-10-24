@@ -10,6 +10,8 @@ import {
   EvidenciasProfesorController,
 } from './evidencias.controller.js';
 import { ALMACENAMIENTO, EvidenciasService } from './evidencias.service.js';
+import { ExpedientesController } from './expedientes.controller.js';
+import { ExpedientesService } from './expedientes.service.js';
 import { HistorialController } from './historial.controller.js';
 import { HistorialService } from './historial.service.js';
 import { ProfesorController } from './profesor.controller.js';
@@ -18,6 +20,7 @@ import { ProfesorService } from './profesor.service.js';
 // Módulo de Fernando: situaciones de convivencia. Importa AuthModule para usar
 // CuentaService y el mismo control de sesión que el resto de la API (PB-127).
 // PB-074 (Camilo): el historial del estudiante también vive aquí.
+// PB-077 (Camilo): la búsqueda de expedientes de Convivencia.
 // PB-053: los casos, que se abren desde una situación.
 // PB-066: las evidencias, guardadas con la clave de servicio en el espacio
 // privado de Storage, como los archivos de las importaciones (PB-019).
@@ -27,6 +30,7 @@ import { ProfesorService } from './profesor.service.js';
     ProfesorController,
     ConvivenciaController,
     HistorialController,
+    ExpedientesController,
     CasosController,
     EvidenciasConvivenciaController,
     EvidenciasProfesorController,
@@ -35,6 +39,7 @@ import { ProfesorService } from './profesor.service.js';
     ProfesorService,
     ConvivenciaService,
     HistorialService,
+    ExpedientesService,
     CasosService,
     EvidenciasService,
     {
