@@ -35,11 +35,11 @@ const AVISOS: Record<string, string> = {
   revision:
     "Iniciaste la revisión. La situación quedó En revisión y su urgencia no cambió.",
   urgencia:
-    "Cambiaste la urgencia. El cambio y su motivo quedaron registrados en la auditoría.",
+    "Cambiaste la urgencia. El cambio y su motivo quedaron en el historial de cambios.",
   aclaracion:
     "Enviaste la pregunta al profesor. La situación quedó en Información solicitada hasta que responda.",
   responsable:
-    "Guardaste el responsable de la revisión. El cambio quedó registrado en la auditoría y el estado no cambió.",
+    "Guardaste el responsable de la revisión. El cambio quedó en el historial de cambios y el estado no cambió.",
   normativa:
     "Guardaste la revisión normativa. Quedó en el historial de la situación y su estado no cambió.",
   antecedente:
@@ -49,6 +49,19 @@ const AVISOS: Record<string, string> = {
   evidencia:
     "Adjuntaste la evidencia. Quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
 };
+
+// PB-142 (HU-121): nombre de cada dato que cambia y cómo se muestra su valor.
+const NOMBRE_CAMPO: Record<string, string> = {
+  estado: "Estado",
+  urgencia: "Urgencia",
+  responsable: "Responsable",
+};
+
+function valorCambio(campo: string, valor: string | null) {
+  if (campo === "estado") return valor ? (NOMBRE_ESTADO[valor] ?? valor) : "Sin estado";
+  if (campo === "urgencia") return valor ? (URGENCIA[valor]?.texto ?? valor) : "Sin urgencia";
+  return valor ?? "Sin responsable";
+}
 
 // PB-044 (HU-037): detalle de una situación para revisarla. Abrirlo no cambia
 // su estado: la revisión empieza con el botón Iniciar revisión (CA2).
@@ -112,6 +125,11 @@ export default async function PaginaRevisionSituacion({
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${urgencia.clase}`}>
             Urgencia: {urgencia.texto}
           </span>
+          {situacion.registro_historico && (
+            <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+              Registro histórico
+            </span>
+          )}
         </div>
       </div>
 
@@ -481,6 +499,47 @@ export default async function PaginaRevisionSituacion({
               registroId={situacion.id}
             />
           </div>
+        </Seccion>
+
+        {/* PB-142 (HU-121): la fecha del hecho y la del registro por separado, y
+            cada cambio con quién lo hizo, cuándo y por qué. No se edita ni borra. */}
+        <Seccion titulo="Historial de cambios" className="lg:col-span-3">
+          <ol className="divide-y divide-border text-sm">
+            <li className="pb-3">
+              <p className="font-medium">
+                {situacion.registro_historico ? "Registro histórico" : "Registro"}
+              </p>
+              <p className="mt-1">
+                El hecho ocurrió el {formatearFecha(situacion.ocurrido_en)} y se
+                registró el {formatearFecha(situacion.reportado_en)}.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Registrada por {situacion.reportado_por}
+              </p>
+            </li>
+            {situacion.cambios.map((cambio) => (
+              <li key={cambio.id} className="py-3 last:pb-0">
+                <ul className="space-y-0.5">
+                  {cambio.cambios.map((c) => (
+                    <li key={c.campo}>
+                      <span className="text-muted-foreground">{NOMBRE_CAMPO[c.campo]}:</span>{" "}
+                      {valorCambio(c.campo, c.antes)} →{" "}
+                      <span className="font-medium">{valorCambio(c.campo, c.despues)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {cambio.motivo && (
+                  <p className="mt-1 whitespace-pre-line">
+                    <span className="text-muted-foreground">Motivo:</span> {cambio.motivo}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {cambio.cambiado_por ?? "Sin cuenta registrada"} ·{" "}
+                  {formatearFecha(cambio.cambiado_en)}
+                </p>
+              </li>
+            ))}
+          </ol>
         </Seccion>
       </div>
     </>
