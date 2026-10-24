@@ -111,6 +111,12 @@ const TRAZOS = {
             <path d="M12 9v4M12 17h.01" />
         </>
     ),
+    buscar: (
+        <>
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+        </>
+    ),
 } satisfies Record<string, ReactNode>;
 
 export type NombreIcono = keyof typeof TRAZOS;
