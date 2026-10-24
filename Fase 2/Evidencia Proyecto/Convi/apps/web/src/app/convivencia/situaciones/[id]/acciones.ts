@@ -47,6 +47,7 @@ export async function abrirCaso(
       formData,
       "justificacion_independiente",
     ),
+    motivo_reconsideracion: leerTexto(formData, "motivo_reconsideracion"),
   };
   if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
   const resultado = await enviarCaso(id, {
@@ -70,6 +71,7 @@ export async function vincularCaso(
   const valores = {
     caso_id: leerTexto(formData, "caso_id"),
     fundamento: leerTexto(formData, "fundamento_vinculacion"),
+    motivo_reconsideracion: leerTexto(formData, "motivo_reconsideracion"),
   };
   if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
   const resultado = await enviarVinculacion(id, {
@@ -85,6 +87,8 @@ export async function vincularCaso(
 // PB-047, PB-048 y PB-051: guarda la situación como antecedente o la
 // descarta. Se envía también la última revisión que se veía, para que la API
 // rechace la decisión si otra persona agregó una entretanto (PB-139).
+// PB-050: las tres decisiones (esta, abrir caso y vincular) llevan el motivo
+// de la reconsideración cuando la situación ya tenía una decisión.
 export async function registrarDecision(
   _anterior: EstadoAccion,
   formData: FormData,
@@ -95,6 +99,7 @@ export async function registrarDecision(
     motivo_descarte: leerTexto(formData, "motivo_descarte"),
     codigo_original: leerTexto(formData, "codigo_original"),
     fundamento: leerTexto(formData, "fundamento_decision"),
+    motivo_reconsideracion: leerTexto(formData, "motivo_reconsideracion"),
   };
   if (!UUID.test(id)) return { mensaje: NO_VALIDA, valores };
   const resultado = await enviarDecision(id, {

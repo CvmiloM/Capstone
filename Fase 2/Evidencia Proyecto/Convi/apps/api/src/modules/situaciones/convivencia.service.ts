@@ -37,6 +37,11 @@ import {
   matriculasAlOcurrir,
   type SituacionRegistrada,
 } from './registro-situacion.js';
+import {
+  esReconsiderable,
+  leerMotivoReconsideracion,
+  prefijoReconsideracion,
+} from './reconsideracion.js';
 import { validarCambioResponsable } from './responsable-revision.js';
 import {
   comprobarNormativaVigente,
@@ -604,12 +609,15 @@ export class ConvivenciaService {
   // abrir un caso. Solo se decide En revisión: una Nueva todavía no se revisa
   // y con una aclaración pendiente se espera al profesor. Se indica la última
   // revisión que se veía; si otra persona agregó una, se rechaza (PB-139).
+  // PB-050 (HU-043): una situación Antecedente o Descartada se reconsidera con
+  // otra decisión distinta y el motivo del cambio.
   registrarDecision(
     sesion: Sesion,
     id: string,
     cuerpo: unknown,
   ): Promise<{ id: string; estado: string }> {
     const datos = validarDecision(cuerpo);
+    const motivo = leerMotivoReconsideracion(cuerpo);
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
@@ -632,12 +640,25 @@ export class ConvivenciaService {
           throw new ConflictException(
             'Espera la respuesta del profesor a la aclaración antes de decidir.',
           );
-        if (fila.estado !== 'EN_REVISION')
+        if (fila.estado === 'VINCULADA_CASO')
           throw new ConflictException(
-            'Esta situación ya tiene una decisión. Para cambiarla hay que reconsiderarla.',
+            'Esta situación está vinculada a un caso. No se traslada ni se desvincula.',
+          );
+        if (fila.estado !== 'EN_REVISION' && !esReconsiderable(fila.estado))
+          throw new ConflictException(
+            'En el estado actual de la situación no se puede decidir.',
           );
         if ((await ultimaRevision(db, id)) !== datos.revision_anterior_id)
           throw new ConflictException(DECISION_DESACTUALIZADA);
+        // HU-043 CA1: reconsiderar es cambiar la decisión, no repetirla.
+        if (datos.resultado === fila.estado)
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. No se guardó la decisión.',
+            errores: {
+              resultado: 'La situación ya tiene esa decisión. Elige otra.',
+            },
+          });
+        const prefijo = prefijoReconsideracion(fila.estado, motivo);
 
         // HU-044 CA2: la original se busca por su código dentro de la escuela
         // (la seguridad por fila oculta las demás) y no puede ser la misma.
@@ -659,7 +680,12 @@ export class ConvivenciaService {
               errores: { codigo_original: error },
             });
         }
-        return insertarDecision(db, id, datos, originalId);
+        return insertarDecision(
+          db,
+          id,
+          { ...datos, fundamento: prefijo + datos.fundamento },
+          originalId,
+        );
       },
     );
   }

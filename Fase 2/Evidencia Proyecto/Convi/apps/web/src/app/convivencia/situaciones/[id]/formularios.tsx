@@ -38,9 +38,57 @@ const LARGO_MAXIMO_SECCION = 220;
 const MAXIMO_REFERENCIAS = 10;
 // vinculacion-caso.ts
 const LARGO_MAXIMO_FUNDAMENTO_VINCULACION = 2000;
+// reconsideracion.ts
+const LARGO_MAXIMO_MOTIVO_RECONSIDERACION = 1000;
 
 const claseControl =
   "mt-1.5 block w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/15";
+
+/** PB-050 (HU-043): la decisión que ya tenía la situación y se va a cambiar. */
+type Reconsideracion = { estado: string; texto: string };
+
+// PB-050: al cambiar una decisión ya tomada se pide el motivo. Cada
+// formulario usa su propio id, porque los tres pueden estar en la página.
+function CampoReconsideracion({
+  id,
+  reconsiderar,
+  valor,
+  error,
+}: {
+  id: string;
+  reconsiderar?: Reconsideracion;
+  valor?: string;
+  error?: string;
+}) {
+  if (!reconsiderar) return null;
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium">
+        Por qué cambias la decisión {reconsiderar.texto}
+      </label>
+      <textarea
+        id={id}
+        name="motivo_reconsideracion"
+        rows={2}
+        maxLength={LARGO_MAXIMO_MOTIVO_RECONSIDERACION}
+        defaultValue={valor}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : `${id}-ayuda`}
+        className={`${claseControl} ${error ? "border-destructive" : "border-input"}`}
+      />
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 text-sm text-destructive">
+          {error}
+        </p>
+      ) : (
+        <p id={`${id}-ayuda`} className="mt-1.5 text-sm text-muted-foreground">
+          Queda junto a la nueva decisión. La decisión anterior se conserva sin
+          cambios.
+        </p>
+      )}
+    </div>
+  );
+}
 
 // HU-037 CA2: botón para empezar la revisión de una situación Nueva.
 export function FormularioRevision({ situacionId }: { situacionId: string }) {
@@ -560,13 +608,16 @@ export function FormularioRevisionNormativa({
 }
 
 // HU-040, HU-041 y HU-044: cierra la revisión sin abrir un caso. La decisión
-// no se edita después; cambiarla es una reconsideración (HU-043).
+// no se edita después; cambiarla es una reconsideración (HU-043), que solo
+// ofrece la otra decisión y pide el motivo.
 export function FormularioDecision({
   situacionId,
   ultimaRevisionId,
+  reconsiderar,
 }: {
   situacionId: string;
   ultimaRevisionId: string | null;
+  reconsiderar?: Reconsideracion;
 }) {
   const [estado, accion, pendiente] = useActionState(
     registrarDecision,
@@ -574,10 +625,17 @@ export function FormularioDecision({
   );
   const valores = estado.valores ?? {};
   const errores = estado.errores ?? {};
-  // Lo elegido se conserva para mostrar los campos que corresponden.
+  // Lo elegido se conserva para mostrar los campos que corresponden. Al
+  // reconsiderar queda una sola opción, que se propone de inmediato.
   const [elegido, setElegido] = useState<string | null>(null);
   const [motivoElegido, setMotivoElegido] = useState<string | null>(null);
-  const resultado = elegido ?? valores.resultado ?? "";
+  const otra =
+    reconsiderar?.estado === "ANTECEDENTE"
+      ? "DESCARTADA"
+      : reconsiderar?.estado === "DESCARTADA"
+        ? "ANTECEDENTE"
+        : "";
+  const resultado = elegido ?? valores.resultado ?? otra;
   const motivo = motivoElegido ?? valores.motivo_descarte ?? "";
   const descarta = resultado === "DESCARTADA";
 
@@ -593,43 +651,56 @@ export function FormularioDecision({
         <AvisoError>{estado.mensaje}</AvisoError>
       )}
 
+      <CampoReconsideracion
+        id="motivo_reconsideracion_decision"
+        reconsiderar={reconsiderar}
+        valor={valores.motivo_reconsideracion}
+        error={errores.motivo_reconsideracion}
+      />
+
       <fieldset
         aria-describedby={errores.resultado ? "resultado-error" : undefined}
       >
-        <legend className="text-sm font-medium">¿Qué decides?</legend>
+        <legend className="text-sm font-medium">
+          {reconsiderar ? "Nueva decisión" : "¿Qué decides?"}
+        </legend>
         <div className="mt-2 space-y-2">
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="radio"
-              name="resultado"
-              value="ANTECEDENTE"
-              checked={resultado === "ANTECEDENTE"}
-              onChange={() => setElegido("ANTECEDENTE")}
-              className="mt-0.5 accent-primary"
-            />
-            <span>
-              Guardar como antecedente
-              <span className="block text-muted-foreground">
-                Es válida y queda en el historial del estudiante, sin abrir un caso.
+          {reconsiderar?.estado !== "ANTECEDENTE" && (
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="resultado"
+                value="ANTECEDENTE"
+                checked={resultado === "ANTECEDENTE"}
+                onChange={() => setElegido("ANTECEDENTE")}
+                className="mt-0.5 accent-primary"
+              />
+              <span>
+                Guardar como antecedente
+                <span className="block text-muted-foreground">
+                  Es válida y queda en el historial del estudiante, sin abrir un caso.
+                </span>
               </span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="radio"
-              name="resultado"
-              value="DESCARTADA"
-              checked={resultado === "DESCARTADA"}
-              onChange={() => setElegido("DESCARTADA")}
-              className="mt-0.5 accent-primary"
-            />
-            <span>
-              Descartar
-              <span className="block text-muted-foreground">
-                Es un duplicado, un error o está fuera de alcance. No se borra.
+            </label>
+          )}
+          {reconsiderar?.estado !== "DESCARTADA" && (
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="resultado"
+                value="DESCARTADA"
+                checked={resultado === "DESCARTADA"}
+                onChange={() => setElegido("DESCARTADA")}
+                className="mt-0.5 accent-primary"
+              />
+              <span>
+                Descartar
+                <span className="block text-muted-foreground">
+                  Es un duplicado, un error o está fuera de alcance. No se borra.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          )}
         </div>
         {errores.resultado && (
           <p id="resultado-error" className="mt-1.5 text-sm text-destructive">
@@ -765,11 +836,13 @@ export function FormularioVinculacion({
   codigoSituacion,
   ultimaRevisionId,
   casos,
+  reconsiderar,
 }: {
   situacionId: string;
   codigoSituacion: string;
   ultimaRevisionId: string | null;
   casos: { id: string; codigo: string; titulo: string; estado: string }[];
+  reconsiderar?: Reconsideracion;
 }) {
   const [estado, accion, pendiente] = useActionState(vincularCaso, estadoInicial);
   const valores = estado.valores ?? {};
@@ -794,6 +867,9 @@ export function FormularioVinculacion({
     if (!datos.get("caso_id")) faltan.caso_id = "Elige el caso al que la vinculas.";
     if (!String(datos.get("fundamento_vinculacion") ?? "").trim())
       faltan.fundamento = "Explica por qué esta situación se sigue en ese caso.";
+    if (reconsiderar && !String(datos.get("motivo_reconsideracion") ?? "").trim())
+      faltan.motivo_reconsideracion =
+        "Explica por qué cambias la decisión que ya tenía la situación.";
     setPaso({ para: estado, faltan });
   }
 
@@ -808,6 +884,13 @@ export function FormularioVinculacion({
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
       )}
+
+      <CampoReconsideracion
+        id="motivo_reconsideracion_vinculacion"
+        reconsiderar={reconsiderar}
+        valor={valores.motivo_reconsideracion}
+        error={errores.motivo_reconsideracion}
+      />
 
       <fieldset aria-describedby={errores.caso_id ? "caso_id-error" : undefined}>
         <legend className="text-sm font-medium">Caso</legend>
@@ -928,6 +1011,7 @@ export function FormularioCaso({
   responsables,
   responsableSugeridoId,
   hayCasosRelacionados,
+  reconsiderar,
 }: {
   situacionId: string;
   ultimaRevisionId: string | null;
@@ -937,6 +1021,7 @@ export function FormularioCaso({
   responsables: { id: string; nombre: string; propia: boolean }[];
   responsableSugeridoId: string | null;
   hayCasosRelacionados: boolean;
+  reconsiderar?: Reconsideracion;
 }) {
   const [estado, accion, pendiente] = useActionState(abrirCaso, estadoInicial);
   const valores = estado.valores ?? {};
@@ -967,6 +1052,13 @@ export function FormularioCaso({
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
       )}
+
+      <CampoReconsideracion
+        id="motivo_reconsideracion_caso"
+        reconsiderar={reconsiderar}
+        valor={valores.motivo_reconsideracion}
+        error={errores.motivo_reconsideracion}
+      />
 
       <div>
         <label htmlFor="titulo" className="block text-sm font-medium">

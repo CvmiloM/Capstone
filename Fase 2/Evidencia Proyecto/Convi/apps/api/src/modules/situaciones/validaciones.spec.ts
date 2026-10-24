@@ -8,6 +8,10 @@ import {
   validarNuevaSituacion,
   validarSituacionConvivencia,
 } from './nueva-situacion.js';
+import {
+  leerMotivoReconsideracion,
+  prefijoReconsideracion,
+} from './reconsideracion.js';
 import { validarRespuesta } from './respuesta-aclaracion.js';
 import { validarCambioResponsable } from './responsable-revision.js';
 import { validarRevisionNormativa } from './revision-normativa.js';
@@ -624,6 +628,39 @@ describe('Cierre del caso (PB-054, HU-047)', () => {
     expect(camposConError(() => validarCierre(sinMovimiento))).toEqual([
       'motivo',
     ]);
+  });
+});
+
+describe('Reconsideración de decisiones (PB-050, HU-043)', () => {
+  it('lee el motivo opcional y limpia el texto', () => {
+    expect(leerMotivoReconsideracion({})).toBeNull();
+    expect(
+      leerMotivoReconsideracion({
+        motivo_reconsideracion: '  Hubo nuevos hechos ',
+      }),
+    ).toBe('Hubo nuevos hechos');
+    expect(
+      camposConError(() =>
+        leerMotivoReconsideracion({ motivo_reconsideracion: 'x'.repeat(1001) }),
+      ),
+    ).toEqual(['motivo_reconsideracion']);
+  });
+
+  it('exige el motivo para cambiar una decisión ya tomada (CA1)', () => {
+    expect(
+      camposConError(() => prefijoReconsideracion('DESCARTADA', null)),
+    ).toEqual(['motivo_reconsideracion']);
+    expect(prefijoReconsideracion('DESCARTADA', 'No era un duplicado')).toBe(
+      'Reconsideración de la decisión Descartada: No era un duplicado. ',
+    );
+    expect(prefijoReconsideracion('ANTECEDENTE', 'Hubo nuevos hechos')).toBe(
+      'Reconsideración de la decisión Antecedente: Hubo nuevos hechos. ',
+    );
+  });
+
+  it('no agrega nada si la situación sigue En revisión', () => {
+    expect(prefijoReconsideracion('EN_REVISION', null)).toBe('');
+    expect(prefijoReconsideracion('EN_REVISION', 'sobra')).toBe('');
   });
 });
 

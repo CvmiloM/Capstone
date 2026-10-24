@@ -75,6 +75,15 @@ export default async function PaginaRevisionSituacion({
   const puedePedirAclaracion =
     deProfesor &&
     ["EN_REVISION", "INFORMACION_SOLICITADA"].includes(situacion.estado);
+  // PB-050 (HU-043): una situación Antecedente o Descartada se reconsidera
+  // con otra decisión: la otra opción, vincularla a un caso o abrir uno.
+  const reconsiderar = ["ANTECEDENTE", "DESCARTADA"].includes(situacion.estado)
+    ? {
+        estado: situacion.estado,
+        texto: NOMBRE_ESTADO[situacion.estado] ?? situacion.estado,
+      }
+    : undefined;
+  const puedeDecidir = situacion.estado === "EN_REVISION" || !!reconsiderar;
 
   return (
     <>
@@ -356,6 +365,20 @@ export default async function PaginaRevisionSituacion({
               situacionId={situacion.id}
               ultimaRevisionId={situacion.ultima_revision_id}
             />
+          ) : reconsiderar ? (
+            <div className="border-t border-border pt-4">
+              <h3 className="text-sm font-semibold">Reconsiderar la decisión</h3>
+              <p className="mt-1 mb-4 text-sm text-muted-foreground">
+                Si cambió la información, registra otra decisión con su motivo. La
+                anterior se conserva. También puedes vincularla a un caso o abrir
+                uno en la sección Caso.
+              </p>
+              <FormularioDecision
+                situacionId={situacion.id}
+                ultimaRevisionId={situacion.ultima_revision_id}
+                reconsiderar={reconsiderar}
+              />
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">
               {situacion.estado === "NUEVA"
@@ -390,7 +413,7 @@ export default async function PaginaRevisionSituacion({
                 traslada a otro caso ni se desvincula.
               </p>
             </>
-          ) : situacion.estado === "EN_REVISION" ? (
+          ) : puedeDecidir ? (
             <>
               {situacion.opciones_caso.casos_relacionados.length > 0 && (
                 <div className="mb-6 border-b border-border pb-6">
@@ -409,6 +432,7 @@ export default async function PaginaRevisionSituacion({
                       titulo: c.titulo,
                       estado: NOMBRE_ESTADO_CASO[c.estado_actual] ?? c.estado_actual,
                     }))}
+                    reconsiderar={reconsiderar}
                   />
                 </div>
               )}
@@ -430,6 +454,7 @@ export default async function PaginaRevisionSituacion({
                 hayCasosRelacionados={
                   situacion.opciones_caso.casos_relacionados.length > 0
                 }
+                reconsiderar={reconsiderar}
               />
             </>
           ) : (
