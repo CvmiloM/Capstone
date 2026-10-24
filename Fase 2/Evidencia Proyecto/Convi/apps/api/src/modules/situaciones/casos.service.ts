@@ -37,6 +37,23 @@ import {
   evidenciasDelCaso,
   type EvidenciaRegistrada,
 } from './evidencias.service.js';
+import {
+  crearPasosDelCaso,
+  insertarRevisionNormativaDelCaso,
+  PROTOCOLOS_APLICABLES,
+  protocolosAplicables,
+  protocolosDelCaso,
+  revisionesNormativasDelCaso,
+  validarAplicacion,
+  type ProtocoloAplicado,
+} from './protocolo-caso.js';
+import {
+  comprobarNormativaVigente,
+  opcionesNormativa,
+  validarRevisionNormativa,
+  type OpcionesNormativa,
+  type RevisionNormativa,
+} from './revision-normativa.js';
 import { validarVinculacion } from './vinculacion-caso.js';
 
 // PB-053 (HU-046): casos de convivencia. Solo Convivencia los abre y los ve;
@@ -111,6 +128,13 @@ export type DetalleCaso = CasoLista & {
   actas_cierre: ActaCaso[];
   /** PB-066: evidencias del caso y de sus situaciones vinculadas. */
   evidencias: EvidenciaRegistrada[];
+  /** PB-082 (HU-071 CA1): protocolos aplicados con sus pasos. */
+  protocolos_aplicados: ProtocoloAplicado[];
+  /** Versiones publicadas y vigentes que se pueden aplicar hoy. */
+  protocolos_aplicables: { id: string; nombre: string; pasos: number }[];
+  /** HU-071 CA2 y CA3: revisiones del caso sin protocolo. */
+  revisiones_normativas: RevisionNormativa[];
+  opciones_normativa: OpcionesNormativa;
 };
 
 // 40001: otra transacción cambió la fila bloqueada; 23505 en el código: otro
@@ -239,7 +263,92 @@ export class CasosService {
           pendientes: await pendientesDelCaso(db, id),
           actas_cierre: await actasDelCaso(db, id),
           evidencias: await evidenciasDelCaso(db, id),
+          protocolos_aplicados: await protocolosDelCaso(db, id),
+          protocolos_aplicables: await protocolosAplicables(db),
+          revisiones_normativas: await revisionesNormativasDelCaso(db, id),
+          opciones_normativa: await opcionesNormativa(db),
         };
+      },
+    );
+  }
+
+  // PB-082 (HU-071 CA1): aplica una versión publicada y vigente al caso, con
+  // quién, cuándo y el fundamento, y crea sus pasos para el caso. Decisión
+  // del PO (por defecto): un caso cerrado no recibe protocolos y un mismo
+  // protocolo no se aplica dos veces mientras siga activo en el caso.
+  aplicarProtocolo(
+    sesion: Sesion,
+    casoId: string,
+    cuerpo: unknown,
+  ): Promise<{ id: string }> {
+    const datos = validarAplicacion(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        await casoAbierto(db, casoId);
+        const errores: Record<string, string> = {};
+        const version = await db.query<{ protocolo_id: string }>(
+          `SELECT vp.protocolo_id ${PROTOCOLOS_APLICABLES} AND vp.id = $1`,
+          [datos.version_protocolo_id],
+        );
+        const protocoloId = version.rows[0]?.protocolo_id;
+        if (!protocoloId)
+          errores.version_protocolo_id =
+            'Ese protocolo no tiene una versión publicada y vigente. Recarga la página.';
+        else {
+          const repetido = await db.query(
+            `SELECT 1 FROM convi.protocolos_caso pc
+             JOIN convi.versiones_protocolo vp ON vp.id = pc.version_protocolo_id
+             WHERE pc.caso_id = $1 AND vp.protocolo_id = $2
+               AND pc.estado = 'ACTIVO'`,
+            [casoId, protocoloId],
+          );
+          if (repetido.rowCount)
+            errores.version_protocolo_id =
+              'Este protocolo ya está aplicado y activo en el caso.';
+        }
+        if (Object.keys(errores).length > 0)
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. No se aplicó el protocolo.',
+            errores,
+          });
+        const aplicado = await db.query<{ id: string }>(
+          `INSERT INTO convi.protocolos_caso
+             (establecimiento_id, caso_id, version_protocolo_id, aplicado_por,
+              fundamento)
+           VALUES (convi.establecimiento_actual(), $1, $2,
+                   convi.membresia_actual(), $3)
+           RETURNING id`,
+          [casoId, datos.version_protocolo_id, datos.fundamento],
+        );
+        await crearPasosDelCaso(db, aplicado.rows[0].id, casoId);
+        return aplicado.rows[0];
+      },
+    );
+  }
+
+  // PB-082 (HU-071 CA2 y CA3): si no aplica un protocolo se registra una
+  // revisión del caso con su aplicabilidad, su fundamento y las páginas
+  // consultadas, sin crear una aplicación ficticia.
+  registrarRevisionNormativa(
+    sesion: Sesion,
+    casoId: string,
+    cuerpo: unknown,
+  ): Promise<{ id: string }> {
+    const datos = validarRevisionNormativa(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        await casoAbierto(db, casoId);
+        const errores = await comprobarNormativaVigente(db, datos);
+        if (Object.keys(errores).length > 0)
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. No se guardó la revisión.',
+            errores,
+          });
+        return insertarRevisionNormativaDelCaso(db, casoId, datos);
       },
     );
   }
@@ -659,4 +768,25 @@ async function casoSinCambios(
   if ((await ultimoMovimiento(db, casoId)) !== movimientoAnteriorId)
     throw new ConflictException(CASO_DESACTUALIZADO);
   return fila.estado_actual;
+}
+
+/**
+ * PB-082: el caso existe y sigue abierto. FOR SHARE impide que se cierre
+ * mientras se le aplica un protocolo o se registra su revisión.
+ */
+async function casoAbierto(db: PoolClient, casoId: string) {
+  const caso = await db
+    .query<{ estado_actual: string }>(
+      'SELECT estado_actual FROM convi.casos WHERE id = $1 FOR SHARE',
+      [casoId],
+    )
+    .catch((error: unknown) => {
+      if (esChoque(error)) throw new ConflictException(CASO_DESACTUALIZADO);
+      throw error;
+    });
+  if (!caso.rows[0]) throw new NotFoundException(NO_EXISTE);
+  if (caso.rows[0].estado_actual === 'CERRADO')
+    throw new ConflictException(
+      'El caso está cerrado. Un caso cerrado solo se puede reabrir.',
+    );
 }

@@ -55,6 +55,27 @@ export class CasosController {
     return this.casos.cerrar(peticion.sesion, id, cuerpo);
   }
 
+  // PB-082: el cuerpo trae { version_protocolo_id, fundamento }.
+  @Post('casos/:id/protocolos')
+  aplicarProtocolo(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.casos.aplicarProtocolo(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-082 (HU-071 CA2): el cuerpo trae { aplicabilidad, modo_revision,
+  // fundamento, version_protocolo_id, referencias }, como en PB-155.
+  @Post('casos/:id/revisiones-normativas')
+  registrarRevisionNormativa(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.casos.registrarRevisionNormativa(peticion.sesion, id, cuerpo);
+  }
+
   // El cuerpo trae { titulo, resumen, fecha_inicio, categoria_principal_id,
   // responsable_id, justificacion_independiente, revision_anterior_id };
   // responde 201 con el id y el código del caso.

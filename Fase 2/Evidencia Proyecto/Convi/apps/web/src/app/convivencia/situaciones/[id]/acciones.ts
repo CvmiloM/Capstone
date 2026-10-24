@@ -9,6 +9,7 @@ import {
   enviarDecision,
   enviarInicioRevision,
   enviarRevisionNormativa,
+  enviarRevisionNormativaCaso,
   enviarVinculacion,
 } from "../../datos";
 
@@ -180,11 +181,14 @@ const MAXIMO_REFERENCIAS = 10;
 // PB-155 (HU-134): registra lo que indica el reglamento o el protocolo. Cada
 // página consultada llega como ref_documento_N, ref_desde_N, ref_hasta_N y
 // ref_seccion_N; las filas vacías se ignoran. La situación no cambia de estado.
+// PB-082 (HU-071 CA2): el mismo formulario registra la revisión de un caso
+// que sigue sin protocolo; entonces llega caso_id en vez de situacion_id.
 export async function registrarRevisionNormativa(
   _anterior: EstadoAccion,
   formData: FormData,
 ): Promise<EstadoAccion> {
-  const id = leerTexto(formData, "situacion_id");
+  const casoId = leerTexto(formData, "caso_id");
+  const id = casoId || leerTexto(formData, "situacion_id");
   const valores: Record<string, string> = {};
   for (const [campo, valor] of formData.entries()) {
     if (typeof valor === "string" && !campo.startsWith("$")) {
@@ -203,17 +207,24 @@ export async function registrarRevisionNormativa(
     };
     if (Object.values(fila).some(Boolean)) referencias.push(fila);
   }
-  const resultado = await enviarRevisionNormativa(id, {
+  const cuerpo = {
     aplicabilidad: valores.aplicabilidad ?? "",
     modo_revision: valores.modo_revision ?? "",
     fundamento: valores.fundamento ?? "",
     version_protocolo_id: valores.version_protocolo_id ?? "",
     referencias,
-  });
+  };
+  const resultado = casoId
+    ? await enviarRevisionNormativaCaso(id, cuerpo)
+    : await enviarRevisionNormativa(id, cuerpo);
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  redirect(`/convivencia/situaciones/${id}?aviso=normativa`);
+  redirect(
+    casoId
+      ? `/convivencia/casos/${id}?aviso=normativa`
+      : `/convivencia/situaciones/${id}?aviso=normativa`,
+  );
 }
 
 // PB-045 (HU-038): pide información al profesor que registró la situación.
