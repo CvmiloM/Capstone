@@ -54,6 +54,12 @@ const SECCIONES: SeccionMenu[] = [
         texto: "Categorías",
         icono: "categorias",
       },
+      // PB-089 (Camilo): reglas de aviso, las mismas del portal de administración
+      {
+        href: "/convivencia/reglas",
+        texto: "Reglas de aviso",
+        icono: "reglas",
+      },
     ],
   },
 ];

@@ -9,6 +9,7 @@ import { CuentasModule } from './modules/cuentas/cuentas.module.js';
 import { ImportacionesModule } from './modules/importaciones/importaciones.module.js';
 import { ProtocolosModule } from './modules/protocolos/protocolos.module.js';
 import { RegistroModule } from './modules/registro/registro.module.js';
+import { ReglasModule } from './modules/reglas/reglas.module.js';
 import { SituacionesModule } from './modules/situaciones/situaciones.module.js';
 
 @Module({
@@ -21,6 +22,7 @@ import { SituacionesModule } from './modules/situaciones/situaciones.module.js';
     ImportacionesModule,
     ProtocolosModule,
     RegistroModule,
+    ReglasModule,
     SituacionesModule,
   ],
   controllers: [AppController],
