@@ -16,6 +16,11 @@ import {
 } from './caso-nuevo.js';
 import { ultimaRevision } from './decision-situacion.js';
 import {
+  esReconsiderable,
+  leerMotivoReconsideracion,
+  prefijoReconsideracion,
+} from './reconsideracion.js';
+import {
   actasDelCaso,
   estadosPermitidos,
   hayPendientes,
@@ -348,15 +353,17 @@ export class CasosService {
   // transacción se crea el caso En análisis con su código (CA2), sus
   // participantes pasan al caso y se registra la decisión que deja la
   // situación vinculada. Si otro caso tomó el mismo código se reintenta.
+  // PB-050: también desde una Antecedente o Descartada, como reconsideración.
   async crearDesdeSituacion(
     sesion: Sesion,
     situacionId: string,
     cuerpo: unknown,
   ): Promise<{ id: string; codigo: string }> {
     const datos = validarNuevoCaso(cuerpo);
+    const motivo = leerMotivoReconsideracion(cuerpo);
     for (let intento = 1; ; intento++) {
       try {
-        return await this.guardarCaso(sesion, situacionId, datos);
+        return await this.guardarCaso(sesion, situacionId, datos, motivo);
       } catch (error) {
         const reintentar =
           error instanceof ConflictException &&
@@ -374,16 +381,18 @@ export class CasosService {
     sesion: Sesion,
     situacionId: string,
     datos: NuevoCaso,
+    motivoReconsideracion: string | null,
   ): Promise<{ id: string; codigo: string }> {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
-        await situacionEnRevision(
+        const prefijo = await situacionPorDecidir(
           db,
           situacionId,
           datos.revision_anterior_id,
           'abrir un caso',
+          motivoReconsideracion,
         );
 
         const errores: Record<string, string> = {};
@@ -475,7 +484,7 @@ export class CasosService {
                    'VINCULADA_CASO', $2, convi.membresia_actual(), $3, $4)`,
           [
             situacionId,
-            `Se abrió el caso ${nuevo.codigo} a partir de esta situación: ${datos.titulo}`,
+            `${prefijo}Se abrió el caso ${nuevo.codigo} a partir de esta situación: ${datos.titulo}`,
             datos.revision_anterior_id,
             nuevo.id,
           ],
@@ -495,15 +504,17 @@ export class CasosService {
     cuerpo: unknown,
   ): Promise<{ id: string; codigo: string }> {
     const datos = validarVinculacion(cuerpo);
+    const motivo = leerMotivoReconsideracion(cuerpo);
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
-        await situacionEnRevision(
+        const prefijo = await situacionPorDecidir(
           db,
           situacionId,
           datos.revision_anterior_id,
           'vincularla a un caso',
+          motivo,
         );
 
         // FOR SHARE impide que el caso se cierre mientras se vincula.
@@ -544,7 +555,7 @@ export class CasosService {
                    'VINCULADA_CASO', $2, convi.membresia_actual(), $3, $4)`,
           [
             situacionId,
-            datos.fundamento,
+            prefijo + datos.fundamento,
             datos.revision_anterior_id,
             elegido.id,
           ],
@@ -574,16 +585,20 @@ export class CasosService {
 }
 
 /**
- * Bloquea la situación y comprueba que siga En revisión y que nadie haya
- * agregado una revisión desde que se abrió el formulario (PB-139). Abrir un
- * caso y vincularla a uno existente son decisiones que terminan la revisión.
+ * Bloquea la situación y comprueba que se pueda decidir sobre ella y que
+ * nadie haya agregado una revisión desde que se abrió el formulario (PB-139).
+ * Abrir un caso y vincularla a uno existente son decisiones: En revisión
+ * terminan la revisión y sobre una Antecedente o Descartada son una
+ * reconsideración (PB-050), que exige el motivo. Devuelve lo que va al
+ * inicio del fundamento.
  */
-async function situacionEnRevision(
+async function situacionPorDecidir(
   db: PoolClient,
   situacionId: string,
   revisionAnteriorId: string | null,
   para: string,
-) {
+  motivoReconsideracion: string | null,
+): Promise<string> {
   const actual = await db
     .query<{ estado: string }>(
       'SELECT estado FROM convi.situaciones WHERE id = $1 FOR UPDATE',
@@ -606,12 +621,13 @@ async function situacionEnRevision(
     throw new ConflictException(
       'Esta situación ya está vinculada a un caso. No se traslada a otro ni se desvincula.',
     );
-  if (fila.estado !== 'EN_REVISION')
+  if (fila.estado !== 'EN_REVISION' && !esReconsiderable(fila.estado))
     throw new ConflictException(
-      'Esta situación ya tiene una decisión. Para cambiarla hay que reconsiderarla.',
+      `En el estado actual de la situación no se puede ${para}.`,
     );
   if ((await ultimaRevision(db, situacionId)) !== revisionAnteriorId)
     throw new ConflictException(DECISION_DESACTUALIZADA);
+  return prefijoReconsideracion(fila.estado, motivoReconsideracion);
 }
 
 /**
