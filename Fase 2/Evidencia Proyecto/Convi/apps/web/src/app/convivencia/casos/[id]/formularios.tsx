@@ -2,7 +2,12 @@
 
 import { useActionState, type ReactNode } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
-import { cambiarEstadoCaso, cerrarCaso, type EstadoAccion } from "./acciones";
+import {
+  aplicarProtocolo,
+  cambiarEstadoCaso,
+  cerrarCaso,
+  type EstadoAccion,
+} from "./acciones";
 
 const estadoInicial: EstadoAccion = {};
 
@@ -10,6 +15,7 @@ const estadoInicial: EstadoAccion = {};
 const LARGO_MAXIMO_MOTIVO = 500;
 const LARGO_MAXIMO_RESUMEN_CIERRE = 4000;
 const LARGO_MAXIMO_JUSTIFICACION = 2000;
+const LARGO_MAXIMO_FUNDAMENTO_PROTOCOLO = 4000;
 
 const claseControl =
   "mt-1.5 block w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/15";
@@ -236,6 +242,71 @@ export function FormularioCierre({
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Cerrando…" : "Cerrar caso"}
+      </button>
+    </form>
+  );
+}
+
+// PB-082 (HU-071 CA1): aplica una versión publicada y vigente del protocolo
+// con su fundamento. Quién y cuándo los guarda el servidor, que crea los
+// pasos del protocolo para el caso con su vencimiento.
+export function FormularioAplicarProtocolo({
+  casoId,
+  protocolos,
+}: {
+  casoId: string;
+  protocolos: { id: string; nombre: string; pasos: number }[];
+}) {
+  const [estado, accion, pendiente] = useActionState(
+    aplicarProtocolo,
+    estadoInicial,
+  );
+  const valores = estado.valores ?? {};
+  const errores = estado.errores ?? {};
+
+  return (
+    <form action={accion} noValidate className="space-y-4">
+      <input type="hidden" name="caso_id" value={casoId} />
+      {estado.mensaje && !estado.errores && (
+        <AvisoError>{estado.mensaje}</AvisoError>
+      )}
+
+      <Campo
+        id="protocolo_aplicado"
+        etiqueta="Protocolo"
+        error={errores.version_protocolo_id}
+      >
+        <select
+          {...propsControl("protocolo_aplicado", errores.version_protocolo_id)}
+          defaultValue={valores.version_protocolo_id ?? ""}
+        >
+          <option value="" disabled>
+            Elige un protocolo publicado
+          </option>
+          {protocolos.map((protocolo) => (
+            <option key={protocolo.id} value={protocolo.id}>
+              {protocolo.nombre} ({protocolo.pasos === 1 ? "1 paso" : `${protocolo.pasos} pasos`})
+            </option>
+          ))}
+        </select>
+      </Campo>
+
+      <Campo
+        id="fundamento_protocolo"
+        etiqueta="Por qué se aplica"
+        error={errores.fundamento}
+        ayuda="Queda con tu nombre y la fecha. La versión aplicada no cambia aunque después se publique otra."
+      >
+        <textarea
+          {...propsControl("fundamento_protocolo", errores.fundamento, true)}
+          rows={3}
+          maxLength={LARGO_MAXIMO_FUNDAMENTO_PROTOCOLO}
+          defaultValue={valores.fundamento}
+        />
+      </Campo>
+
+      <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
+        {pendiente ? "Aplicando…" : "Aplicar protocolo"}
       </button>
     </form>
   );

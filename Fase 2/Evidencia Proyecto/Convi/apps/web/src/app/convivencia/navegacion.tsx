@@ -16,6 +16,12 @@ const SECCIONES: SeccionMenu[] = [
         texto: "Casos",
         icono: "escudo",
       },
+      // PB-081 y PB-083: protocolos de la escuela, que se aplican en los casos (PB-082)
+      {
+        href: "/convivencia/protocolos",
+        texto: "Protocolos",
+        icono: "protocolos",
+      },
       // PB-043: situaciones que llegan por otros canales
       {
         href: "/convivencia/registrar",

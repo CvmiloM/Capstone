@@ -373,10 +373,13 @@ export function FormularioAclaracion({
 // cambia el estado de la situación (CA4) y no se edita después (CA5).
 export function FormularioRevisionNormativa({
   situacionId,
+  casoId,
   protocolos,
   documentos,
 }: {
-  situacionId: string;
+  situacionId?: string;
+  /** PB-082 (HU-071 CA2): revisión de un caso que sigue sin protocolo. */
+  casoId?: string;
   protocolos: { id: string; nombre: string }[];
   documentos: { id: string; nombre: string }[];
 }) {
@@ -395,7 +398,11 @@ export function FormularioRevisionNormativa({
 
   return (
     <form action={accion} noValidate className="space-y-5">
-      <input type="hidden" name="situacion_id" value={situacionId} />
+      {casoId ? (
+        <input type="hidden" name="caso_id" value={casoId} />
+      ) : (
+        <input type="hidden" name="situacion_id" value={situacionId} />
+      )}
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
       )}

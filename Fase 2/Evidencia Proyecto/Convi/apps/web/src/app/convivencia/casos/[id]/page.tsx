@@ -14,7 +14,13 @@ import {
   obtenerCaso,
   type DetalleCaso,
 } from "../datos";
-import { FormularioCierre, FormularioEstado } from "./formularios";
+import { FormularioRevisionNormativa } from "../../situaciones/[id]/formularios";
+import { APLICABILIDAD, MODO_REVISION } from "../../situaciones/[id]/opciones";
+import {
+  FormularioAplicarProtocolo,
+  FormularioCierre,
+  FormularioEstado,
+} from "./formularios";
 
 export const metadata: Metadata = { title: "Caso" };
 
@@ -29,6 +35,24 @@ const AVISOS: Record<string, string> = {
     "Cerraste el caso. El cierre quedó en su historial con el resumen, y sus antecedentes se conservan.",
   evidencia:
     "Adjuntaste la evidencia al caso. Quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
+  protocolo:
+    "Aplicaste el protocolo. Sus pasos quedaron en el caso con su vencimiento y su responsable.",
+  normativa:
+    "Registraste por qué el caso sigue sin protocolo. Quedó con tu nombre y la fecha.",
+};
+
+/** PB-082: estados del protocolo aplicado y de cada paso en el caso. */
+const NOMBRE_ESTADO_PROTOCOLO: Record<string, string> = {
+  ACTIVO: "Activo",
+  COMPLETADO: "Completado",
+  CANCELADO: "Cancelado",
+};
+const NOMBRE_ESTADO_PASO: Record<string, string> = {
+  PENDIENTE: "Pendiente",
+  EN_PROGRESO: "En progreso",
+  COMPLETADO: "Completado",
+  OMITIDO: "Omitido",
+  VENCIDO: "Vencido",
 };
 
 /** HU-047 CA2: las tareas sin terminar, en palabras. */
@@ -230,6 +254,131 @@ export default async function PaginaCaso({
               <FormularioEvidencia destino="convivencia-caso" registroId={caso.id} />
             )}
           </div>
+        </Seccion>
+
+        {/* PB-082 (HU-071): protocolo aplicado al caso, o por qué sigue sin uno. */}
+        <Seccion titulo="Protocolo" className="lg:col-span-3">
+          {caso.protocolos_aplicados.length === 0 &&
+            caso.revisiones_normativas.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Todavía no se aplica un protocolo ni se registra por qué el caso
+                sigue sin uno.
+              </p>
+            )}
+          {caso.protocolos_aplicados.map((aplicado) => (
+            <div key={aplicado.id} className="mb-4 rounded-xl border border-border p-4 text-sm">
+              <p className="font-medium">
+                {aplicado.protocolo} · versión {aplicado.numero_version}
+                <span className="ml-2 rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                  {NOMBRE_ESTADO_PROTOCOLO[aplicado.estado] ?? aplicado.estado}
+                </span>
+              </p>
+              <p className="mt-1 whitespace-pre-line">{aplicado.fundamento}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Aplicado por {aplicado.aplicado_por} el {formatearFecha(aplicado.aplicado_en)}
+              </p>
+              <ol className="mt-3 divide-y divide-border border-t border-border">
+                {aplicado.pasos.map((paso) => (
+                  <li
+                    key={paso.id}
+                    className="flex flex-wrap items-start justify-between gap-2 py-2"
+                  >
+                    <div>
+                      <p>
+                        {paso.orden_paso}. {paso.nombre}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {[
+                          paso.vence_en
+                            ? `Vence el ${formatearFecha(paso.vence_en)}`
+                            : "Sin plazo",
+                          paso.responsable
+                            ? `Responsable: ${paso.responsable}`
+                            : "Sin responsable asignado",
+                          paso.es_obligatorio ? null : "Opcional",
+                          paso.requiere_evidencia ? "Exige evidencia" : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                      {NOMBRE_ESTADO_PASO[paso.estado] ?? paso.estado}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ))}
+          {caso.revisiones_normativas.map((r) => (
+            <div key={r.id} className="mb-4 rounded-xl border border-border p-4 text-sm">
+              <div className="flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                  Sin protocolo · {APLICABILIDAD[r.aplicabilidad] ?? r.aplicabilidad}
+                </span>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                  {MODO_REVISION[r.modo_revision] ?? r.modo_revision}
+                </span>
+              </div>
+              <p className="mt-2 whitespace-pre-line">{r.fundamento}</p>
+              {r.protocolo && (
+                <p className="mt-2 text-muted-foreground">
+                  Protocolo considerado: <span className="text-foreground">{r.protocolo}</span>
+                </p>
+              )}
+              {r.referencias.length > 0 && (
+                <ul className="mt-2 list-inside list-disc text-muted-foreground">
+                  {r.referencias.map((ref, n) => (
+                    <li key={n}>
+                      {ref.documento} ({ref.version})
+                      {ref.pagina_desde &&
+                        (ref.pagina_hasta && ref.pagina_hasta !== ref.pagina_desde
+                          ? `, páginas ${ref.pagina_desde} a ${ref.pagina_hasta}`
+                          : `, página ${ref.pagina_desde}`)}
+                      {ref.titulo_seccion && `, ${ref.titulo_seccion}`}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Registrada por {r.revisado_por} el {formatearFecha(r.revisado_en)}
+              </p>
+            </div>
+          ))}
+          {caso.estado_actual !== "CERRADO" && (
+            <div className="mt-4 grid gap-6 border-t border-border pt-4 lg:grid-cols-2">
+              <div>
+                <h3 className="mb-3 text-sm font-semibold">Aplicar un protocolo</h3>
+                {caso.protocolos_aplicables.length > 0 ? (
+                  <FormularioAplicarProtocolo
+                    casoId={caso.id}
+                    protocolos={caso.protocolos_aplicables}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No hay protocolos publicados y vigentes. Se preparan y publican
+                    en{" "}
+                    <Link href="/convivencia/protocolos" className={claseEnlace}>
+                      Protocolos
+                    </Link>
+                    .
+                  </p>
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold">O registrar que sigue sin protocolo</h3>
+                <p className="mt-1 mb-3 text-sm text-muted-foreground">
+                  Indica si la norma es aplicable y por qué no se aplica un
+                  protocolo. No se crea una aplicación ficticia.
+                </p>
+                <FormularioRevisionNormativa
+                  casoId={caso.id}
+                  protocolos={caso.opciones_normativa.protocolos}
+                  documentos={caso.opciones_normativa.documentos}
+                />
+              </div>
+            </div>
+          )}
         </Seccion>
 
         {/* PB-152 (HU-131 CA1) y PB-054 (HU-047 CA4): cada cambio queda en el historial. */}

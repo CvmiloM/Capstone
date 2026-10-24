@@ -185,9 +185,10 @@ const SIN_CONEXION =
 
 /**
  * Envía un cambio a la API. Los errores se devuelven en vez de lanzarse, para
- * que el formulario los muestre sin perder lo escrito.
+ * que el formulario los muestre sin perder lo escrito. PB-081: los protocolos
+ * (protocolos/datos.ts) también la usan.
  */
-async function enviar(
+export async function enviar(
   metodo: "POST" | "PATCH",
   ruta: string,
   cuerpo?: unknown,
@@ -313,6 +314,24 @@ export function enviarCierreCaso(id: string, cuerpo: unknown) {
   return enviar(
     "POST",
     `/convivencia/casos/${encodeURIComponent(id)}/cierre`,
+    cuerpo,
+  );
+}
+
+/** HU-071 CA1: aplica una versión publicada del protocolo al caso. */
+export function enviarAplicacionProtocolo(id: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/casos/${encodeURIComponent(id)}/protocolos`,
+    cuerpo,
+  );
+}
+
+/** HU-071 CA2 y CA3: revisión del caso sin protocolo, como la de PB-155. */
+export function enviarRevisionNormativaCaso(id: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/casos/${encodeURIComponent(id)}/revisiones-normativas`,
     cuerpo,
   );
 }

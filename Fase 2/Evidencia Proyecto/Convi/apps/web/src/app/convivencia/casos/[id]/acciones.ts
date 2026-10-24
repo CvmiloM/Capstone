@@ -1,7 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { enviarCambioEstadoCaso, enviarCierreCaso } from "../../datos";
+import {
+  enviarAplicacionProtocolo,
+  enviarCambioEstadoCaso,
+  enviarCierreCaso,
+} from "../../datos";
 
 export type EstadoAccion = {
   /** Error general del formulario. */
@@ -65,4 +69,23 @@ export async function cerrarCaso(
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
   redirect(`/convivencia/casos/${id}?aviso=cerrado`);
+}
+
+// PB-082 (HU-071 CA1): aplica al caso una versión publicada del protocolo
+// con su fundamento; la API crea los pasos para el caso.
+export async function aplicarProtocolo(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const id = leerTexto(formData, "caso_id");
+  const valores = {
+    version_protocolo_id: leerTexto(formData, "protocolo_aplicado"),
+    fundamento: leerTexto(formData, "fundamento_protocolo"),
+  };
+  if (!UUID.test(id)) return { mensaje: NO_VALIDO, valores };
+  const resultado = await enviarAplicacionProtocolo(id, valores);
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  redirect(`/convivencia/casos/${id}?aviso=protocolo`);
 }

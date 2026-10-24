@@ -1,5 +1,5 @@
 import type { Evidencia } from "@/app/components/evidencias/opciones";
-import { pedir } from "../datos";
+import { pedir, type RevisionNormativa } from "../datos";
 
 // PB-053 (HU-046): casos del portal de Convivencia. Mismas formas que devuelve
 // apps/api/src/modules/situaciones/casos.service.ts; las fechas llegan como
@@ -74,6 +74,36 @@ export type DetalleCaso = CasoLista & {
   actas_cierre: { id: string; titulo: string; fecha_documento: string }[];
   /** PB-066: evidencias del caso y de sus situaciones vinculadas. */
   evidencias: Evidencia[];
+  /** PB-082 (HU-071 CA1): protocolos aplicados con sus pasos. */
+  protocolos_aplicados: {
+    id: string;
+    protocolo: string;
+    codigo: string;
+    numero_version: number;
+    estado: string;
+    fundamento: string;
+    aplicado_por: string;
+    aplicado_en: string;
+    pasos: {
+      id: string;
+      orden_paso: number;
+      nombre: string;
+      descripcion: string | null;
+      estado: string;
+      vence_en: string | null;
+      requiere_evidencia: boolean;
+      es_obligatorio: boolean;
+      responsable: string | null;
+    }[];
+  }[];
+  /** Versiones publicadas y vigentes que se pueden aplicar hoy. */
+  protocolos_aplicables: { id: string; nombre: string; pasos: number }[];
+  /** HU-071 CA2 y CA3: revisiones del caso sin protocolo. */
+  revisiones_normativas: RevisionNormativa[];
+  opciones_normativa: {
+    protocolos: { id: string; nombre: string }[];
+    documentos: { id: string; nombre: string }[];
+  };
 };
 
 export function obtenerCasos() {
