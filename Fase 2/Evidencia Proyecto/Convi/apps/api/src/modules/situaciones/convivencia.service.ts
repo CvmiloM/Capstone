@@ -8,6 +8,10 @@ import {
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
+import {
+  cambiosDeSituacion,
+  type CambioSituacion,
+} from './cambios-situacion.js';
 import { opcionesCaso, type OpcionesCaso } from './caso-nuevo.js';
 import {
   decisionesDeSituacion,
@@ -145,6 +149,10 @@ export type DetalleConvivencia = SituacionBandeja & {
   opciones_caso: OpcionesCaso;
   /** PB-066: evidencias de la situación y de las respuestas a sus aclaraciones. */
   evidencias: EvidenciaRegistrada[];
+  /** PB-142 (HU-121): la registró Convivencia como registro histórico (PB-075). */
+  registro_historico: boolean;
+  /** PB-142 (HU-121): cambios de estado, urgencia o responsable, con quién y por qué. */
+  cambios: CambioSituacion[];
 };
 
 export type ResponsableAsignado = {
@@ -290,15 +298,21 @@ export class ConvivenciaService {
 
   // Detalle completo para revisar: participantes con su curso histórico y las
   // aclaraciones pedidas. Otra escuela no la ve por la seguridad por fila.
+  // PB-142 (HU-121): también el historial de cambios que guardó la auditoría.
   situacion(sesion: Sesion, id: string): Promise<DetalleConvivencia> {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
         const base = await db.query<
-          SituacionBandeja & { lugar: string | null; descripcion: string }
+          SituacionBandeja & {
+            lugar: string | null;
+            descripcion: string;
+            registro_historico: boolean;
+          }
         >(
-          `SELECT ${COLUMNAS_BANDEJA}, s.lugar, s.descripcion
+          `SELECT ${COLUMNAS_BANDEJA}, s.lugar, s.descripcion,
+                  s.registro_historico
            ${DESDE_BANDEJA}
            WHERE s.id = $1`,
           [id],
@@ -378,6 +392,7 @@ export class ConvivenciaService {
             ).rows[0] ?? null,
           opciones_caso: await opcionesCaso(db, id),
           evidencias: await evidenciasDeSituacion(db, id),
+          cambios: await cambiosDeSituacion(db, id),
         };
       },
     );

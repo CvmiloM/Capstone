@@ -109,6 +109,22 @@ export type DetalleConvivencia = SituacionBandeja & {
   };
   /** PB-066: evidencias de la situación y de las respuestas a sus aclaraciones. */
   evidencias: Evidencia[];
+  /** PB-142 (HU-121): la registró Convivencia como registro histórico (PB-075). */
+  registro_historico: boolean;
+  /** PB-142 (HU-121): cambios de estado, urgencia o responsable, con quién y por qué. */
+  cambios: {
+    id: string;
+    cambiado_en: string;
+    /** null si el cambio se hizo sin una cuenta. */
+    cambiado_por: string | null;
+    /** Estado y urgencia van con su código; el responsable, con su nombre. */
+    cambios: {
+      campo: "estado" | "urgencia" | "responsable";
+      antes: string | null;
+      despues: string | null;
+    }[];
+    motivo: string | null;
+  }[];
 };
 
 /** Misma forma que devuelve apps/api/src/modules/situaciones/revision-normativa.ts. */
