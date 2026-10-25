@@ -237,8 +237,20 @@ export class EvidenciasService {
         return fila.rows[0];
       },
     );
+    // PB-143: la credencial de Storage no debe leer fuera del espacio de esta escuela.
+    if (
+      archivo.espacio !== ESPACIO ||
+      !archivo.clave.startsWith(`${sesion.establecimiento_id}/`) ||
+      /[%\\]/.test(archivo.clave) ||
+      archivo.clave
+        .split('/')
+        .some((parte) => !parte || parte === '.' || parte === '..')
+    )
+      throw new NotFoundException(
+        'La evidencia no existe o no tienes permiso para descargarla.',
+      );
     const { data, error } = await this.supabase.storage
-      .from(archivo.espacio)
+      .from(ESPACIO)
       .download(archivo.clave);
     if (error || !data)
       throw new ServiceUnavailableException(
