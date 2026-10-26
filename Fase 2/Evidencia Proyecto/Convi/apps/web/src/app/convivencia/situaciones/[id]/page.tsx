@@ -322,7 +322,9 @@ export default async function PaginaRevisionSituacion({
                     <ul className="mt-2 list-inside list-disc text-muted-foreground">
                       {r.referencias.map((ref, n) => (
                         <li key={n}>
-                          {ref.documento} ({ref.version})
+                          <Link className={claseEnlace} href={`/convivencia/documentos/versiones/${ref.version_documento_id}?pagina=${ref.pagina_desde ?? 1}`}>
+                            {ref.documento} ({ref.version})
+                          </Link>
                           {ref.pagina_desde &&
                             (ref.pagina_hasta && ref.pagina_hasta !== ref.pagina_desde
                               ? `, páginas ${ref.pagina_desde} a ${ref.pagina_hasta}`

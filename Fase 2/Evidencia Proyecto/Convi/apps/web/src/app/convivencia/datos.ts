@@ -137,6 +137,7 @@ export type RevisionNormativa = {
   fundamento: string;
   protocolo: string | null;
   referencias: {
+    version_documento_id: string;
     documento: string;
     version: string;
     pagina_desde: number | null;
