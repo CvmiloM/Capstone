@@ -167,6 +167,69 @@ export class CuentaService implements OnModuleDestroy {
     });
   }
 
+  /**
+   * PB-090 (HU-079 CA5): trabajo del motor de reglas, sin sesión de persona.
+   * Usa la identidad técnica convi_motor_reglas, que solo lee fechas,
+   * categorías, cursos y estados, y solo crea alertas, avisos y el registro
+   * de su ejecución. Evalúa una escuela por transacción con su zona horaria.
+   * Si la escuela no existe o no está activa no hace nada y devuelve null.
+   */
+  async operarMotor<T>(
+    establecimientoId: string,
+    trabajo: (cliente: PoolClient) => Promise<T>,
+  ): Promise<T | null> {
+    if (!UUID.test(establecimientoId))
+      throw new BadRequestException('Escuela no válida.');
+    const cliente = await this.pool.connect();
+    let descartarConexion = false;
+    try {
+      // READ COMMITTED: cada consulta ve lo ya confirmado, incluida la
+      // situación recién guardada y las alertas de una evaluación anterior.
+      await cliente.query(
+        'BEGIN ISOLATION LEVEL READ COMMITTED; SET LOCAL ROLE convi_motor_reglas',
+      );
+      await cliente.query(
+        `SELECT set_config('app.auth_usuario_id', '', true),
+                set_config('app.aal', '', true),
+                set_config('app.membresia_id', '', true),
+                set_config('app.establecimiento_id', $1, true)`,
+        [establecimientoId],
+      );
+      // Dos evaluaciones de la misma escuela esperan su turno, aunque corran
+      // en dos copias de la API: así no se generan dos alertas por la misma racha.
+      await cliente.query(
+        `SELECT pg_advisory_xact_lock(hashtext('convi_motor_reglas'), hashtext($1))`,
+        [establecimientoId],
+      );
+      // La política del motor solo deja ver la escuela si está activa.
+      const escuela = await cliente.query<{ zona_horaria: string }>(
+        `SELECT zona_horaria FROM convi.establecimientos
+         WHERE id = convi.establecimiento_actual()`,
+      );
+      if (escuela.rows.length !== 1) {
+        await cliente.query('ROLLBACK');
+        return null;
+      }
+      // current_date y ::date usan el día de la escuela, no UTC.
+      await cliente.query(`SELECT set_config('TimeZone', $1, true)`, [
+        escuela.rows[0].zona_horaria,
+      ]);
+      const respuesta = await trabajo(cliente);
+      await cliente.query('COMMIT');
+      return respuesta;
+    } catch (error) {
+      try {
+        await cliente.query('ROLLBACK');
+      } catch {
+        descartarConexion = true;
+      }
+      throw error;
+    } finally {
+      // El rol técnico y la escuela terminan con la transacción.
+      cliente.release(descartarConexion);
+    }
+  }
+
   private async transaccion<T>(
     identidad: Identidad,
     soloLectura: boolean,
