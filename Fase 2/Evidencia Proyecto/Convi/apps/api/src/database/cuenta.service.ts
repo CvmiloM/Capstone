@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   Inject,
@@ -299,6 +300,14 @@ export class CuentaService implements OnModuleDestroy {
         descartarConexion = true;
       }
       if (error instanceof HttpException) throw error;
+      if (
+        ['40001', '40P01'].includes(
+          (error as { code?: string } | null)?.code ?? '',
+        )
+      )
+        throw new ConflictException(
+          'Otra operación cambió los datos mientras trabajabas, recarga la página e inténtalo nuevamente',
+        );
       throw new ServiceUnavailableException(
         'No se pudo completar la operación.',
       );

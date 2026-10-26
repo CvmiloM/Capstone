@@ -32,6 +32,11 @@ const SECCIONES: SeccionMenu[] = [
       },
       // PB-043: situaciones que llegan por otros canales
       {
+        href: "/convivencia/documentos",
+        texto: "Documentos institucionales",
+        icono: "documentos",
+      },
+      {
         href: "/convivencia/registrar",
         texto: "Registrar situación",
         icono: "info",

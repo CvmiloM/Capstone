@@ -206,7 +206,7 @@ export async function revisionesNormativasDelCaso(
   const referencias = await db.query<
     RevisionNormativa['referencias'][number] & { revision_id: string }
   >(
-    `SELECT rr.revision_id, d.titulo AS documento, v.etiqueta_version AS version,
+    `SELECT rr.revision_id, rr.version_documento_id, d.titulo AS documento, v.etiqueta_version AS version,
             rr.pagina_desde, rr.pagina_hasta, rr.titulo_seccion
      FROM convi.referencias_revision_normativa rr
      JOIN convi.versiones_documento v ON v.id = rr.version_documento_id
