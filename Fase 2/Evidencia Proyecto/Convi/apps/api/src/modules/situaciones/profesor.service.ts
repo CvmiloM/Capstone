@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import { EvaluacionReglas } from '../alertas/evaluacion.service.js';
 import {
   errorDeCampos,
   type NuevaSituacion,
@@ -126,7 +127,10 @@ const DESDE_SITUACIONES = `
 
 @Injectable()
 export class ProfesorService {
-  constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
+  constructor(
+    @Inject(CuentaService) private readonly cuentas: CuentaService,
+    @Inject(EvaluacionReglas) private readonly reglas: EvaluacionReglas,
+  ) {}
 
   // CA1: solo cursos con una asignación vigente hoy, con la cantidad de matrículas activas.
   cursos(sesion: Sesion): Promise<CursoAsignado[]> {
@@ -199,7 +203,14 @@ export class ProfesorService {
   // sola transacción. Si algo falla no queda una situación sin estudiantes.
   registrar(sesion: Sesion, cuerpo: unknown): Promise<SituacionRegistrada> {
     const datos = validarNuevaSituacion(cuerpo);
-    return conReintentosDeCodigo(() => this.guardarSituacion(sesion, datos));
+    return conReintentosDeCodigo(() =>
+      this.guardarSituacion(sesion, datos),
+    ).then((registrada) => {
+      // PB-090 (HU-079 CA4 y CA8): con la transacción ya confirmada se
+      // evalúan las reglas de cantidad; si falla, la situación queda guardada.
+      this.reglas.despuesDeGuardar(sesion.establecimiento_id, registrada.id);
+      return registrada;
+    });
   }
 
   // CA1: curso_reporte usa convi.puede_reportar_curso, que exige la asignación

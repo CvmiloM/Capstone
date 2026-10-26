@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
+import { AlertasModule } from '../alertas/alertas.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { CasosController } from './casos.controller.js';
 import { CasosService } from './casos.service.js';
@@ -24,8 +25,10 @@ import { ProfesorService } from './profesor.service.js';
 // PB-053: los casos, que se abren desde una situación.
 // PB-066: las evidencias, guardadas con la clave de servicio en el espacio
 // privado de Storage, como los archivos de las importaciones (PB-019).
+// PB-090 (Camilo): AlertasModule evalúa las reglas de cantidad después de
+// registrar una situación.
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, AlertasModule],
   controllers: [
     ProfesorController,
     ConvivenciaController,

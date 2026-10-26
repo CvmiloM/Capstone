@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import { EvaluacionReglas } from '../alertas/evaluacion.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
 import {
   cambiosDeSituacion,
@@ -256,7 +257,10 @@ const DESDE_BANDEJA = `
 
 @Injectable()
 export class ConvivenciaService {
-  constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
+  constructor(
+    @Inject(CuentaService) private readonly cuentas: CuentaService,
+    @Inject(EvaluacionReglas) private readonly reglas: EvaluacionReglas,
+  ) {}
 
   // CA1 y CA4: bandeja filtrada por estado y urgencia, la más urgente primero.
   // La lista y los totales se leen en la misma transacción, así que coinciden.
@@ -991,6 +995,11 @@ export class ConvivenciaService {
           return registrada;
         },
       ),
-    );
+    ).then((registrada) => {
+      // PB-090 (HU-079 CA4 y CA8): con la transacción ya confirmada se
+      // evalúan las reglas de cantidad; si falla, la situación queda guardada.
+      this.reglas.despuesDeGuardar(sesion.establecimiento_id, registrada.id);
+      return registrada;
+    });
   }
 }
