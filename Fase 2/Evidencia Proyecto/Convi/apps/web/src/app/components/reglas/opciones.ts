@@ -1,6 +1,7 @@
 // PB-089 (HU-078): valores y textos de las reglas de aviso, compartidos por el
 // formulario (cliente) y las pantallas (servidor). Los mismos valores que
-// valida apps/api/src/modules/reglas/regla.ts.
+// valida apps/api/src/modules/reglas/regla.ts. PB-091 y PB-092: los textos de
+// fecha límite y de variación dicen lo que cuenta el motor cada mañana.
 
 export type Tipo =
   | "RECURRENCIA"
@@ -23,12 +24,12 @@ export const TIPOS: { valor: Tipo; texto: string; ayuda: string }[] = [
   {
     valor: "VARIACION_PERIODO",
     texto: "Variación entre períodos",
-    ayuda: "Compara dos períodos seguidos de igual duración y avisa si las situaciones suben o bajan.",
+    ayuda: "Cada mañana compara los últimos días cerrados con el mismo período anterior y avisa si las situaciones suben o bajan.",
   },
   {
     valor: "FECHA_LIMITE",
     texto: "Fecha límite",
-    ayuda: "Avisa cuando un caso pasa su fecha límite de cierre.",
+    ayuda: "Avisa cuando un caso acumula compromisos, acciones del plan o seguimientos con la fecha vencida.",
   },
   {
     valor: "PLAZO_PROTOCOLO",
@@ -144,7 +145,7 @@ export function describirRegla(regla: {
     case "VARIACION_PERIODO":
       return `Variación de ${operador.toLowerCase()} ${n} % en las situaciones${de} ${DONDE[regla.codigo_ambito]}, comparando dos períodos seguidos de ${dias} ${plural(dias, "día", "días")}`;
     case "FECHA_LIMITE":
-      return `Casos con ${operador.toLowerCase()} ${n} ${plural(n, "fecha límite de cierre vencida", "fechas límite de cierre vencidas")}`;
+      return `Casos con ${operador.toLowerCase()} ${n} ${plural(n, "compromiso, acción o seguimiento vencido", "compromisos, acciones o seguimientos vencidos")}`;
     case "PLAZO_PROTOCOLO":
       return `Casos con ${operador.toLowerCase()} ${n} ${plural(n, "paso de protocolo vencido", "pasos de protocolo vencidos")}`;
   }

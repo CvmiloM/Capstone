@@ -230,6 +230,34 @@ export class CuentaService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * PB-091 y PB-092: las escuelas activas que tienen reglas diarias activas,
+   * para la evaluación de cada mañana. La identidad técnica del motor solo ve
+   * la escuela de cada transacción, así que la lista la entrega una función
+   * de la base que devuelve solo identificadores.
+   */
+  async escuelasConReglasDiarias(): Promise<string[]> {
+    const cliente = await this.pool.connect();
+    let descartarConexion = false;
+    try {
+      await cliente.query('BEGIN READ ONLY; SET LOCAL ROLE convi_motor_reglas');
+      const filas = await cliente.query<{ id: string }>(
+        'SELECT id FROM convi.motor_escuelas_con_reglas_diarias() AS id',
+      );
+      await cliente.query('COMMIT');
+      return filas.rows.map((f) => f.id);
+    } catch (error) {
+      try {
+        await cliente.query('ROLLBACK');
+      } catch {
+        descartarConexion = true;
+      }
+      throw error;
+    } finally {
+      cliente.release(descartarConexion);
+    }
+  }
+
   private async transaccion<T>(
     identidad: Identidad,
     soloLectura: boolean,
