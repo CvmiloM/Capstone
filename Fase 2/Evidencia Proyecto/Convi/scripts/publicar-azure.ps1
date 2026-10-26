@@ -81,6 +81,12 @@ try {
     }
 
     $base = Invocar-Az -Argumentos @('deployment', 'group', 'show', '-g', $resourceGroup, '-n', 'convi-base', '--query', 'properties.outputs', '-o', 'json') | ConvertFrom-Json
+    if ($cloud['IA_EMBEDDINGS_URL']) {
+        try { $iaDestino = [uri]$cloud['IA_EMBEDDINGS_URL'] } catch { throw 'IA_EMBEDDINGS_URL no es una dirección válida.' }
+        if ($iaDestino.Scheme -ne 'https' -or $iaDestino.UserInfo -or $iaDestino.Fragment -or -not $cloud['IA_EMBEDDINGS_TOKEN']) {
+            throw 'El servicio de embeddings cloud requiere HTTPS, sin credenciales en la URL y con IA_EMBEDDINGS_TOKEN privado.'
+        }
+    }
     $registro = $base.registryServer.value
     $apiImage = "$registro/convi-api:$Version"
     $webImage = "$registro/convi-web:$Version"
@@ -118,6 +124,8 @@ try {
         supabaseUrl = $cloud['SUPABASE_URL']; supabasePublishableKey = $cloud['SUPABASE_PUBLISHABLE_KEY']
         supabaseSecretKey = $cloud['SUPABASE_SECRET_KEY']; supabaseDbUrl = $db
         redisUrl = $cloud['AZURE_REDIS_URL']
+        iaEmbeddingsUrl = [string]$cloud['IA_EMBEDDINGS_URL']
+        iaEmbeddingsToken = [string]$cloud['IA_EMBEDDINGS_TOKEN']
         webCustomDomains = $dominios
     }
     $parametros = @{}

@@ -22,6 +22,7 @@ import {
   type ArchivoSubido,
 } from '../situaciones/archivo-evidencia.js';
 import { DocumentosService } from './documentos.service.js';
+import { PreparacionDocumentos } from './preparacion.service.js';
 
 const CARGA = FileInterceptor('archivo', {
   limits: { fileSize: TAMANO_MAXIMO + 1024 * 1024, files: 1, fields: 5 },
@@ -32,6 +33,8 @@ const CARGA = FileInterceptor('archivo', {
 export class DocumentosController {
   constructor(
     @Inject(DocumentosService) private readonly documentos: DocumentosService,
+    @Inject(PreparacionDocumentos)
+    private readonly preparacion: PreparacionDocumentos,
   ) {}
   @Get() listar(@Req() r: PeticionConSesion) {
     return this.documentos.listar(r.sesion);
@@ -48,6 +51,21 @@ export class DocumentosController {
   @Get('versiones/:id')
   version(@Req() r: PeticionConSesion, @Param('id', ParseUUIDPipe) id: string) {
     return this.documentos.version(r.sesion, id);
+  }
+  @Post('versiones/:id/preparacion')
+  preparar(
+    @Req() r: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.preparacion.solicitar(r.sesion, id);
+  }
+  @Get('versiones/:id/preparacion')
+  @Header('Cache-Control', 'private, no-store')
+  estadoPreparacion(
+    @Req() r: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.preparacion.estado(r.sesion, id);
   }
   @Post('versiones/:id/publicacion')
   publicar(

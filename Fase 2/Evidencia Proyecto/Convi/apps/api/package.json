@@ -29,9 +29,11 @@
     "bullmq": "6.3.11",
     "exceljs": "4.4.0",
     "ioredis": "5.11.1",
+    "mammoth": "1.13.0",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "unpdf": "1.9.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",

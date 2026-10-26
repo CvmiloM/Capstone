@@ -14,10 +14,10 @@ import {
 } from "./datos";
 import { AccionesVersion, FormularioCarga } from "./formularios";
 import { TarjetaDocumento } from "./tarjeta-documento";
+import { PreparacionDocumento } from "./preparacion";
 import {
   COLOR_ESTADO,
   ESTADOS,
-  PROCESAMIENTO,
   TIPOS,
   fecha,
   tamanoArchivo,
@@ -88,10 +88,12 @@ export async function DetalleDocumento({
   portal,
   id,
   guardado,
+  preparacionSinConfirmar = false,
 }: {
   portal: Portal;
   id: string;
   guardado: boolean;
+  preparacionSinConfirmar?: boolean;
 }) {
   const d = await leer<Detalle>(`/${encodeURIComponent(id)}`);
   if (!d) notFound();
@@ -133,6 +135,16 @@ export async function DetalleDocumento({
           Los cambios se guardaron correctamente
         </p>
       )}
+      {preparacionSinConfirmar && (
+        <p
+          role="alert"
+          className="mb-5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm"
+        >
+          El original se guardó, no pudimos confirmar la solicitud de
+          preparación para búsqueda, revisa su estado abajo y vuelve a
+          solicitarla si hace falta
+        </p>
+      )}
       <details className="mb-6 max-w-2xl rounded-2xl border border-border bg-card p-5">
         <summary className="cursor-pointer font-medium">
           Subir una nueva versión
@@ -155,34 +167,11 @@ export async function DetalleDocumento({
             key={v.id}
             nombre={d.titulo + " - " + v.etiqueta_version}
             preparacion={
-              <details className="pointer-events-auto w-fit max-w-full text-sm">
-                <summary className="cursor-pointer text-muted-foreground">
-                  Preparación para búsqueda
-                </summary>
-                <div className="mt-2 space-y-1 text-muted-foreground">
-                  <p>
-                    Estado: {PROCESAMIENTO[v.estado_procesamiento]} · Intentos:{" "}
-                    {v.intentos_procesamiento}
-                  </p>
-                  {v.incluir_en_busqueda_ia &&
-                    v.estado_procesamiento === "PENDIENTE" && (
-                      <p>
-                        El original ya está disponible, la preparación
-                        automática para búsqueda se incorporará en una próxima
-                        entrega
-                      </p>
-                    )}
-                  {d.tipo_documento === "PLANTILLA" && (
-                    <p>
-                      Las plantillas se pueden descargar, no se utilizan como
-                      fuente para la búsqueda con IA
-                    </p>
-                  )}
-                  {v.detalle_error_procesamiento && (
-                    <p role="alert">{v.detalle_error_procesamiento}</p>
-                  )}
-                </div>
-              </details>
+              <PreparacionDocumento
+                key={`${v.id}-${v.estado_procesamiento}-${v.intentos_procesamiento}`}
+                version={v}
+                portal={portal}
+              />
             }
             acciones={
               <>

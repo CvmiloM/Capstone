@@ -38,7 +38,12 @@ export type Detalle = Documento & { versiones: Version[]; hoy: string };
 export type VersionDetalle = Version &
   Pick<Documento, "titulo" | "tipo_documento">;
 export type Resultado =
-  | { ok: true; id: string; version_id?: string }
+  | {
+      ok: true;
+      id: string;
+      version_id?: string;
+      preparacion_solicitada?: boolean;
+    }
   | { ok: false; mensaje: string; errores?: Record<string, string> };
 
 async function token() {
@@ -91,6 +96,7 @@ export async function guardar(
     id?: string;
     documento_id?: string;
     version_id?: string;
+    preparacion_solicitada?: boolean;
     mensaje?: string;
     message?: string;
     errores?: Record<string, string>;
@@ -100,6 +106,7 @@ export async function guardar(
       ok: true,
       id: datos.documento_id ?? datos.id,
       version_id: datos.version_id,
+      preparacion_solicitada: datos.preparacion_solicitada,
     };
   if (r.status === 413)
     return { ok: false, mensaje: "El archivo supera el límite de 25 MB" };
@@ -110,6 +117,24 @@ export async function guardar(
     errores: datos?.errores,
   };
 }
+export async function estadoPreparacion(id: string) {
+  const respuesta = await pedir(
+    `/versiones/${encodeURIComponent(id)}/preparacion`,
+  );
+  return new Response(
+    respuesta.ok
+      ? await respuesta.text()
+      : JSON.stringify({ mensaje: "No pudimos consultar la preparación" }),
+    {
+      status: respuesta.status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "private, no-store",
+      },
+    },
+  );
+}
+
 export async function archivoVersion(id: string, ver: boolean) {
   const r = await pedir(
     `/versiones/${encodeURIComponent(id)}/archivo${ver ? "?ver=1" : ""}`,

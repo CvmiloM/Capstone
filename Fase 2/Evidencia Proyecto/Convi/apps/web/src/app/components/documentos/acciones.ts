@@ -2,7 +2,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { guardar } from "./datos";
-export type Estado = { mensaje?: string; errores?: Record<string, string> };
+export type Estado = {
+  mensaje?: string;
+  errores?: Record<string, string>;
+  solicitudPreparacion?: number;
+};
 const texto = (f: FormData, c: string) =>
   typeof f.get(c) === "string" ? String(f.get(c)).trim() : "";
 export async function cambiarDocumento(
@@ -27,6 +31,7 @@ export async function cambiarDocumento(
       cerrar: "cierre-vigencia",
       archivar: "archivo",
       republicar: "republicacion",
+      preparar: "preparacion",
     };
     if (!rutas[accion]) return { mensaje: "Acción no válida" };
     ruta = `/versiones/${encodeURIComponent(version)}/${rutas[accion]}`;
@@ -40,8 +45,10 @@ export async function cambiarDocumento(
     return { mensaje: resultado.mensaje, errores: resultado.errores };
   for (const portal of ["admin", "convivencia"])
     revalidatePath(`/${portal}/documentos`, "layout");
+  if (accion === "preparar")
+    return { solicitudPreparacion: (_anterior.solicitudPreparacion ?? 0) + 1 };
   const portal = texto(f, "portal") === "admin" ? "admin" : "convivencia";
   redirect(
-    `/${portal}/documentos/${encodeURIComponent(resultado.id)}?guardado=1`,
+    `/${portal}/documentos/${encodeURIComponent(resultado.id)}?guardado=1${resultado.preparacion_solicitada === false ? "&preparacion=sin-confirmar" : ""}`,
   );
 }
