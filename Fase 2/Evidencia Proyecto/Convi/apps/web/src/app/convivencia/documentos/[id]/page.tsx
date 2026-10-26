@@ -4,7 +4,7 @@ export default async function Pagina({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ guardado?: string }>;
+  searchParams: Promise<{ guardado?: string; preparacion?: string }>;
 }) {
   const [{ id }, q] = await Promise.all([params, searchParams]);
   return (
@@ -12,6 +12,7 @@ export default async function Pagina({
       portal="convivencia"
       id={id}
       guardado={q.guardado === "1"}
+      preparacionSinConfirmar={q.preparacion === "sin-confirmar"}
     />
   );
 }

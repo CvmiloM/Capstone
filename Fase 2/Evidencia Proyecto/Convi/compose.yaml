@@ -22,6 +22,8 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:-}"
       # PB-027: cola de la confirmación de importaciones (Redis de Docker).
       REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
+      IA_EMBEDDINGS_URL: "${IA_EMBEDDINGS_URL:-}"
+      IA_EMBEDDINGS_TOKEN: "${IA_EMBEDDINGS_TOKEN:-}"
     ports:
       - "127.0.0.1:${API_PORT:-3001}:3001"
     volumes:

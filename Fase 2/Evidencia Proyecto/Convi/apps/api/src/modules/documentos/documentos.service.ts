@@ -14,6 +14,11 @@ import type { Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import type { ArchivoSubido } from '../situaciones/archivo-evidencia.js';
 import { validarCarga, validarVigencia } from './documento.js';
+import {
+  COLA_DOCUMENTOS,
+  encolarDocumento,
+  type ColaDocumentos,
+} from './cola.js';
 
 export const DOCUMENTOS_STORAGE = Symbol('DOCUMENTOS_STORAGE');
 const ESPACIO = 'convi-privado';
@@ -32,13 +37,15 @@ const DESDE_VERSION = `FROM convi.versiones_documento v
   JOIN convi.membresias_establecimiento m ON m.id = v.subido_por
   JOIN convi.personas p ON p.id = m.persona_id`;
 
-// PB-078/080/084: cada archivo original se conserva, la preparación para IA es PB-079.
+// El original se conserva incluso si no se consigue encolar su preparación.
 @Injectable()
 export class DocumentosService {
   private readonly logger = new Logger(DocumentosService.name);
   constructor(
     @Inject(CuentaService) private readonly cuentas: CuentaService,
     @Inject(DOCUMENTOS_STORAGE) private readonly supabase: SupabaseClient,
+    @Inject(COLA_DOCUMENTOS)
+    private readonly cola: ColaDocumentos | null = null,
   ) {}
 
   private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
@@ -59,6 +66,36 @@ export class DocumentosService {
         }
       },
     );
+  }
+
+  async programarPreparacion(sesion: Sesion, id: string): Promise<boolean> {
+    try {
+      const version = await this.version(sesion, id);
+      if (
+        !version.incluir_en_busqueda_ia ||
+        version.estado_procesamiento === 'LISTO'
+      )
+        return true;
+      await encolarDocumento(this.cola, sesion, id);
+      return true;
+    } catch {
+      await this.operar(sesion, (db) =>
+        db.query(
+          `UPDATE convi.versiones_documento
+        SET estado_procesamiento = 'FALLIDO', detalle_error_procesamiento = $2
+        WHERE id = $1 AND incluir_en_busqueda_ia AND estado_procesamiento = 'PENDIENTE'`,
+          [
+            id,
+            'No pudimos confirmar la solicitud de preparación, el original se guardó y puedes volver a solicitarla',
+          ],
+        ),
+      ).catch(() =>
+        this.logger.warn(
+          'No se pudo registrar el estado de una solicitud de preparación',
+        ),
+      );
+      return false;
+    }
   }
 
   listar(sesion: Sesion) {
@@ -123,7 +160,7 @@ export class DocumentosService {
     const clave = `${sesion.establecimiento_id}/documentos/${randomUUID()}.${datos.archivo.formato}`;
     let subido = false;
     try {
-      return await this.operar(sesion, async (db) => {
+      const guardado = await this.operar(sesion, async (db) => {
         await this.bloquearCatalogo(db);
         let doc: {
           id: string;
@@ -196,6 +233,11 @@ export class DocumentosService {
         subido = true;
         return { id: doc.id, version_id: v.rows[0].id };
       });
+      const preparacion_solicitada = await this.programarPreparacion(
+        sesion,
+        guardado.version_id,
+      );
+      return { ...guardado, preparacion_solicitada };
     } catch (e) {
       // Un COMMIT sin respuesta puede haber guardado el registro, comprobar antes de retirar el objeto.
       if (subido) {
@@ -383,9 +425,9 @@ export class DocumentosService {
     });
   }
 
-  republicar(sesion: Sesion, id: string, cuerpo: unknown) {
+  async republicar(sesion: Sesion, id: string, cuerpo: unknown) {
     const datos = validarVigencia(cuerpo);
-    return this.operar(sesion, async (db) => {
+    const guardado = await this.operar(sesion, async (db) => {
       await this.bloquearCatalogo(db);
       const v = await this.bloquearVersion(db, id);
       if (v.estado !== 'ARCHIVADO' || !v.documento_activo)
@@ -450,6 +492,11 @@ export class DocumentosService {
       );
       return { id: nueva.id, documento_id: v.documento_id };
     });
+    const preparacion_solicitada = await this.programarPreparacion(
+      sesion,
+      guardado.id,
+    );
+    return { ...guardado, preparacion_solicitada };
   }
 
   async descargar(sesion: Sesion, id: string) {

@@ -721,3 +721,30 @@ Supabase recomienda considerar la cercanía a la base para trabajo intensivo
 en datos en su [guía de ejecución regional](https://supabase.com/docs/guides/functions/regional-invocation).
 Después de publicar hay que repetir la prueba online antes de atribuirle
 un porcentaje o duración garantizados a la mejora.
+
+## Preparación de documentos para búsqueda
+
+La API prepara los documentos habilitados en segundo plano con el Redis existente,
+sin instalar modelos en las imágenes de CONVI, la lectura conserva las páginas del
+PDF y el texto de Word sin inventar su paginación, los originales siguen disponibles
+si la preparación falla y cada documento muestra el estado, los intentos y el error
+
+Configurar solo en la API `IA_EMBEDDINGS_URL` con la dirección completa de la operación
+de embeddings y `IA_EMBEDDINGS_TOKEN` con su credencial privada, en local estos valores
+van en `.env` y requieren recrear la API con `docker compose up -d --no-deps api`,
+para una instalación cloud el script lee los mismos nombres desde `.env.cloud` y
+entrega el token como secreto de la API, producción exige HTTPS y autenticación
+
+La operación utiliza el contrato de Ollama `/api/embed`, también puede atenderla
+FastAPI, recibe `model: "bge-m3:567m-fp16"`, `input` como lista de textos y
+`truncate: false`, debe devolver `model` con el mismo nombre y `embeddings` con
+un vector de 1024 números finitos por texto y en el mismo orden, el modelo y la
+dimensión corresponden al esquema existente, no se sustituyen por otro modelo
+
+Los fragmentos y el estado Listo se guardan juntos solo después de validar toda la
+respuesta, los reintentos no cambian texto ni páginas ya conservados, cada tramo de
+base vuelve a comprobar la cuenta, su perfil y su escuela, el servicio recibe solo
+los fragmentos del documento autorizado, nunca tokens de la sesión ni credenciales
+de Supabase, la conexión real con el servicio de Camilo debe probarse antes de dar
+por terminada la integración, las pruebas con un servicio simulado no demuestran
+calidad de búsqueda ni funcionamiento de un modelo real

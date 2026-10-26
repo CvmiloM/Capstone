@@ -12,6 +12,9 @@ param supabaseSecretKey string
 param supabaseDbUrl string
 @secure()
 param redisUrl string
+param iaEmbeddingsUrl string = ''
+@secure()
+param iaEmbeddingsToken string = ''
 // Conserva certificados y dominios existentes al repetir la instalación inicial.
 param webCustomDomains array = []
 
@@ -38,24 +41,25 @@ resource api 'Microsoft.App/containerApps@2025-07-01' = {
       activeRevisionsMode: 'Single'
       ingress: { external: false, targetPort: 3001, transport: 'http', allowInsecure: false }
       registries: registries
-      secrets: [
+      secrets: concat([
         { name: 'supabase-secret', value: supabaseSecretKey }
         { name: 'supabase-db', value: supabaseDbUrl }
         { name: 'redis-url', value: redisUrl }
-      ]
+      ], empty(iaEmbeddingsToken) ? [] : [{ name: 'ia-embeddings-token', value: iaEmbeddingsToken }])
     }
     template: {
       containers: [{
         name: 'api'
         image: apiImage
         resources: { cpu: json('0.25'), memory: '0.5Gi' }
-        env: [
+        env: concat([
           { name: 'SUPABASE_URL', value: supabaseUrl }
           { name: 'SUPABASE_PUBLISHABLE_KEY', value: supabasePublishableKey }
           { name: 'SUPABASE_SECRET_KEY', secretRef: 'supabase-secret' }
           { name: 'SUPABASE_DB_URL', secretRef: 'supabase-db' }
           { name: 'REDIS_URL', secretRef: 'redis-url' }
-        ]
+        ], empty(iaEmbeddingsUrl) ? [] : [{ name: 'IA_EMBEDDINGS_URL', value: iaEmbeddingsUrl }],
+          empty(iaEmbeddingsToken) ? [] : [{ name: 'IA_EMBEDDINGS_TOKEN', secretRef: 'ia-embeddings-token' }])
         probes: [
           { type: 'Startup', tcpSocket: { port: 3001 }, periodSeconds: 2, failureThreshold: 60 }
           { type: 'Readiness', httpGet: { path: '/', port: 3001 }, periodSeconds: 10, timeoutSeconds: 5 }

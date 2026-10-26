@@ -3,12 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import { AuthModule } from '../auth/auth.module.js';
 import { DocumentosController } from './documentos.controller.js';
 import { DocumentosService, DOCUMENTOS_STORAGE } from './documentos.service.js';
+import { COLA_DOCUMENTOS, crearColaDocumentos } from './cola.js';
+import { PreparacionDocumentos } from './preparacion.service.js';
+import { TrabajadorDocumentos } from './trabajador.js';
 
 @Module({
   imports: [AuthModule],
   controllers: [DocumentosController],
   providers: [
     DocumentosService,
+    PreparacionDocumentos,
+    TrabajadorDocumentos,
+    { provide: COLA_DOCUMENTOS, useFactory: crearColaDocumentos },
     {
       provide: DOCUMENTOS_STORAGE,
       useFactory: () => {
