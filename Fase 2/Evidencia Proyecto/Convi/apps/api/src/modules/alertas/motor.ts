@@ -120,7 +120,7 @@ export function evaluarRecurrencia(
 export function claveEvento(datos: {
   codigoRegla: string;
   version: number;
-  ambito: AmbitoConteo;
+  ambito: AmbitoConteo | 'CASO';
   registroId: string | null;
   cumpleDesde: string;
 }): string {
@@ -192,12 +192,229 @@ export function textoAviso(datos: {
   umbral: number;
   conteo: number;
 }) {
-  const prioridad =
-    { BAJA: 'baja', MEDIA: 'media', ALTA: 'alta' }[datos.prioridad] ??
-    datos.prioridad.toLowerCase();
   const situaciones = datos.conteo === 1 ? 'situación' : 'situaciones';
   return {
-    titulo: `Alerta de prioridad ${prioridad}: ${datos.nombre}`.slice(0, 180),
+    titulo: tituloAviso(datos.prioridad, datos.nombre),
     cuerpo: `Se cumplió la regla ${datos.codigoRegla} con ${datos.conteo} ${situaciones} ${SUJETO[datos.ambito]} en los últimos ${datos.ventanaDias} días, y la regla pide ${CONDICION[datos.operador]} ${datos.umbral}`,
+  };
+}
+
+function tituloAviso(prioridad: string, nombre: string) {
+  const texto =
+    { BAJA: 'baja', MEDIA: 'media', ALTA: 'alta' }[prioridad] ??
+    prioridad.toLowerCase();
+  return `Alerta de prioridad ${texto}: ${nombre}`.slice(0, 180);
+}
+
+// ===== PB-092 (HU-079 CA4): variación entre dos períodos, una vez al día =====
+
+/** Variación porcentual con dos decimales, o null si el período anterior tiene cero. */
+export function variacionPorcentual(
+  actual: number,
+  anterior: number,
+): number | null {
+  if (anterior === 0) return null;
+  return Math.round(((actual - anterior) / anterior) * 10000) / 100;
+}
+
+export type Variacion = {
+  /** Situaciones que cuentan, por día de la escuela ('AAAA-MM-DD'). */
+  porDia: ReadonlyMap<string, number>;
+  /** Último día cerrado: el día anterior a la evaluación. */
+  ayer: string;
+  ventanaDias: number;
+  operador: Operador;
+  umbral: number;
+  /** Primer día cerrado que se evalúa: la vigencia de la regla o un año atrás. */
+  inicio: string;
+};
+
+export type VariacionCumplida = {
+  actual: number;
+  anterior: number;
+  variacion: number;
+  periodoActual: { desde: string; hasta: string };
+  periodoAnterior: { desde: string; hasta: string };
+  /** Último día de la primera ventana de la racha que se cumple hasta ayer. */
+  cumpleDesde: string;
+};
+
+/**
+ * Decisión del PO, ventanas móviles: cada día cerrado se comparan sus últimos
+ * N días con los N anteriores. Si el período anterior tiene cero, la
+ * variación no se calcula y no se cumple (HU-078 CA4). Devuelve null si ayer
+ * no se cumple. Si se cumple, también el día en que empezó la racha, para no
+ * repetir la alerta mientras siga cumpliéndose (HU-079 CA6).
+ */
+export function evaluarVariacion(datos: Variacion): VariacionCumplida | null {
+  const ayer = numeroDeDia(datos.ayer);
+  const inicio = numeroDeDia(datos.inicio);
+  if (inicio > ayer) return null;
+  const ventana = datos.ventanaDias;
+  const primero = inicio - 2 * ventana + 1;
+
+  // acumulado[i] = situaciones desde el primer día hasta el día primero + i - 1.
+  const acumulado = [0];
+  for (let dia = primero; dia <= ayer; dia++)
+    acumulado.push(
+      acumulado[acumulado.length - 1] +
+        (datos.porDia.get(diaDeNumero(dia)) ?? 0),
+    );
+  const hasta = (dia: number) => acumulado[dia - primero + 1];
+  const valores = (dia: number) => {
+    const actual = hasta(dia) - hasta(dia - ventana);
+    const anterior = hasta(dia - ventana) - hasta(dia - 2 * ventana);
+    return {
+      actual,
+      anterior,
+      variacion: variacionPorcentual(actual, anterior),
+    };
+  };
+  const seCumple = (dia: number) => {
+    const { variacion } = valores(dia);
+    return (
+      variacion !== null && cumple(variacion, datos.operador, datos.umbral)
+    );
+  };
+
+  if (!seCumple(ayer)) return null;
+  let racha = ayer;
+  while (racha > inicio && seCumple(racha - 1)) racha--;
+
+  const hoy = valores(ayer);
+  return {
+    actual: hoy.actual,
+    anterior: hoy.anterior,
+    variacion: hoy.variacion!,
+    periodoActual: {
+      desde: diaDeNumero(ayer - ventana + 1),
+      hasta: datos.ayer,
+    },
+    periodoAnterior: {
+      desde: diaDeNumero(ayer - 2 * ventana + 1),
+      hasta: diaDeNumero(ayer - ventana),
+    },
+    cumpleDesde: diaDeNumero(racha),
+  };
+}
+
+const porcentaje = new Intl.NumberFormat('es-CL', {
+  maximumFractionDigits: 2,
+});
+
+/** HU-079 CA3: períodos, conteos y fórmula de la variación. */
+export function explicacionVariacion(datos: {
+  ambito: AmbitoConteo;
+  categoriaId: string | null;
+  ventanaDias: number;
+  operador: Operador;
+  umbral: number;
+  resultado: VariacionCumplida;
+}) {
+  const { resultado: r } = datos;
+  return {
+    metrica: 'VARIACION_PORCENTUAL',
+    ambito: datos.ambito,
+    categoria_id: datos.categoriaId,
+    ventana_dias: datos.ventanaDias,
+    periodo_actual: r.periodoActual,
+    periodo_anterior: r.periodoAnterior,
+    conteo_actual: r.actual,
+    conteo_anterior: r.anterior,
+    variacion: r.variacion,
+    operador: datos.operador,
+    umbral: datos.umbral,
+    formula: `(${r.actual} − ${r.anterior}) / ${r.anterior} × 100 = ${r.variacion} % ${SIMBOLO[datos.operador]} ${datos.umbral} %`,
+    cumple_desde: r.cumpleDesde,
+  };
+}
+
+export function textoAvisoVariacion(datos: {
+  codigoRegla: string;
+  nombre: string;
+  prioridad: string;
+  ambito: AmbitoConteo;
+  ventanaDias: number;
+  operador: Operador;
+  umbral: number;
+  resultado: VariacionCumplida;
+}) {
+  const { resultado: r } = datos;
+  return {
+    titulo: tituloAviso(datos.prioridad, datos.nombre),
+    cuerpo: `Se cumplió la regla ${datos.codigoRegla}: las situaciones ${SUJETO[datos.ambito]} pasaron de ${r.anterior} a ${r.actual} entre dos períodos de ${datos.ventanaDias} días (${porcentaje.format(r.variacion)} %), y la regla pide ${CONDICION[datos.operador]} ${porcentaje.format(datos.umbral)} %`,
+  };
+}
+
+// ===== PB-091 (HU-079 CA4): vencimientos de un caso, una vez al día =====
+
+/** Lo que cuenta cada tipo de regla de vencimientos (decisión del PO). */
+export type Vencido = {
+  tipo:
+    | 'compromisos'
+    | 'acciones_plan_intervencion'
+    | 'actuaciones'
+    | 'estados_pasos_protocolo_caso';
+  id: string;
+};
+
+/**
+ * HU-079 CA6: no se repite la alerta mientras siga vencido algo de lo que ya
+ * avisó una alerta anterior de la misma regla y caso. Si todo eso se puso al
+ * día y vence otra cosa, la alerta es nueva.
+ */
+export function yaAvisado(
+  vencidos: readonly Vencido[],
+  anteriores: readonly (readonly Vencido[])[],
+): boolean {
+  const actuales = new Set(vencidos.map((v) => v.id));
+  return anteriores.some((lista) => lista.some((v) => actuales.has(v.id)));
+}
+
+export function explicacionVencidos(datos: {
+  tipoRegla: 'FECHA_LIMITE' | 'PLAZO_PROTOCOLO';
+  alCierreDe: string;
+  operador: Operador;
+  umbral: number;
+  vencidos: readonly Vencido[];
+}) {
+  const conteo = datos.vencidos.length;
+  const porTipo: Record<string, number> = {};
+  for (const v of datos.vencidos) porTipo[v.tipo] = (porTipo[v.tipo] ?? 0) + 1;
+  return {
+    metrica: 'CONTEO_VENCIDOS',
+    ambito: 'CASO',
+    tipo_regla: datos.tipoRegla,
+    al_cierre_de: datos.alCierreDe,
+    conteo,
+    por_tipo: porTipo,
+    operador: datos.operador,
+    umbral: datos.umbral,
+    formula: `vencidos al cierre del ${datos.alCierreDe} ${SIMBOLO[datos.operador]} ${datos.umbral}: ${conteo} ${SIMBOLO[datos.operador]} ${datos.umbral}`,
+    vencidos: datos.vencidos,
+  };
+}
+
+export function textoAvisoVencidos(datos: {
+  tipoRegla: 'FECHA_LIMITE' | 'PLAZO_PROTOCOLO';
+  codigoRegla: string;
+  nombre: string;
+  prioridad: string;
+  operador: Operador;
+  umbral: number;
+  conteo: number;
+}) {
+  const uno = datos.conteo === 1;
+  const que =
+    datos.tipoRegla === 'PLAZO_PROTOCOLO'
+      ? uno
+        ? 'paso de protocolo vencido'
+        : 'pasos de protocolo vencidos'
+      : uno
+        ? 'vencimiento entre compromisos, acciones del plan y seguimientos'
+        : 'vencimientos entre compromisos, acciones del plan y seguimientos';
+  return {
+    titulo: tituloAviso(datos.prioridad, datos.nombre),
+    cuerpo: `Se cumplió la regla ${datos.codigoRegla} con ${datos.conteo} ${que} de un caso, y la regla pide ${CONDICION[datos.operador]} ${datos.umbral}`,
   };
 }

@@ -19,7 +19,37 @@ export type TrabajoReglas = {
   situacion_id: string;
 };
 
-export type ColaReglas = Queue<TrabajoReglas>;
+/**
+ * PB-091 y PB-092 (HU-079 CA4): el trabajo de cada mañana, sin datos.
+ * Recorre las escuelas con reglas de vencimientos o de variación activas.
+ */
+export type TrabajoDiario = { diaria: true };
+
+export type ColaReglas = Queue<TrabajoReglas | TrabajoDiario>;
+
+export const TRABAJO_DIARIO = 'diaria';
+const PROGRAMA_DIARIO = 'evaluacion-diaria-reglas';
+
+/** Todos los días a las 6:00 de Chile, antes de que llegue el equipo de Convivencia. */
+export const HORARIO_DIARIO = { pattern: '0 6 * * *', tz: 'America/Santiago' };
+
+/**
+ * Deja programado en Redis el trabajo diario. Repetirlo al encender la API
+ * no crea otro: actualiza el mismo programa. Si la API estaba apagada a esa
+ * hora, el trabajo pendiente corre apenas vuelve a encender.
+ */
+export async function programarEvaluacionDiaria(cola: ColaReglas) {
+  await cola.upsertJobScheduler(PROGRAMA_DIARIO, HORARIO_DIARIO, {
+    name: TRABAJO_DIARIO,
+    data: { diaria: true },
+    opts: {
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 60000 },
+      removeOnComplete: true,
+      removeOnFail: true,
+    },
+  });
+}
 
 /** Un aviso por minuto como máximo mientras Redis no responde, sin datos de la conexión. */
 export function avisoSinRedisReglas(logger: Logger) {

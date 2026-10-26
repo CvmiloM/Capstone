@@ -2,6 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { CuentaService } from '../../database/cuenta.service.js';
 import {
+  COLUMNA_AMBITO,
+  guardarAlerta,
+  registrarEjecucion,
+  situacionesQueCuentan,
+} from './alerta.js';
+import {
   type AmbitoConteo,
   claveEvento,
   DIAS_HACIA_ATRAS,
@@ -40,27 +46,6 @@ export type ResultadoEvaluacion = {
   evaluaciones: number;
   alertas_generadas: number;
   avisos_creados: number;
-};
-
-/** Las situaciones que cuentan para un ámbito, con $1 = registro del ámbito. */
-const DEL_AMBITO: Record<AmbitoConteo, string> = {
-  ESTUDIANTE: `EXISTS (
-      SELECT 1 FROM convi.participaciones p
-      JOIN convi.estudiantes e ON e.persona_id = p.persona_id
-      WHERE p.situacion_id = s.id AND e.id = $1)`,
-  // Cuenta para un curso si ocurrió en ese curso o si participa un estudiante
-  // que ese día estaba matriculado en él, como en la búsqueda de expedientes.
-  CURSO: `(s.curso_contexto_id = $1 OR EXISTS (
-      SELECT 1 FROM convi.participaciones p
-      JOIN convi.matriculas m ON m.id = p.matricula_contexto_id
-      WHERE p.situacion_id = s.id AND m.curso_id = $1))`,
-  ESTABLECIMIENTO: `$1::uuid IS NULL`,
-};
-
-const COLUMNA_AMBITO: Record<AmbitoConteo, string | null> = {
-  ESTUDIANTE: 'estudiante_id',
-  CURSO: 'curso_id',
-  ESTABLECIMIENTO: null,
 };
 
 @Injectable()
@@ -131,13 +116,10 @@ export class MotorReglasService {
     }
 
     // Cada ejecución queda registrada con sus cantidades, sin datos personales.
-    await db.query(
-      `INSERT INTO convi.eventos_auditoria
-         (establecimiento_id, codigo_accion, tipo_recurso, recurso_id,
-          codigo_resultado, metadatos)
-       VALUES (convi.establecimiento_actual(), 'EVALUACION_REGLAS',
-               'situaciones', $1, 'OK', $2)`,
-      [situacionId, JSON.stringify(resultado)],
+    await registrarEjecucion(
+      db,
+      { tipo: 'situaciones', id: situacionId },
+      resultado,
     );
     return resultado;
   }
@@ -216,11 +198,7 @@ export class MotorReglasService {
     );
 
     // CA6: todas las situaciones del período, aunque estén en otra alerta.
-    const condiciones = `s.estado <> 'DESCARTADA'
-         AND ($2::uuid IS NULL OR s.categoria_id = $2)
-         AND s.ocurrido_en >= $3::date::timestamptz
-         AND s.ocurrido_en < ($4::date + 1)::timestamptz
-         AND ${DEL_AMBITO[ambito]}`;
+    const condiciones = situacionesQueCuentan(ambito);
     const porDia = await db.query<{ dia: string; n: number }>(
       `SELECT s.ocurrido_en::date::text AS dia, count(*)::int AS n
        FROM convi.situaciones s
@@ -258,69 +236,37 @@ export class MotorReglasService {
       registroId,
       cumpleDesde: cumplida.cumpleDesde,
     });
-    const alerta = await db.query<{ id: string }>(
-      `INSERT INTO convi.alertas
-         (establecimiento_id, regla_id, estudiante_id, curso_id,
-          datos_explicacion, clave_evento)
-       VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5)
-       ON CONFLICT (establecimiento_id, clave_evento) DO NOTHING
-       RETURNING id`,
-      [
-        regla.id,
-        ambito === 'ESTUDIANTE' ? registroId : null,
-        ambito === 'CURSO' ? registroId : null,
-        JSON.stringify(
-          explicacion({
-            ambito,
-            categoriaId: regla.categoria_id,
-            ventanaDias: regla.ventana_dias,
-            operador: regla.codigo_operador,
-            umbral: regla.umbral,
-            resultado: cumplida,
-            situacionId: datos.situacionId,
-          }),
-        ),
-        clave,
-      ],
-    );
-    const alertaId = alerta.rows[0]?.id;
-    if (!alertaId) return null;
-
-    // CA3: las situaciones que la originaron, las de la ventana de hoy.
-    await db.query(
-      `INSERT INTO convi.situaciones_alerta
-         (establecimiento_id, alerta_id, situacion_id)
-       SELECT convi.establecimiento_actual(), $5, s.id
-       FROM convi.situaciones s
-       WHERE ${condiciones}`,
-      [registroId, regla.categoria_id, cumplida.desde, hoy, alertaId],
-    );
-
-    // CA7: con «registrar y avisar», un aviso para cada cuenta activa de
-    // Convivencia, que se ve en la bandeja de avisos (PB-094).
-    if (regla.codigo_accion !== 'ALERTA_Y_NOTIFICACION') return 0;
-    const aviso = textoAviso({
-      codigoRegla: regla.codigo_regla,
-      nombre: regla.nombre,
-      prioridad: regla.codigo_prioridad,
+    // CA3 y CA7: la explicación, las situaciones de la ventana de hoy y, con
+    // «registrar y avisar», un aviso para cada cuenta activa de Convivencia.
+    return guardarAlerta(db, {
+      regla,
       ambito,
-      ventanaDias: regla.ventana_dias,
-      operador: regla.codigo_operador,
-      umbral: regla.umbral,
-      conteo: cumplida.conteo,
+      registroId,
+      clave,
+      explicacion: explicacion({
+        ambito,
+        categoriaId: regla.categoria_id,
+        ventanaDias: regla.ventana_dias,
+        operador: regla.codigo_operador,
+        umbral: regla.umbral,
+        resultado: cumplida,
+        situacionId: datos.situacionId,
+      }),
+      situaciones: {
+        categoriaId: regla.categoria_id,
+        desde: cumplida.desde,
+        hasta: hoy,
+      },
+      aviso: textoAviso({
+        codigoRegla: regla.codigo_regla,
+        nombre: regla.nombre,
+        prioridad: regla.codigo_prioridad,
+        ambito,
+        ventanaDias: regla.ventana_dias,
+        operador: regla.codigo_operador,
+        umbral: regla.umbral,
+        conteo: cumplida.conteo,
+      }),
     });
-    const avisos = await db.query(
-      `INSERT INTO convi.notificaciones
-         (establecimiento_id, membresia_destinatario_id, tipo_notificacion,
-          titulo, cuerpo, tipo_recurso, recurso_id, clave_evento)
-       SELECT convi.establecimiento_actual(), m.id, 'ALERTA_GENERADA',
-              $1, $2, 'alertas', $3, $4
-       FROM convi.membresias_establecimiento m
-       WHERE m.codigo_perfil = 'CONVIVENCIA' AND m.estado = 'ACTIVO'
-       ON CONFLICT (membresia_destinatario_id, clave_evento)
-         WHERE clave_evento IS NOT NULL DO NOTHING`,
-      [aviso.titulo, aviso.cuerpo, alertaId, clave],
-    );
-    return avisos.rowCount ?? 0;
   }
 }
