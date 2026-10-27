@@ -5,7 +5,7 @@ import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evid
 import { ListaEvidencias } from "@/app/components/evidencias/lista-evidencias";
 import { claseEnlace } from "@/app/components/formulario";
 // Mismo formato de fecha y nombres de rol que el resto del portal.
-import { formatearFecha } from "@/app/profesor/datos";
+import { obtenerFormatoFecha } from "@/app/profesor/datos";
 import { NOMBRE_ROL_EN_SITUACION } from "@/app/profesor/situacion-opciones";
 import { AvisoNoDisponible } from "../../aviso-no-disponible";
 import {
@@ -99,7 +99,7 @@ export default async function PaginaCaso({
   searchParams: Promise<{ aviso?: string }>;
 }) {
   const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
-  const respuesta = await obtenerCaso(id);
+  const [respuesta, formatearFecha] = await Promise.all([obtenerCaso(id), obtenerFormatoFecha()]);
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia/casos" />;
   const caso = respuesta.datos;
   const textoAviso = aviso ? AVISOS[aviso] : undefined;

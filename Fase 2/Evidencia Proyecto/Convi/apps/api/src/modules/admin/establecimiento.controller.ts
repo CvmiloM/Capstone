@@ -20,4 +20,12 @@ export class EstablecimientoController {
   editar(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
     return this.escuela.editar(peticion.sesion, cuerpo);
   }
+
+  @Patch('configuracion')
+  editarConfiguracion(
+    @Req() peticion: PeticionConSesion,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.escuela.editarConfiguracion(peticion.sesion, cuerpo);
+  }
 }

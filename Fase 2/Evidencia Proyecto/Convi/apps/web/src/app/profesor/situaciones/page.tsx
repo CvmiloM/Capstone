@@ -3,7 +3,7 @@ import Link from "next/link";
 import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
 import { AvisoSinPermiso } from "../aviso-sin-permiso";
 import {
-  formatearFecha,
+  obtenerFormatoFecha,
   NOMBRE_ESTADO,
   obtenerSituaciones,
   URGENCIA,
@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Mis registros" };
 
 // HU-034 CA2: las situaciones que registró el profesor, la más reciente primero.
 export default async function PaginaMisRegistros() {
-  const respuesta = await obtenerSituaciones();
+  const [respuesta, formatearFecha] = await Promise.all([obtenerSituaciones(), obtenerFormatoFecha()]);
   if (!respuesta.ok) return <AvisoSinPermiso volverA="/profesor" />;
   const situaciones = respuesta.datos;
 

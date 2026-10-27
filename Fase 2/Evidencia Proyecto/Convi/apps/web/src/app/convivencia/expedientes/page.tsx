@@ -8,7 +8,7 @@ import {
   Encabezado,
 } from "@/app/components/formulario";
 // Mismos estilos de urgencia y formato de fecha que el resto del portal.
-import { formatearFecha, URGENCIA } from "@/app/profesor/datos";
+import { obtenerFormatoFecha, URGENCIA } from "@/app/profesor/datos";
 import { AvisoNoDisponible } from "../aviso-no-disponible";
 import { formatearDia, nombreEstado, OPCIONES_ESTADO } from "../estudiantes/datos";
 import {
@@ -291,7 +291,8 @@ function nombres(estudiantes: string[]) {
 }
 
 // Toda la tarjeta abre el detalle de la situación o del caso (CA1).
-function Expediente({ expediente }: { expediente: ExpedienteEncontrado }) {
+async function Expediente({ expediente }: { expediente: ExpedienteEncontrado }) {
+  const formatearFecha = await obtenerFormatoFecha();
   const esCaso = expediente.tipo === "CASO";
   const urgencia =
     expediente.tipo === "SITUACION" ? (URGENCIA[expediente.urgencia] ?? URGENCIA.NORMAL) : null;

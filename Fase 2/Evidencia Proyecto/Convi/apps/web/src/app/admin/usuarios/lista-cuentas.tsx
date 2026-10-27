@@ -128,22 +128,17 @@ function SelectorPerfil({
   );
 }
 
-// TODO(HU-021): usar la zona horaria de la escuela cuando la API la entregue
-const formatoFecha = new Intl.DateTimeFormat("es-CL", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "America/Santiago",
-});
-
 function FechaCuenta({
   texto,
   fecha,
+  zonaHoraria,
 }: {
   texto: string;
   fecha: string | null;
+  zonaHoraria: string;
 }) {
   if (!fecha) return null;
+  const formatoFecha = new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeZone: zonaHoraria });
   return (
     <p>
       {texto}{" "}
@@ -154,10 +149,12 @@ function FechaCuenta({
 
 export function ListaCuentas({
   cuentas,
+  zonaHoraria,
   perfilInicial,
   suspendidasInicial,
 }: {
   cuentas: CuentaEscuela[];
+  zonaHoraria: string;
   perfilInicial: string;
   suspendidasInicial: boolean;
 }) {
@@ -235,6 +232,7 @@ export function ListaCuentas({
                     {cuenta.estado === "PENDIENTE" && (
                       <>
                         <FechaCuenta
+                      zonaHoraria={zonaHoraria}
                           texto="Invitada el"
                           fecha={cuenta.invitado_en}
                         />
@@ -244,14 +242,17 @@ export function ListaCuentas({
                       </>
                     )}
                     <FechaCuenta
+                      zonaHoraria={zonaHoraria}
                       texto="Se activó el"
                       fecha={cuenta.activado_en}
                     />
                     <FechaCuenta
+                      zonaHoraria={zonaHoraria}
                       texto="Suspendida el"
                       fecha={cuenta.suspendido_en}
                     />
                     <FechaCuenta
+                      zonaHoraria={zonaHoraria}
                       texto="Reactivada el"
                       fecha={cuenta.reactivado_en}
                     />

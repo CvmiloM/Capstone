@@ -1,6 +1,6 @@
 import { claseEnlace } from "@/app/components/formulario";
 // Mismo formato de fecha que el resto de los portales.
-import { formatearFecha } from "@/app/profesor/datos";
+import { obtenerFormatoFecha } from "@/app/profesor/datos";
 import {
   formatearTamano,
   NOMBRE_TIPO_EVIDENCIA,
@@ -10,7 +10,7 @@ import {
 // PB-066 (HU-057): evidencias ya adjuntadas, con su descarga. El enlace va a
 // una ruta del portal (rutaDescarga/id) que pide el archivo a la API, donde
 // se vuelve a comprobar el permiso (CA3).
-export function ListaEvidencias({
+export async function ListaEvidencias({
   evidencias,
   rutaDescarga,
   vacio,
@@ -21,6 +21,7 @@ export function ListaEvidencias({
 }) {
   if (evidencias.length === 0)
     return <p className="text-sm text-muted-foreground">{vacio}</p>;
+  const formatearFecha = await obtenerFormatoFecha();
   return (
     <ul className="divide-y divide-border text-sm">
       {evidencias.map((ev) => (

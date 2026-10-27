@@ -1,9 +1,32 @@
-import { Controller, Get, Req } from '@nestjs/common';
-import { ConsultaSesion } from '../../common/acceso.decorator.js';
+import { Controller, Get, Inject, Req } from '@nestjs/common';
+import {
+  ConsultaSesion,
+  PerfilesPermitidos,
+} from '../../common/acceso.decorator.js';
+import { PERFILES } from '../../common/sesion.js';
+import { CuentaService } from '../../database/cuenta.service.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 
 @Controller('auth')
 export class AuthController {
+  constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
+
+  @Get('zona-horaria')
+  @PerfilesPermitidos(...PERFILES)
+  zonaHoraria(@Req() peticion: PeticionConSesion) {
+    return this.cuentas.operar(
+      peticion.sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const resultado = await db.query<{ zona_horaria: string }>(
+          'SELECT zona_horaria FROM convi.establecimientos WHERE id = $1',
+          [peticion.sesion.establecimiento_id],
+        );
+        return resultado.rows[0];
+      },
+    );
+  }
+
   @Get('sesion')
   @ConsultaSesion()
   consultar(@Req() peticion: PeticionConSesion) {

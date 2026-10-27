@@ -6,7 +6,7 @@ import { ListaEvidencias } from "@/app/components/evidencias/lista-evidencias";
 import { claseEnlace } from "@/app/components/formulario";
 import { AvisoSinPermiso } from "../../aviso-sin-permiso";
 import {
-  formatearFecha,
+  obtenerFormatoFecha,
   NOMBRE_ESTADO,
   obtenerSituacion,
   URGENCIA,
@@ -32,7 +32,7 @@ export default async function PaginaDetalleSituacion({
     params,
     searchParams,
   ]);
-  const respuesta = await obtenerSituacion(id);
+  const [respuesta, formatearFecha] = await Promise.all([obtenerSituacion(id), obtenerFormatoFecha()]);
   if (!respuesta.ok) return <AvisoSinPermiso volverA="/profesor/situaciones" />;
   const situacion = respuesta.datos;
   const urgencia = URGENCIA[situacion.urgencia] ?? URGENCIA.NORMAL;

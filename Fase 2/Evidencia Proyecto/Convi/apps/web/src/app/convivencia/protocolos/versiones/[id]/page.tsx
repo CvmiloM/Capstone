@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { claseEnlace } from "@/app/components/formulario";
-import { formatearFecha } from "@/app/profesor/datos";
+import { obtenerFormatoFecha } from "@/app/profesor/datos";
 import { AvisoNoDisponible } from "../../../aviso-no-disponible";
 import { formatearDia } from "../../../casos/datos";
 import { obtenerVersion } from "../../datos";
@@ -35,7 +35,7 @@ export default async function PaginaVersionProtocolo({
   searchParams: Promise<{ aviso?: string }>;
 }) {
   const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
-  const respuesta = await obtenerVersion(id);
+  const [respuesta, formatearFecha] = await Promise.all([obtenerVersion(id), obtenerFormatoFecha()]);
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia/protocolos" />;
   const version = respuesta.datos;
   const borrador = version.estado === "BORRADOR";

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { claseEnlace } from "@/app/components/formulario";
-import { formatearFecha } from "@/app/profesor/datos";
+import { obtenerFormatoFecha } from "@/app/profesor/datos";
 import { AvisoNoDisponible } from "../../aviso-no-disponible";
 import { formatearDia } from "../../casos/datos";
 import { obtenerProtocolo } from "../datos";
@@ -25,7 +25,7 @@ export default async function PaginaProtocolo({
   searchParams: Promise<{ aviso?: string }>;
 }) {
   const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
-  const respuesta = await obtenerProtocolo(id);
+  const [respuesta, formatearFecha] = await Promise.all([obtenerProtocolo(id), obtenerFormatoFecha()]);
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia/protocolos" />;
   const protocolo = respuesta.datos;
   const textoAviso = aviso ? AVISOS[aviso] : undefined;

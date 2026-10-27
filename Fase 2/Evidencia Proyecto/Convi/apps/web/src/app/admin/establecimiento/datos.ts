@@ -12,6 +12,7 @@ export type FichaInstitucional = {
   creado_en: string;
   actualizado_en: string;
   zona_horaria: string;
+  plazo_cierre_dias: number | null;
 };
 
 export async function obtenerFichaInstitucional(): Promise<FichaInstitucional> {
