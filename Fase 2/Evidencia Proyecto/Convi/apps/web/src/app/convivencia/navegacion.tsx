@@ -30,6 +30,12 @@ const SECCIONES: SeccionMenu[] = [
         texto: "Protocolos",
         icono: "protocolos",
       },
+      // PB-117 a PB-119 (Camilo): consulta del reglamento con IA, solo para Convivencia
+      {
+        href: "/convivencia/reglamento",
+        texto: "Consultar reglamento",
+        icono: "buscar",
+      },
       // PB-043: situaciones que llegan por otros canales
       {
         href: "/convivencia/documentos",
