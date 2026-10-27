@@ -81,10 +81,12 @@ try {
     }
 
     $base = Invocar-Az -Argumentos @('deployment', 'group', 'show', '-g', $resourceGroup, '-n', 'convi-base', '--query', 'properties.outputs', '-o', 'json') | ConvertFrom-Json
-    if ($cloud['IA_EMBEDDINGS_URL']) {
-        try { $iaDestino = [uri]$cloud['IA_EMBEDDINGS_URL'] } catch { throw 'IA_EMBEDDINGS_URL no es una dirección válida.' }
-        if ($iaDestino.Scheme -ne 'https' -or $iaDestino.UserInfo -or $iaDestino.Fragment -or -not $cloud['IA_EMBEDDINGS_TOKEN']) {
-            throw 'El servicio de embeddings cloud requiere HTTPS, sin credenciales en la URL y con IA_EMBEDDINGS_TOKEN privado.'
+    foreach ($iaVariable in @('IA_EMBEDDINGS_URL', 'IA_GENERACION_URL')) {
+        if (-not $cloud[$iaVariable]) { continue }
+        try { $iaDestino = [uri]$cloud[$iaVariable] } catch { throw "$iaVariable no es una dirección válida." }
+        if (-not $iaDestino.IsAbsoluteUri -or $iaDestino.Scheme -ne 'https' -or -not $iaDestino.Host -or
+            $iaDestino.UserInfo -or $iaDestino.Fragment -or -not $cloud['IA_EMBEDDINGS_TOKEN']) {
+            throw "$iaVariable requiere HTTPS, sin credenciales en la URL y con IA_EMBEDDINGS_TOKEN privado."
         }
     }
     $registro = $base.registryServer.value
@@ -125,6 +127,7 @@ try {
         supabaseSecretKey = $cloud['SUPABASE_SECRET_KEY']; supabaseDbUrl = $db
         redisUrl = $cloud['AZURE_REDIS_URL']
         iaEmbeddingsUrl = [string]$cloud['IA_EMBEDDINGS_URL']
+        iaGeneracionUrl = [string]$cloud['IA_GENERACION_URL']
         iaEmbeddingsToken = [string]$cloud['IA_EMBEDDINGS_TOKEN']
         webCustomDomains = $dominios
     }
