@@ -11,6 +11,13 @@ coverage/
 *.log
 *.tsbuildinfo
 
+# Python del servicio de IA (apps/ia, PB-079)
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
 # Variables de entorno
 .env
 .env.*
