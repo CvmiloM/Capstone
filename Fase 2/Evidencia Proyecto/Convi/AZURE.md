@@ -766,3 +766,14 @@ Pruebas del servicio con `uv run --directory apps/ia pytest` y revisión con `uv
 El portal de Convivencia tiene Consultar reglamento, la API busca con bge-m3 en `convi.buscar_fragmentos_normativa`, que solo devuelve fragmentos de versiones publicadas, vigentes, habilitadas y preparadas de la escuela y solo para Convivencia, y pide la respuesta a qwen3.5:9b por `POST /api/chat` de convi-ia con un esquema JSON, la API valida que cada cita sea uno de los fragmentos entregados y, si no hay citas, responde ella misma que el reglamento no lo regula
 
 Se configura en la API con `IA_GENERACION_URL` (local `http://host.docker.internal:8000/api/chat`) y el mismo `IA_EMBEDDINGS_TOKEN`, el modelo se instala con `ollama pull qwen3.5:9b`, cada consulta queda en `registros_solicitudes_ia` con propósito, modelo, fuentes citadas, tiempo y resultado, sin la pregunta ni la respuesta, y si la IA falla la consulta queda Fallida y la pantalla lo informa sin afectar el resto de CONVI
+
+Para Azure, `.env.cloud` lleva `IA_EMBEDDINGS_URL=https://<servicio>/api/embed`,
+`IA_GENERACION_URL=https://<servicio>/api/chat` y `IA_EMBEDDINGS_TOKEN` privado,
+`publicar-azure.ps1` exige HTTPS y entrega ambas direcciones solo a la API,
+el token se conserva como secreto y no se incluye en las imágenes ni en la web
+
+Antes de consultar el reglamento se aplica una sola vez la migración
+`20261027001627_busqueda_normativa_definer.sql`, comprobando si ya está aplicada,
+el servicio y los modelos del equipo de Camilo deben estar encendidos y accesibles
+desde Azure, los documentos locales no se copian a la nube, para probar se sube y
+publica un reglamento de prueba en la escuela cloud y se espera su preparación

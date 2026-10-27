@@ -13,6 +13,7 @@ param supabaseDbUrl string
 @secure()
 param redisUrl string
 param iaEmbeddingsUrl string = ''
+param iaGeneracionUrl string = ''
 @secure()
 param iaEmbeddingsToken string = ''
 // Conserva certificados y dominios existentes al repetir la instalación inicial.
@@ -59,6 +60,7 @@ resource api 'Microsoft.App/containerApps@2025-07-01' = {
           { name: 'SUPABASE_DB_URL', secretRef: 'supabase-db' }
           { name: 'REDIS_URL', secretRef: 'redis-url' }
         ], empty(iaEmbeddingsUrl) ? [] : [{ name: 'IA_EMBEDDINGS_URL', value: iaEmbeddingsUrl }],
+          empty(iaGeneracionUrl) ? [] : [{ name: 'IA_GENERACION_URL', value: iaGeneracionUrl }],
           empty(iaEmbeddingsToken) ? [] : [{ name: 'IA_EMBEDDINGS_TOKEN', secretRef: 'ia-embeddings-token' }])
         probes: [
           { type: 'Startup', tcpSocket: { port: 3001 }, periodSeconds: 2, failureThreshold: 60 }
