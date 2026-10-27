@@ -281,3 +281,83 @@ describe('PB-080 y PB-084: conservación y descarga privada', () => {
     );
   });
 });
+
+describe('PB-079: altas de documentos sin bloquear la fila de la escuela', () => {
+  it('operar usa REPEATABLE READ salvo que se pida READ COMMITTED', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('resolver_membresia')) return { rows: [{ ...sesion }] };
+      if (sql.includes('FOR SHARE OF m, e'))
+        return { rows: [{ id: sesion.membresia_id }] };
+      return { rows: [] };
+    });
+    const cuenta = new CuentaService({
+      connect: async () => ({ query, release: vi.fn() }),
+    } as unknown as Pool);
+    const acceso = { tipo: 'establecimiento', perfiles: ['ADMIN'] } as const;
+    await cuenta.operar(sesion, acceso, async () => null);
+    await cuenta.operar(sesion, acceso, async () => null, 'READ COMMITTED');
+    expect(
+      query.mock.calls
+        .map(([sql]) => sql)
+        .filter((sql) => sql.startsWith('BEGIN')),
+    ).toEqual([
+      'BEGIN ISOLATION LEVEL REPEATABLE READ; SET LOCAL ROLE convi_backend',
+      'BEGIN ISOLATION LEVEL READ COMMITTED; SET LOCAL ROLE convi_backend',
+    ]);
+  });
+  it('cargar espera su turno con un bloqueo propio y no actualiza la escuela', async () => {
+    const { query, operar, servicio } = preparar();
+    query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'd1',
+            titulo: 'Reglamento',
+            tipo_documento: 'RICE',
+            estado: 'ACTIVO',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            titulo: 'Reglamento',
+            etiqueta_version: '2026',
+            creado: '01-10-2026 10:00',
+          },
+        ],
+      });
+    await expect(servicio.cargar(sesion, datos, archivo)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect((operar.mock.calls[0] as unknown[])[3]).toBe('READ COMMITTED');
+    expect(String(query.mock.calls[0][0])).toContain('pg_advisory_xact_lock');
+    expect(
+      query.mock.calls.some(([sql]) =>
+        String(sql).includes('UPDATE convi.establecimientos'),
+      ),
+    ).toBe(false);
+  });
+  it('republicar espera el mismo turno y no actualiza la escuela', async () => {
+    const { query, operar, servicio } = preparar();
+    query.mockResolvedValueOnce({ rows: [] });
+    bloquear(query);
+    await expect(
+      servicio.republicar(sesion, 'v1', { vigente_desde: '2026-10-25' }),
+    ).rejects.toThrow(ConflictException);
+    expect((operar.mock.calls[0] as unknown[])[3]).toBe('READ COMMITTED');
+    expect(String(query.mock.calls[0][0])).toContain('pg_advisory_xact_lock');
+    expect(
+      query.mock.calls.some(([sql]) =>
+        String(sql).includes('UPDATE convi.establecimientos'),
+      ),
+    ).toBe(false);
+  });
+  it('las demás operaciones siguen en REPEATABLE READ', async () => {
+    const { query, operar, servicio } = preparar();
+    query.mockResolvedValueOnce({ rows: [] });
+    await servicio.listar(sesion);
+    expect(operar.mock.calls[0]).toHaveLength(3);
+  });
+});

@@ -28,6 +28,11 @@ export type AccesoRegistro = Permisos &
     | { tipo: 'curso_reporte'; id: string }
   );
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * REPEATABLE READ para todo, salvo operaciones que esperan su turno con un bloqueo
+ * propio y deben ver lo que otra guardó mientras esperaban, como las altas de documentos.
+ */
+export type Aislamiento = 'REPEATABLE READ' | 'READ COMMITTED';
 
 @Injectable()
 export class CuentaService implements OnModuleDestroy {
@@ -37,7 +42,7 @@ export class CuentaService implements OnModuleDestroy {
   async resolver(identidad: Identidad): Promise<Cuenta> {
     return this.transaccion(
       identidad,
-      true,
+      'SOLO LECTURA',
       async (_cliente, cuenta) => cuenta,
     );
   }
@@ -95,6 +100,7 @@ export class CuentaService implements OnModuleDestroy {
     sesion: Sesion,
     acceso: AccesoRegistro,
     trabajo: (cliente: PoolClient) => Promise<T>,
+    aislamiento: Aislamiento = 'REPEATABLE READ',
   ): Promise<T> {
     if (
       'id' in acceso &&
@@ -106,7 +112,7 @@ export class CuentaService implements OnModuleDestroy {
       throw new BadRequestException('Registro no válido.');
     }
     // Volvemos a consultar la cuenta para detectar cambios desde la entrada a la ruta.
-    return this.transaccion(sesion, false, async (cliente, cuenta) => {
+    return this.transaccion(sesion, aislamiento, async (cliente, cuenta) => {
       if (
         cuenta.membresia_id !== sesion.membresia_id ||
         cuenta.establecimiento_id !== sesion.establecimiento_id ||
@@ -261,7 +267,7 @@ export class CuentaService implements OnModuleDestroy {
 
   private async transaccion<T>(
     identidad: Identidad,
-    soloLectura: boolean,
+    modo: 'SOLO LECTURA' | Aislamiento,
     trabajo: (cliente: PoolClient, cuenta: Cuenta) => Promise<T>,
   ): Promise<T> {
     const cliente = await this.pool.connect().catch(() => {
@@ -272,9 +278,11 @@ export class CuentaService implements OnModuleDestroy {
       // El permiso y el trabajo deben ver los mismos datos durante toda la operación.
       // Las instrucciones fijas comparten un viaje; los datos siguen parametrizados.
       await cliente.query(
-        soloLectura
+        modo === 'SOLO LECTURA'
           ? 'BEGIN READ ONLY; SET LOCAL ROLE convi_backend'
-          : 'BEGIN ISOLATION LEVEL REPEATABLE READ; SET LOCAL ROLE convi_backend',
+          : modo === 'READ COMMITTED'
+            ? 'BEGIN ISOLATION LEVEL READ COMMITTED; SET LOCAL ROLE convi_backend'
+            : 'BEGIN ISOLATION LEVEL REPEATABLE READ; SET LOCAL ROLE convi_backend',
       );
       await cliente.query(
         `SELECT set_config('app.auth_usuario_id', $1, true),

@@ -1,0 +1,36 @@
+[project]
+name = "convi-ia"
+version = "0.1.0"
+description = "Servicio de IA de CONVI: embeddings con Ollama detrás de FastAPI (PB-079)"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi==0.143.0",
+    "httpx==0.28.1",
+    "uvicorn==0.54.0",
+]
+
+[project.scripts]
+convi-ia = "convi_ia.servidor:main"
+
+[build-system]
+requires = ["uv_build>=0.11.29,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S104", "S105", "S106"]

@@ -9,3 +9,7 @@
 !**/.env.example
 supabase/.temp
 supabase/.branches
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache

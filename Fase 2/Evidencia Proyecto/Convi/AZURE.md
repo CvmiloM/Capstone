@@ -748,3 +748,15 @@ los fragmentos del documento autorizado, nunca tokens de la sesión ni credencia
 de Supabase, la conexión real con el servicio de Camilo debe probarse antes de dar
 por terminada la integración, las pruebas con un servicio simulado no demuestran
 calidad de búsqueda ni funcionamiento de un modelo real
+
+### Servicio de IA en el equipo de Camilo (apps/ia)
+
+`apps/ia` es el servicio `convi-ia` en Python con FastAPI, atiende `POST /api/embed` con el mismo contrato y le pasa el trabajo a Ollama solo después de revisar el token, el modelo, que vengan de 1 a 8 textos no vacíos de hasta 8000 caracteres, `truncate: false` y un cuerpo de hasta 256 KiB, a la vuelta valida que Ollama entregue 1024 números finitos por texto con el modelo pedido, no guarda ni registra el texto de los fragmentos, no publica documentación y `GET /salud` dice si Ollama responde y si el modelo está instalado
+
+En local se usa con Ollama instalado en Windows y el modelo descargado con `ollama pull bge-m3:567m-fp16`, se levanta desde la carpeta Convi con `uv run --directory apps/ia convi-ia`, escucha en `127.0.0.1:8000` y la API lo alcanza con `IA_EMBEDDINGS_URL=http://host.docker.internal:8000/api/embed` en `.env`, sin token mientras escuche solo en el equipo
+
+Variables de `convi-ia`: `OLLAMA_URL` (por defecto `http://127.0.0.1:11434`), `IA_HOST` (por defecto `127.0.0.1`), `IA_PUERTO` (por defecto `8000`) e `IA_EMBEDDINGS_TOKEN`, que debe tener el mismo valor que recibe la API, el servicio no arranca si escucha fuera del equipo sin token o con un token de menos de 32 caracteres
+
+Respuestas: 401 sin el token correcto, 400 si la solicitud no cumple el contrato, 413 si el cuerpo es demasiado grande, 503 si Ollama no responde, tarda más de 55 segundos o no tiene el modelo, que la API reintenta, 422 si Ollama rechaza un texto por largo y 502 si Ollama responde con error o con vectores inválidos
+
+Pruebas del servicio con `uv run --directory apps/ia pytest` y revisión con `uv run --directory apps/ia ruff check`, para usarlo desde Azure falta exponerlo con HTTPS y configurar el token en `.env.cloud`, eso se decide con PB-118

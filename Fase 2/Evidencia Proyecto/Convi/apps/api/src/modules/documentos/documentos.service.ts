@@ -11,7 +11,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Sesion } from '../../common/sesion.js';
-import { CuentaService } from '../../database/cuenta.service.js';
+import {
+  CuentaService,
+  type AccesoRegistro,
+} from '../../database/cuenta.service.js';
 import type { ArchivoSubido } from '../situaciones/archivo-evidencia.js';
 import { validarCarga, validarVigencia } from './documento.js';
 import {
@@ -23,6 +26,7 @@ import {
 export const DOCUMENTOS_STORAGE = Symbol('DOCUMENTOS_STORAGE');
 const ESPACIO = 'convi-privado';
 const PERFILES = ['ADMIN', 'CONVIVENCIA'] as const;
+const ACCESO: AccesoRegistro = { tipo: 'establecimiento', perfiles: PERFILES };
 const NO_EXISTE = 'El documento no existe o no tienes permiso para consultarlo';
 const VERSION = `v.id, v.documento_id, v.etiqueta_version, v.estado,
   v.vigente_desde::text, v.vigente_hasta::text, v.publicado_en,
@@ -37,6 +41,21 @@ const DESDE_VERSION = `FROM convi.versiones_documento v
   JOIN convi.membresias_establecimiento m ON m.id = v.subido_por
   JOIN convi.personas p ON p.id = m.persona_id`;
 
+// Un choque con otra operación al mismo tiempo se informa como conflicto para que la pantalla pida recargar.
+function conConflicto<T>(trabajo: (db: PoolClient) => Promise<T>) {
+  return async (db: PoolClient) => {
+    try {
+      return await trabajo(db);
+    } catch (error) {
+      if (['40001', '40P01'].includes((error as { code?: string }).code ?? ''))
+        throw new ConflictException(
+          'El documento cambió mientras trabajabas, recarga la página',
+        );
+      throw error;
+    }
+  };
+}
+
 // El original se conserva incluso si no se consigue encolar su preparación.
 @Injectable()
 export class DocumentosService {
@@ -49,22 +68,26 @@ export class DocumentosService {
   ) {}
 
   private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
+    return this.cuentas.operar(sesion, ACCESO, conConflicto(trabajo));
+  }
+
+  /**
+   * Altas de documentos y versiones: esperan su turno con bloquearCatalogo y van en
+   * READ COMMITTED, así la revisión de etiquetas ve lo que otra carga guardó mientras
+   * esta esperaba y dos cargas a la vez se guardan una después de la otra.
+   */
+  private operarCatalogo<T>(
+    sesion: Sesion,
+    trabajo: (db: PoolClient) => Promise<T>,
+  ) {
     return this.cuentas.operar(
       sesion,
-      { tipo: 'establecimiento', perfiles: PERFILES },
-      async (db) => {
-        try {
-          return await trabajo(db);
-        } catch (error) {
-          if (
-            ['40001', '40P01'].includes((error as { code?: string }).code ?? '')
-          )
-            throw new ConflictException(
-              'El documento cambió mientras trabajabas, recarga la página',
-            );
-          throw error;
-        }
-      },
+      ACCESO,
+      conConflicto(async (db) => {
+        await this.bloquearCatalogo(db);
+        return trabajo(db);
+      }),
+      'READ COMMITTED',
     );
   }
 
@@ -160,8 +183,7 @@ export class DocumentosService {
     const clave = `${sesion.establecimiento_id}/documentos/${randomUUID()}.${datos.archivo.formato}`;
     let subido = false;
     try {
-      const guardado = await this.operar(sesion, async (db) => {
-        await this.bloquearCatalogo(db);
+      const guardado = await this.operarCatalogo(sesion, async (db) => {
         let doc: {
           id: string;
           titulo: string;
@@ -284,9 +306,12 @@ export class DocumentosService {
   }
 
   private async bloquearCatalogo(db: PoolClient) {
-    // Serializar altas de títulos iguales sin alterar datos o fechas de la escuela ni agregar un índice.
+    // Ordena las altas de la escuela sin tocar datos ni agregar un índice, con un bloqueo
+    // que dura hasta el COMMIT. No se usa la fila de la escuela porque toda operación la
+    // bloquea al revisar la cuenta (CuentaService.operar), y actualizarla hacía fallar con
+    // un conflicto lo que corría al mismo tiempo, también la preparación de documentos.
     await db.query(
-      'UPDATE convi.establecimientos SET nombre = nombre WHERE id = convi.establecimiento_actual()',
+      `SELECT pg_advisory_xact_lock(hashtext('convi_documentos'), hashtext(convi.establecimiento_actual()::text))`,
     );
   }
 
@@ -427,8 +452,7 @@ export class DocumentosService {
 
   async republicar(sesion: Sesion, id: string, cuerpo: unknown) {
     const datos = validarVigencia(cuerpo);
-    const guardado = await this.operar(sesion, async (db) => {
-      await this.bloquearCatalogo(db);
+    const guardado = await this.operarCatalogo(sesion, async (db) => {
       const v = await this.bloquearVersion(db, id);
       if (v.estado !== 'ARCHIVADO' || !v.documento_activo)
         throw new ConflictException(
