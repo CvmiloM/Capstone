@@ -15,6 +15,16 @@ MAXIMO_CUERPO = 256 * 1024
 # Menos que los 60 segundos que espera la API, así ella recibe una respuesta clara.
 ESPERA_OLLAMA = 55.0
 
+# PB-118: el modelo que redacta las respuestas, decidido por el PO el 2026-10-26.
+MODELO_GENERACION = "qwen3.5:9b"
+# Con el modelo cargado responde en 1 a 2 segundos, pero cargarlo puede tardar cerca de un
+# minuto, la API espera 120 segundos.
+ESPERA_GENERACION = 110.0
+# Ollama lo mantiene cargado este tiempo después de cada respuesta.
+MANTENER_CARGADO = "30m"
+MAXIMO_MENSAJES = 4
+MAXIMO_CARACTERES_MENSAJE = 40000
+
 LOCALES = {"127.0.0.1", "::1", "localhost"}
 LARGO_MINIMO_TOKEN = 32
 

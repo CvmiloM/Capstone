@@ -11,12 +11,14 @@ from convi_ia.configuracion import (
     DIMENSIONES_EMBEDDING,
     MAXIMO_CUERPO,
     MODELO_EMBEDDING,
+    MODELO_GENERACION,
     Configuracion,
     ErrorConfiguracion,
 )
 
 TOKEN = "t" * 40
 TEXTO_PRIVADO = "Reglamento interno, artículo 12: el estudiante Juan Pérez"
+RESPUESTA = '{"respuesta": "Se cita al apoderado", "citas": ["F1"], "sin_disposicion": false}'
 
 
 def vector(semilla: float = 0.1) -> list[float]:
@@ -34,6 +36,14 @@ class OllamaFalso:
     def normal(solicitud: httpx.Request) -> httpx.Response:
         if solicitud.url.path == "/api/show":
             return httpx.Response(200, json={"details": {"family": "bert"}})
+        if solicitud.url.path == "/api/chat":
+            return httpx.Response(
+                200,
+                json={
+                    "model": MODELO_GENERACION,
+                    "message": {"role": "assistant", "content": RESPUESTA},
+                },
+            )
         cuerpo = json.loads(solicitud.content)
         vectores = [vector(0.1 + i) for i, _ in enumerate(cuerpo["input"])]
         return httpx.Response(
@@ -125,7 +135,7 @@ def test_rechaza_lo_que_no_cumple_el_contrato_sin_llamar_a_ollama(cuerpo):
     with cliente(ollama) as c:
         r = c.post("/api/embed", json=cuerpo)
     assert r.status_code == 400
-    assert r.json()["detail"] == "La solicitud no cumple el contrato de embeddings"
+    assert r.json()["detail"] == "La solicitud no cumple el contrato del servicio de IA"
     assert ollama.solicitudes == []
 
 
@@ -296,3 +306,125 @@ def test_configuracion_insegura_o_invalida_no_arranca(entorno):
 def test_fuera_del_equipo_con_token_si_arranca():
     c = Configuracion.desde_entorno({"IA_HOST": "0.0.0.0", "IA_EMBEDDINGS_TOKEN": f"  {TOKEN}  "})
     assert c.token == TOKEN
+
+
+ESQUEMA = {
+    "type": "object",
+    "properties": {"respuesta": {"type": "string"}},
+    "required": ["respuesta"],
+}
+
+
+def chat(**extra) -> dict:
+    return {
+        "model": MODELO_GENERACION,
+        "messages": [
+            {"role": "system", "content": "Responde solo con los fragmentos"},
+            {"role": "user", "content": "Pregunta: ¿qué pasa con los atrasos?"},
+        ],
+        "format": ESQUEMA,
+        **extra,
+    }
+
+
+def test_chat_devuelve_el_texto_del_modelo_y_fija_las_opciones():
+    ollama = OllamaFalso()
+    with cliente(ollama) as c:
+        r = c.post("/api/chat", json=chat())
+    assert r.status_code == 200
+    assert r.json() == {
+        "model": MODELO_GENERACION,
+        "message": {"role": "assistant", "content": RESPUESTA},
+    }
+    enviado = json.loads(ollama.solicitudes[0].content)
+    assert ollama.solicitudes[0].url.path == "/api/chat"
+    assert enviado["think"] is False and enviado["stream"] is False
+    assert enviado["options"]["temperature"] == 0
+    assert enviado["keep_alive"] == "30m"
+    assert enviado["format"] == ESQUEMA
+
+
+def test_chat_exige_token_si_esta_configurado():
+    ollama = OllamaFalso()
+    with cliente(ollama, token=TOKEN) as c:
+        sin = c.post("/api/chat", json=chat())
+        con = c.post("/api/chat", json=chat(), headers={"Authorization": f"Bearer {TOKEN}"})
+    assert sin.status_code == 401 and con.status_code == 200
+    assert len(ollama.solicitudes) == 1
+
+
+@pytest.mark.parametrize(
+    "cuerpo",
+    [
+        chat(model="llama3"),
+        chat(stream=True),
+        chat(format={"type": "string"}),
+        chat(messages=[{"role": "assistant", "content": "respuesta previa"}]),
+        chat(messages=[]),
+        chat(messages=[{"role": "user", "content": "x" * 40001}]),
+        chat(messages=[{"role": "user", "content": f"m{i}"} for i in range(5)]),
+        chat(tools=[]),
+        {"model": MODELO_GENERACION, "messages": [{"role": "user", "content": "hola"}]},
+    ],
+)
+def test_chat_rechaza_lo_que_no_cumple_el_contrato(cuerpo):
+    ollama = OllamaFalso()
+    with cliente(ollama) as c:
+        r = c.post("/api/chat", json=cuerpo)
+    assert r.status_code == 400
+    assert ollama.solicitudes == []
+
+
+def test_chat_con_modelo_no_instalado_dice_como_instalarlo():
+    with cliente(OllamaFalso(lambda _: httpx.Response(404, json={"error": "not found"}))) as c:
+        r = c.post("/api/chat", json=chat())
+    assert r.status_code == 503
+    assert f"ollama pull {MODELO_GENERACION}" in r.json()["detail"]
+
+
+def test_chat_con_ollama_lento_es_recuperable():
+    def lento(solicitud: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("tarde", request=solicitud)
+
+    with cliente(OllamaFalso(lento)) as c:
+        r = c.post("/api/chat", json=chat())
+    assert r.status_code == 503
+
+
+@pytest.mark.parametrize(
+    "respuesta",
+    [
+        {"message": {"role": "assistant", "content": ""}},
+        {"message": {"role": "assistant"}},
+        {"done": True},
+        {"message": {"role": "assistant", "content": "x" * (64 * 1024 + 1)}},
+    ],
+)
+def test_chat_respuesta_vacia_o_enorme_de_ollama(respuesta):
+    with cliente(OllamaFalso(lambda _: httpx.Response(200, json=respuesta))) as c:
+        r = c.post("/api/chat", json=chat())
+    assert r.status_code == 502
+
+
+def test_chat_no_devuelve_ni_registra_el_texto(caplog):
+    with caplog.at_level("INFO"), cliente(OllamaFalso()) as c:
+        c.post("/api/chat", json=chat(messages=[{"role": "user", "content": TEXTO_PRIVADO}]))
+        r = c.post(
+            "/api/chat",
+            json=chat(model="otro", messages=[{"role": "user", "content": TEXTO_PRIVADO}]),
+        )
+    assert "Juan" not in r.text
+    assert "Juan" not in caplog.text
+
+
+def test_salud_avisa_si_falta_el_modelo_que_redacta():
+    def solo_embedding(solicitud: httpx.Request) -> httpx.Response:
+        if json.loads(solicitud.content)["model"] == MODELO_GENERACION:
+            return httpx.Response(404, json={"error": "not found"})
+        return httpx.Response(200, json={})
+
+    with cliente(OllamaFalso(solo_embedding)) as c:
+        r = c.get("/salud")
+    assert r.status_code == 503
+    assert r.json()["instalado"] is True
+    assert f"ollama pull {MODELO_GENERACION}" in r.json()["generacion"]["instalado"]

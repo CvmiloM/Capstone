@@ -760,3 +760,9 @@ Variables de `convi-ia`: `OLLAMA_URL` (por defecto `http://127.0.0.1:11434`), `I
 Respuestas: 401 sin el token correcto, 400 si la solicitud no cumple el contrato, 413 si el cuerpo es demasiado grande, 503 si Ollama no responde, tarda más de 55 segundos o no tiene el modelo, que la API reintenta, 422 si Ollama rechaza un texto por largo y 502 si Ollama responde con error o con vectores inválidos
 
 Pruebas del servicio con `uv run --directory apps/ia pytest` y revisión con `uv run --directory apps/ia ruff check`, para usarlo desde Azure falta exponerlo con HTTPS y configurar el token en `.env.cloud`, eso se decide con PB-118
+
+### Consulta del reglamento con IA (PB-117 a PB-119)
+
+El portal de Convivencia tiene Consultar reglamento, la API busca con bge-m3 en `convi.buscar_fragmentos_normativa`, que solo devuelve fragmentos de versiones publicadas, vigentes, habilitadas y preparadas de la escuela y solo para Convivencia, y pide la respuesta a qwen3.5:9b por `POST /api/chat` de convi-ia con un esquema JSON, la API valida que cada cita sea uno de los fragmentos entregados y, si no hay citas, responde ella misma que el reglamento no lo regula
+
+Se configura en la API con `IA_GENERACION_URL` (local `http://host.docker.internal:8000/api/chat`) y el mismo `IA_EMBEDDINGS_TOKEN`, el modelo se instala con `ollama pull qwen3.5:9b`, cada consulta queda en `registros_solicitudes_ia` con propósito, modelo, fuentes citadas, tiempo y resultado, sin la pregunta ni la respuesta, y si la IA falla la consulta queda Fallida y la pantalla lo informa sin afectar el resto de CONVI

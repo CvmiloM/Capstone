@@ -8,6 +8,7 @@ import { CategoriasModule } from './modules/categorias/categorias.module.js';
 import { CuentasModule } from './modules/cuentas/cuentas.module.js';
 import { DocumentosModule } from './modules/documentos/documentos.module.js';
 import { ImportacionesModule } from './modules/importaciones/importaciones.module.js';
+import { NormativaModule } from './modules/normativa/normativa.module.js';
 import { ProtocolosModule } from './modules/protocolos/protocolos.module.js';
 import { RegistroModule } from './modules/registro/registro.module.js';
 import { ReglasModule } from './modules/reglas/reglas.module.js';
@@ -22,6 +23,7 @@ import { SituacionesModule } from './modules/situaciones/situaciones.module.js';
     CuentasModule,
     DocumentosModule,
     ImportacionesModule,
+    NormativaModule,
     ProtocolosModule,
     RegistroModule,
     ReglasModule,
