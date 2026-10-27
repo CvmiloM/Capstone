@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Encabezado } from "@/app/components/formulario";
+import { obtenerContextoAdmin } from "../datos";
 import { obtenerCuentas } from "./datos";
 import { FormularioInvitacion } from "./formulario-invitacion";
 import { ListaCuentas } from "./lista-cuentas";
@@ -17,7 +18,7 @@ export default async function PaginaUsuarios({
     suspendidas?: string;
   }>;
 }) {
-  const cuentas = await obtenerCuentas();
+  const [cuentas, contexto] = await Promise.all([obtenerCuentas(), obtenerContextoAdmin()]);
   const parametros = await searchParams;
   const perfil =
     typeof parametros.perfil === "string" &&
@@ -45,6 +46,7 @@ export default async function PaginaUsuarios({
       <div className="grid gap-6 lg:grid-cols-3">
         <ListaCuentas
           cuentas={cuentas}
+          zonaHoraria={contexto.escuela.zonaHoraria}
           perfilInicial={perfil}
           suspendidasInicial={parametros.suspendidas === "1"}
         />

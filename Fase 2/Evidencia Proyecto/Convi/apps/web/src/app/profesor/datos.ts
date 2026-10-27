@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import type { Evidencia } from "@/app/components/evidencias/opciones";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 
@@ -268,18 +269,20 @@ export const URGENCIA: Record<string, { texto: string; clase: string }> = {
   INMEDIATA: { texto: "Inmediata", clase: "bg-destructive/10 text-destructive" },
 };
 
-// TODO(HU-021): usar la zona horaria de la escuela cuando la API la entregue.
-const formatoFecha = new Intl.DateTimeFormat("es-CL", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-  timeZone: "America/Santiago",
+// Solo se comparte dentro de la misma petición, nunca entre escuelas o usuarios.
+export const obtenerFormatoFecha = cache(async () => {
+  const token = await tokenDeSesion();
+  const respuesta = await fetch(`${URL_API}/auth/zona-horaria`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(10000),
+  });
+  if (respuesta.status === 401) redirect("/login");
+  if (!respuesta.ok) throw new Error("No pudimos consultar el horario de tu escuela");
+  const { zona_horaria } = await respuesta.json();
+  if (typeof zona_horaria !== "string") throw new Error("Horario de escuela no disponible");
+  const formato = new Intl.DateTimeFormat("es-CL", {
+    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: zona_horaria,
+  });
+  return (iso: string) => formato.format(new Date(iso));
 });
-
-/** Fecha y hora legibles a partir del texto ISO que entrega la API. */
-export function formatearFecha(iso: string) {
-  return formatoFecha.format(new Date(iso));
-}

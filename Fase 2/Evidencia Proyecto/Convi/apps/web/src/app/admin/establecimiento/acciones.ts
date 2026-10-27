@@ -39,3 +39,23 @@ export async function guardarFichaInstitucional(
   revalidatePath("/admin", "layout");
   redirect("/admin/establecimiento?ficha=guardada");
 }
+
+export async function guardarConfiguracionEscuela(
+  _anterior: EstadoFicha,
+  formData: FormData,
+): Promise<EstadoFicha> {
+  const valores: Record<string, string> = {};
+  for (const campo of ["zona_horaria", "plazo_cierre_dias", "actualizado_en"]) {
+    const valor = formData.get(campo);
+    valores[campo] = typeof valor === "string" ? valor.trim() : "";
+  }
+  const resultado = await enviarCambio(
+    "PATCH",
+    "/admin/establecimiento/configuracion",
+    valores,
+  );
+  if (!resultado.ok)
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  revalidatePath("/", "layout");
+  redirect("/admin/establecimiento?configuracion=guardada");
+}

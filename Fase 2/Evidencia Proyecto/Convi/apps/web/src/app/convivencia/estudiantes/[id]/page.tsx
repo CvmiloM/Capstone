@@ -9,7 +9,7 @@ import {
   claseEnlace,
 } from "@/app/components/formulario";
 // Mismos estilos de urgencia, formato de fecha y nombres de rol que el resto del portal.
-import { formatearFecha, URGENCIA } from "@/app/profesor/datos";
+import { obtenerFormatoFecha, URGENCIA } from "@/app/profesor/datos";
 import { NOMBRE_ROL_EN_SITUACION } from "@/app/profesor/situacion-opciones";
 import { AvisoNoDisponible } from "../../aviso-no-disponible";
 import {
@@ -236,7 +236,8 @@ function CampoFecha({
   );
 }
 
-function Registro({ registro }: { registro: RegistroHistorial }) {
+async function Registro({ registro }: { registro: RegistroHistorial }) {
+  const formatearFecha = await obtenerFormatoFecha();
   const esCaso = registro.tipo === "CASO";
   const urgencia =
     registro.tipo === "SITUACION" ? (URGENCIA[registro.urgencia] ?? URGENCIA.NORMAL) : null;

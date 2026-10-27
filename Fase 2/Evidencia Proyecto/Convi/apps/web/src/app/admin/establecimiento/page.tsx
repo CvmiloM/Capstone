@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { Encabezado } from "@/app/components/formulario";
 import { obtenerFichaInstitucional } from "./datos";
 import { FormularioFicha } from "./formulario-ficha";
+import { FormularioConfiguracion } from "./formulario-configuracion";
 
 export const metadata: Metadata = { title: "Establecimiento" };
 
 export default async function PaginaEstablecimiento({
   searchParams,
 }: {
-  searchParams: Promise<{ ficha?: string }>;
+  searchParams: Promise<{ ficha?: string; configuracion?: string }>;
 }) {
   const [ficha, consulta] = await Promise.all([
     obtenerFichaInstitucional(),
@@ -23,16 +24,19 @@ export default async function PaginaEstablecimiento({
   return (
     <>
       <Encabezado
-        titulo="Establecimiento"
+        titulo="Establecimiento, Fechas y Plazos"
         descripcion="Mantén actualizados los datos institucionales y de contacto de tu escuela"
       />
       <div className="max-w-4xl space-y-6">
-        {consulta.ficha === "guardada" && (
+        {(consulta.ficha === "guardada" ||
+          consulta.configuracion === "guardada") && (
           <div
             role="status"
             className="rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm"
           >
-            Ficha institucional guardada
+            {consulta.configuracion === "guardada"
+              ? "Configuración de fechas y plazos guardada"
+              : "Ficha institucional guardada"}
           </div>
         )}
         <section
@@ -58,6 +62,12 @@ export default async function PaginaEstablecimiento({
           className="rounded-2xl border border-border bg-card p-5 sm:p-6"
         >
           <FormularioFicha ficha={ficha} />
+        </section>
+        <section
+          aria-label="Fechas y plazos"
+          className="rounded-2xl border border-border bg-card p-5 sm:p-6"
+        >
+          <FormularioConfiguracion key={ficha.actualizado_en} ficha={ficha} />
         </section>
       </div>
     </>

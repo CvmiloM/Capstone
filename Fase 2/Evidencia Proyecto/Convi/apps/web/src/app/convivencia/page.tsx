@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
 // Mismos estilos de urgencia y formato de fecha que el portal del profesor.
-import { formatearFecha, URGENCIA } from "@/app/profesor/datos";
+import { obtenerFormatoFecha, URGENCIA } from "@/app/profesor/datos";
 import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
 import { AvisoNoDisponible } from "./aviso-no-disponible";
 import {
@@ -55,7 +55,7 @@ export default async function PaginaBandeja({
       ? parametros.urgencia
       : undefined;
 
-  const respuesta = await obtenerBandeja({ estado, urgencia });
+  const [respuesta, formatearFecha] = await Promise.all([obtenerBandeja({ estado, urgencia }), obtenerFormatoFecha()]);
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/" />;
   const { situaciones, conteo, limite } = respuesta.datos;
 

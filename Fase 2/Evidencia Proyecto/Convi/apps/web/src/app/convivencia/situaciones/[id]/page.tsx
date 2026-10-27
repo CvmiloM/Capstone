@@ -5,7 +5,7 @@ import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evid
 import { ListaEvidencias } from "@/app/components/evidencias/lista-evidencias";
 import { claseEnlace } from "@/app/components/formulario";
 // Mismos estilos de urgencia, formato de fecha y nombres de rol que el portal del profesor.
-import { formatearFecha, URGENCIA } from "@/app/profesor/datos";
+import { obtenerFormatoFecha, URGENCIA } from "@/app/profesor/datos";
 import { NOMBRE_ROL_EN_SITUACION } from "@/app/profesor/situacion-opciones";
 import { AvisoNoDisponible } from "../../aviso-no-disponible";
 import {
@@ -77,7 +77,7 @@ export default async function PaginaRevisionSituacion({
   searchParams: Promise<{ aviso?: string }>;
 }) {
   const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
-  const respuesta = await obtenerSituacion(id);
+  const [respuesta, formatearFecha] = await Promise.all([obtenerSituacion(id), obtenerFormatoFecha()]);
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia" />;
   const situacion = respuesta.datos;
   const urgencia = URGENCIA[situacion.urgencia] ?? URGENCIA.NORMAL;
