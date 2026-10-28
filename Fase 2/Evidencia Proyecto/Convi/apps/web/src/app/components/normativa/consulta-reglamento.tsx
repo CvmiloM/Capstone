@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   AvisoError,
   BotonEnviar,
@@ -12,6 +12,11 @@ import {
   type Cita,
   type EstadoConsulta,
 } from "./acciones";
+import { MascotaIA, type FaseMascota } from "./mascota-ia";
+
+// La consulta es una sola llamada, así que las fases mientras espera son una guía
+// visual por tiempo: busca, después piensa y escribe hasta que llega la respuesta.
+const FASES_ESPERA = ["buscando", "pensando", "escribiendo"] as const;
 
 const estadoInicial: EstadoConsulta = {};
 const LARGO_MAXIMO = 1000;
@@ -42,11 +47,34 @@ export function ConsultaReglamento() {
     estadoInicial,
   );
   const resultado = estado.resultado;
+  const [paso, setPaso] = useState(0);
+
+  useEffect(() => {
+    if (!pendiente) return;
+    const pensar = setTimeout(() => setPaso(1), 1200);
+    const escribir = setTimeout(() => setPaso(2), 2800);
+    return () => {
+      clearTimeout(pensar);
+      clearTimeout(escribir);
+    };
+  }, [pendiente]);
+
+  const fase: FaseMascota = pendiente
+    ? FASES_ESPERA[paso]
+    : resultado
+      ? resultado.sin_disposicion
+        ? "sin-disposicion"
+        : "listo"
+      : estado.mensaje && !estado.errores
+        ? "error"
+        : "reposo";
 
   return (
     <div className="space-y-6">
+      <MascotaIA fase={fase} />
       <form
         action={accion}
+        onSubmit={() => setPaso(0)}
         className="space-y-4 rounded-2xl border border-border bg-card p-5"
       >
         <div>
