@@ -21,6 +21,7 @@ import {
   FormularioCierre,
   FormularioEstado,
 } from "./formularios";
+import { OrientacionCaso } from "./orientacion";
 
 export const metadata: Metadata = { title: "Caso" };
 
@@ -164,6 +165,10 @@ export default async function PaginaCaso({
               <Dato nombre="Cerrado">{formatearFecha(caso.cerrado_en)}</Dato>
             )}
           </dl>
+        </Seccion>
+
+        <Seccion titulo="Orientación con IA" className="lg:col-span-3">
+          <OrientacionCaso casoId={caso.id} />
         </Seccion>
 
         <Seccion titulo="Estudiantes del caso" className="lg:col-span-3">

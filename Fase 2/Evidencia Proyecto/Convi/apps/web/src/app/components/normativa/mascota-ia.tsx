@@ -479,7 +479,16 @@ function dibujar(
   ctx.globalAlpha = 1;
 }
 
-export function MascotaIA({ fase }: { fase: FaseMascota }) {
+/** Cada pantalla puede cambiar lo que dice el gato en alguna fase. */
+export type MensajesMascota = Partial<Record<FaseMascota, string>>;
+
+export function MascotaIA({
+  fase,
+  mensajes,
+}: {
+  fase: FaseMascota;
+  mensajes?: MensajesMascota;
+}) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   const faseActual = useRef<FaseMascota>(fase);
   const animacion = useRef<EstadoAnimacion>({
@@ -560,7 +569,7 @@ export function MascotaIA({ fase }: { fase: FaseMascota }) {
         role="status"
         className="relative mb-16 max-w-sm rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-2.5 text-sm shadow-sm"
       >
-        {MENSAJES[fase]}
+        {mensajes?.[fase] ?? MENSAJES[fase]}
       </p>
     </div>
   );

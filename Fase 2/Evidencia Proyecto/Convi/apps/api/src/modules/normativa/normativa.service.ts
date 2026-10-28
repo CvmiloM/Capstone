@@ -13,15 +13,14 @@ import {
   construirMensajes,
   ErrorIA,
   esquemaRespuesta,
-  FRAGMENTOS_BUSCADOS,
   interpretarRespuesta,
   MODELO_GENERACION,
-  seleccionarFragmentos,
   sinDisposicion,
   validarPregunta,
   type FragmentoEncontrado,
   type ResultadoConsulta,
 } from './consulta.js';
+import { buscarFragmentosNormativa } from './busqueda.js';
 import { configuracionGeneracion, generar } from './generacion.js';
 
 const NO_DISPONIBLE =
@@ -78,22 +77,8 @@ export class NormativaService {
         },
       ]);
       // Se buscan 12 y se descartan las páginas del índice antes de quedarse con 6.
-      fragmentos = seleccionarFragmentos(
-        await this.operar(
-          sesion,
-          async (db) =>
-            (
-              await db.query<FragmentoEncontrado>(
-                `SELECT b.fragmento_id, b.version_id, b.documento_id, b.pagina_desde, b.pagina_hasta,
-                b.contenido, b.distancia, d.titulo, v.etiqueta_version
-              FROM convi.buscar_fragmentos_normativa($1, $2) b
-              JOIN convi.versiones_documento v ON v.id = b.version_id
-              JOIN convi.documentos_institucionales d ON d.id = b.documento_id
-              ORDER BY b.distancia, b.fragmento_id`,
-                [JSON.stringify(vector), FRAGMENTOS_BUSCADOS],
-              )
-            ).rows,
-        ),
+      fragmentos = await this.operar(sesion, (db) =>
+        buscarFragmentosNormativa(db, vector),
       );
       // HU-102: sin fragmentos no hay nada que citar y no se le pregunta al modelo.
       const resultado = fragmentos.length
