@@ -135,6 +135,10 @@ export default async function PaginaCaso({
         </div>
       </div>
 
+      <Link href={`/convivencia/casos/${caso.id}/historial`} className={`mb-6 inline-flex text-sm ${claseEnlace}`}>
+        Ver historial del caso y sus cambios →
+      </Link>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Seccion titulo="Resumen" className="lg:col-span-2">
           <p className="whitespace-pre-line text-sm">{caso.resumen}</p>
