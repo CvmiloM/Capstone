@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Identidad } from '../../common/sesion.js';
+import { comprobarIngresoPosterior } from './sesion-restablecida.js';
 
 export const SUPABASE_AUTH = Symbol('supabase-auth');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -54,6 +55,11 @@ export class IdentidadService {
       if (errorUsuario || usuario.user?.id !== claims.sub) {
         throw new UnauthorizedException('Sesión no válida.');
       }
+      // Leer la marca actual de Auth, no la copia posiblemente antigua del JWT.
+      comprobarIngresoPosterior(
+        usuario.user.app_metadata.convi_restablecimiento_mfa,
+        claims.amr,
+      );
       // El correo se comprueba con Auth, nunca con un campo enviado por el formulario.
       if (
         correoVerificado &&
@@ -64,7 +70,11 @@ export class IdentidadService {
       // Supabase aporta la identidad; el perfil y la escuela se resolverán en la base.
       return {
         authUsuarioId: claims.sub,
-        aal: claims.aal === 'aal2' ? 'aal2' : 'aal1',
+        aal:
+          claims.aal === 'aal2' &&
+          usuario.user.factors?.some((factor) => factor.status === 'verified')
+            ? 'aal2'
+            : 'aal1',
       };
     } catch (error) {
       if (

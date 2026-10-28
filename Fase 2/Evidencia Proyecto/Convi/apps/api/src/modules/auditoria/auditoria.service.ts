@@ -11,6 +11,12 @@ import {
 } from './auditoria.js';
 import { CAMPOS_ADMINISTRATIVOS, OPCIONES_AUDITORIA } from './opciones.js';
 
+const AUTOR_ADMIN = `coalesce(p.nombres || ' ' || p.apellidos,
+  CASE WHEN e.tipo_recurso = 'membresias_establecimiento'
+    AND e.codigo_accion IN ('MFA_RESTABLECIMIENTO_SOLICITADO','MFA_RESTABLECIDO')
+    AND e.metadatos->>'canal' = 'OPERACION'
+    THEN 'Operador: ' || left(e.metadatos->>'operador', 100) END, 'Proceso del sistema')`;
+
 @Injectable()
 export class AuditoriaService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
@@ -28,7 +34,7 @@ export class AuditoriaService {
           `SELECT e.id, e.codigo_accion AS tipo, e.tipo_recurso AS recurso,
                 e.recurso_id AS referencia, e.codigo_resultado AS resultado,
                 to_char(e.ocurrido_en AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS fecha,
-                p.nombres || ' ' || p.apellidos AS autor,
+                ${AUTOR_ADMIN} AS autor,
                 detalle.referencia_nombre, cambios.campos_modificados
          FROM convi.eventos_auditoria e
          LEFT JOIN convi.membresias_establecimiento m
@@ -104,7 +110,7 @@ export class AuditoriaService {
          ) cambios ON true
          WHERE e.establecimiento_id = convi.establecimiento_actual()
            AND ($1::timestamptz IS NULL OR (e.ocurrido_en, e.id, e.codigo_accion) < ($1::timestamptz, $2::uuid, $3::text))
-           AND ($5::text = '' OR position($5 in translate(lower(coalesce(p.nombres || ' ' || p.apellidos, 'Proceso del sistema')), 'áéíóúüñ', 'aeiouun')) > 0)
+           AND ($5::text = '' OR position($5 in translate(lower(${AUTOR_ADMIN}), 'áéíóúüñ', 'aeiouun')) > 0)
            AND ($6::date IS NULL OR e.ocurrido_en >= $6::date::timestamptz)
            AND ($7::date IS NULL OR e.ocurrido_en < ($7::date + 1)::timestamptz)
            AND ($9::text IS NULL OR e.tipo_recurso = $9)
@@ -115,7 +121,7 @@ export class AuditoriaService {
            AND (cardinality($8::text[]) = 0 OR NOT EXISTS (
              SELECT 1 FROM unnest($8::text[]) palabra
              WHERE position(palabra in translate(lower(replace(concat_ws(' ',
-               coalesce(p.nombres || ' ' || p.apellidos, 'Proceso del sistema'),
+               ${AUTOR_ADMIN},
                e.codigo_accion, e.tipo_recurso, e.codigo_resultado, e.recurso_id::text,
                detalle.referencia_nombre, array_to_string(cambios.campos_modificados, ' '),
                $12::jsonb->>e.tipo_recurso, $13::jsonb->>e.codigo_accion,

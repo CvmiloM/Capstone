@@ -54,11 +54,18 @@ function detalleAdministrativo(e: FilaAuditoria) {
   );
   return {
     referencia_nombre: permitidos ? e.referencia_nombre || null : null,
-    resumen: !permitidos
-      ? 'El detalle de este registro no se muestra en la auditoría administrativa'
-      : campos.length
-        ? `Se actualizaron estos datos: ${campos.join(', ')}`
-        : 'Este evento no conserva un desglose de los datos modificados',
+    resumen:
+      e.recurso === 'membresias_establecimiento' &&
+      e.tipo === 'MFA_RESTABLECIDO'
+        ? 'Se retiró el autenticador anterior, la cuenta debe iniciar sesión y configurar uno nuevo'
+        : e.recurso === 'membresias_establecimiento' &&
+            e.tipo === 'MFA_RESTABLECIMIENTO_SOLICITADO'
+          ? 'Se verificó la identidad fuera de CONVI y se registró la solicitud de recuperación'
+          : !permitidos
+            ? 'El detalle de este registro no se muestra en la auditoría administrativa'
+            : campos.length
+              ? `Se actualizaron estos datos: ${campos.join(', ')}`
+              : 'Este evento no conserva un desglose de los datos modificados',
   };
 }
 

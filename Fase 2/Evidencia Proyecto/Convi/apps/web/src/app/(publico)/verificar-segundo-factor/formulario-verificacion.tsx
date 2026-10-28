@@ -79,6 +79,10 @@ export function FormularioVerificacion({
         <p className="text-xs text-muted-foreground">
           Este paso protege las funciones de Administración y Convivencia.
         </p>
+        <details className="rounded-xl border border-border p-3 text-sm">
+          <summary className="cursor-pointer font-medium text-primary">¿Perdiste tu aplicación autenticadora?</summary>
+          <p className="mt-2 text-muted-foreground">Pide a otro administrador de tu escuela que verifique tu identidad y restablezca tu segundo factor desde Usuarios, si eres el único administrador, contacta a quien opera CONVI para realizar esa verificación</p>
+        </details>
       </form>
     );
   }
