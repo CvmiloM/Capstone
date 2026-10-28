@@ -92,6 +92,35 @@ export async function matricularEstudiante(
   return { listo: "Matriculaste al estudiante." };
 }
 
+// PB-022 y PB-031 (HU-017 y HU-024): cambio de curso, paso de año, egreso o
+// retiro. La API termina la matrícula vigente y, si corresponde, abre la nueva.
+export async function cambiarMatricula(
+  _anterior: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const id = leerTexto(formData, "estudiante_id");
+  const valores = {
+    tipo: leerTexto(formData, "tipo"),
+    matricula_id: leerTexto(formData, "matricula_id"),
+    curso_id: leerTexto(formData, "curso_id"),
+    fecha: leerTexto(formData, "fecha"),
+    motivo: leerTexto(formData, "motivo"),
+  };
+  const resultado = await enviarCambio(
+    "POST",
+    `/admin/estudiantes/${encodeURIComponent(id)}/movimientos`,
+    valores,
+  );
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  revalidatePath("/admin/estudiantes", "layout");
+  revalidatePath("/admin/cursos", "layout");
+  redirect(
+    `/admin/estudiantes/${encodeURIComponent(id)}?cambio=${encodeURIComponent(valores.tipo)}`,
+  );
+}
+
 export async function vincularApoderado(
   estudianteId: string,
   _anterior: EstadoFormulario,

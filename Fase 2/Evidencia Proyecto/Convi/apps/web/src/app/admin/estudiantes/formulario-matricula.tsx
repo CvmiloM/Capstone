@@ -8,8 +8,12 @@ import { type EstadoFormulario, matricularEstudiante } from "./acciones";
 const estadoInicial: EstadoFormulario = {};
 
 export type OpcionesMatricula = {
+  /** Id del año académico. */
+  id: string;
   anio: number;
   estado: string;
+  /** AAAA-MM-DD, o null si el año no lo indica. */
+  fecha_inicio: string | null;
   cursos: { id: string; codigo: string; nombre: string }[];
 }[];
 

@@ -92,15 +92,20 @@ async function pedir<T>(ruta: string): Promise<T | null> {
   return (await respuesta.json()) as T;
 }
 
-/** Una página de la nómina, filtrada por texto y curso. */
+/**
+ * Una página de la nómina, filtrada por texto, curso y estado. Sin estado, la
+ * API muestra solo a los estudiantes Activos (PB-031).
+ */
 export async function obtenerNomina(filtro: {
   buscar: string;
   curso: string;
   pagina: number;
+  estado: string;
 }): Promise<Nomina> {
   const parametros = new URLSearchParams();
   if (filtro.buscar) parametros.set("buscar", filtro.buscar);
   if (filtro.curso) parametros.set("curso", filtro.curso);
+  if (filtro.estado) parametros.set("estado", filtro.estado);
   if (filtro.pagina > 1) parametros.set("pagina", String(filtro.pagina));
   const nomina = await pedir<Nomina>(`/admin/estudiantes?${parametros}`);
   return nomina ?? { estudiantes: [], total: 0, pagina: 1, por_pagina: 50 };

@@ -11,7 +11,7 @@ import { obtenerCurso, obtenerCursos } from "../cursos/datos";
 import { obtenerContextoAdmin } from "../datos";
 import { obtenerNomina } from "./datos";
 import { FormularioEstudiante } from "./formulario-estudiante";
-import { NOMBRE_ESTADO_ESTUDIANTE } from "./opciones";
+import { FILTRO_ESTADO_NOMINA, NOMBRE_ESTADO_ESTUDIANTE } from "./opciones";
 
 export const metadata: Metadata = { title: "Estudiantes" };
 
@@ -24,18 +24,29 @@ function leer(valor: string | undefined) {
 
 // PB-017 (HU-014): nómina de estudiantes de la escuela, con búsqueda por
 // nombre, código o RUT y filtro por curso (?buscar=, ?curso=, ?pagina=).
+// PB-031 (HU-024 CA2): por defecto solo los Activos; ?estado= muestra otros.
 export default async function PaginaEstudiantes({
   searchParams,
 }: {
-  searchParams: Promise<{ buscar?: string; curso?: string; pagina?: string }>;
+  searchParams: Promise<{
+    buscar?: string;
+    curso?: string;
+    pagina?: string;
+    estado?: string;
+  }>;
 }) {
   const parametros = await searchParams;
   const buscar = leer(parametros.buscar);
   const curso = leer(parametros.curso);
   const pagina = Math.max(1, Number.parseInt(leer(parametros.pagina), 10) || 1);
+  const estado = FILTRO_ESTADO_NOMINA.some(
+    ([valor]) => valor !== "" && valor === leer(parametros.estado),
+  )
+    ? leer(parametros.estado)
+    : "";
 
   const [nomina, anios, { escuela }, cursoElegido] = await Promise.all([
-    obtenerNomina({ buscar, curso, pagina }),
+    obtenerNomina({ buscar, curso, pagina, estado }),
     obtenerAnios(),
     obtenerContextoAdmin(),
     curso ? obtenerCurso(curso) : null,
@@ -52,7 +63,7 @@ export default async function PaginaEstudiantes({
   }).format(new Date());
 
   const totalPaginas = Math.max(1, Math.ceil(nomina.total / nomina.por_pagina));
-  const filtrando = buscar !== "" || curso !== "";
+  const filtrando = buscar !== "" || curso !== "" || estado !== "";
   const desde = (nomina.pagina - 1) * nomina.por_pagina + 1;
   const hasta = desde + nomina.estudiantes.length - 1;
 
@@ -60,6 +71,7 @@ export default async function PaginaEstudiantes({
     const consulta = new URLSearchParams();
     if (buscar) consulta.set("buscar", buscar);
     if (curso) consulta.set("curso", curso);
+    if (estado) consulta.set("estado", estado);
     if (numero > 1) consulta.set("pagina", String(numero));
     const texto = consulta.toString();
     return texto ? `/admin/estudiantes?${texto}` : "/admin/estudiantes";
@@ -81,7 +93,7 @@ export default async function PaginaEstudiantes({
           <Form
             action="/admin/estudiantes"
             role="search"
-            className="mb-4 grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-tarjeta sm:grid-cols-[1fr_14rem_auto] sm:items-end"
+            className="mb-4 grid gap-3 rounded-2xl border border-border bg-card p-4 shadow-tarjeta sm:grid-cols-[1fr_12rem_9rem_auto] sm:items-end"
           >
             <div>
               <label htmlFor="buscar" className="block text-sm font-medium">
@@ -115,6 +127,23 @@ export default async function PaginaEstudiantes({
                 ))}
               </select>
             </div>
+            <div>
+              <label htmlFor="estado" className="block text-sm font-medium">
+                Estado
+              </label>
+              <select
+                id="estado"
+                name="estado"
+                defaultValue={estado}
+                className={claseControl}
+              >
+                {FILTRO_ESTADO_NOMINA.map(([valor, nombre]) => (
+                  <option key={valor} value={valor}>
+                    {nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex gap-2">
               <button type="submit" className={claseBotonSecundario}>
                 Buscar
@@ -134,7 +163,7 @@ export default async function PaginaEstudiantes({
             <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
               {filtrando
                 ? "No encontramos estudiantes con esa búsqueda."
-                : "Tu escuela todavía no tiene estudiantes. Crea la primera ficha con el formulario."}
+                : "No hay estudiantes activos. Crea una ficha con el formulario o elige otro estado en el filtro."}
             </p>
           ) : (
             <>

@@ -29,14 +29,22 @@ export class EstudiantesController {
   ) {}
 
   // GET /admin/estudiantes?buscar=<nombre, código o RUT>&curso=<id>&pagina=<n>
+  // &estado=<ACTIVO (por defecto), INACTIVO, EGRESADO o TODOS>
   @Get()
   listar(
     @Req() peticion: PeticionConSesion,
     @Query('buscar') buscar: unknown,
     @Query('curso') curso: unknown,
     @Query('pagina') pagina: unknown,
+    @Query('estado') estado: unknown,
   ) {
-    return this.estudiantes.listar(peticion.sesion, buscar, curso, pagina);
+    return this.estudiantes.listar(
+      peticion.sesion,
+      buscar,
+      curso,
+      pagina,
+      estado,
+    );
   }
 
   // Cuerpo: { codigo_estudiante, nombres, apellidos, rut, fecha_nacimiento,
@@ -73,5 +81,17 @@ export class EstudiantesController {
     @Body() cuerpo: unknown,
   ) {
     return this.matriculas.matricular(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-022 y PB-031. Cuerpo: { tipo (TRASLADO, PROMOCION, EGRESO o RETIRO),
+  // matricula_id (la vigente), curso_id (al cambiar de curso o de año),
+  // fecha, motivo }.
+  @Post(':id/movimientos')
+  mover(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.matriculas.mover(peticion.sesion, id, cuerpo);
   }
 }
