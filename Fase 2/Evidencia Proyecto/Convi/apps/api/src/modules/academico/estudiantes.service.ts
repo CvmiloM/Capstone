@@ -7,6 +7,11 @@ import {
 import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import {
+  errorOtraPersona,
+  esOtraPersona,
+  type IdentidadPersona,
+} from './correccion-persona.js';
 import { errorDeCampos } from './curso.js';
 import {
   type DatosEstudiante,
@@ -177,10 +182,10 @@ export class EstudiantesService {
     });
   }
 
-  // Decisión del PO: la ficha se corrige aquí (adelanta HU-016 para el
-  // estudiante). Conserva el estudiante y su persona; la base guarda en la
-  // auditoría el valor anterior, el nuevo y quién lo cambió. No toca la
-  // matrícula ni el estado.
+  // PB-021 (HU-016): la ficha se corrige aquí. Conserva el estudiante y su
+  // persona; la base guarda en la auditoría el valor anterior, el nuevo y
+  // quién lo cambió (CA1). No toca la matrícula, el estado, los vínculos ni
+  // nada de convivencia (CA2 y CA4).
   editar(
     sesion: Sesion,
     id: string,
@@ -188,12 +193,21 @@ export class EstudiantesService {
   ): Promise<FichaEstudiante> {
     const datos = validarEstudiante(cuerpo);
     return this.operar(sesion, async (db) => {
-      const actual = await db.query<{ persona_id: string }>(
-        `SELECT persona_id FROM convi.estudiantes WHERE id = $1 FOR UPDATE`,
+      const actual = await db.query<IdentidadPersona & { persona_id: string }>(
+        `SELECT e.persona_id, p.nombres, p.apellidos, p.rut
+         FROM convi.estudiantes e
+         JOIN convi.personas p ON p.id = e.persona_id
+         WHERE e.id = $1
+         FOR UPDATE OF e, p`,
         [id],
       );
       if (actual.rows.length === 0)
         throw new NotFoundException('No encontramos ese estudiante.');
+      // CA2: la ficha no se convierte en la de otra persona.
+      if (esOtraPersona(actual.rows[0], datos))
+        throw errorOtraPersona(
+          'Cambiaste nombres y apellidos a la vez: eso sería otro estudiante. Si lo es, crea su propia ficha. No se guardó la ficha.',
+        );
       await revisarNacimiento(db, datos);
       await db.query(
         `UPDATE convi.personas

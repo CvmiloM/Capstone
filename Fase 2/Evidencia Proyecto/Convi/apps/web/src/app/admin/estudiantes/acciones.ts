@@ -184,3 +184,36 @@ export async function terminarVinculo(
     `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados?vinculo=terminado`,
   );
 }
+
+// PB-021 (HU-016): corrige los datos personales del contacto de un vínculo.
+// La API revisa que no se convierta en otra persona y que el RUT no se repita.
+export async function corregirContacto(
+  estudianteId: string,
+  vinculoId: string,
+  _anterior: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const campos = [
+    "nombres",
+    "apellidos",
+    "rut",
+    "correo",
+    "telefono",
+    "direccion",
+  ];
+  const valores = Object.fromEntries(
+    campos.map((campo) => [campo, leerTexto(formData, campo)]),
+  );
+  const resultado = await enviarCambio(
+    "PATCH",
+    `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados/${encodeURIComponent(vinculoId)}/persona`,
+    valores,
+  );
+  if (!resultado.ok)
+    return { valores, mensaje: resultado.mensaje, errores: resultado.errores };
+  // La misma persona puede ser apoderada de otros estudiantes.
+  revalidatePath("/admin/estudiantes", "layout");
+  redirect(
+    `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados?vinculo=corregido`,
+  );
+}

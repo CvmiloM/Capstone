@@ -4,7 +4,11 @@ import { notFound } from "next/navigation";
 import { Encabezado, claseEnlace } from "@/app/components/formulario";
 import { obtenerContextoAdmin } from "../../../datos";
 import { obtenerApoderados, obtenerFicha } from "../../datos";
-import { AgregarApoderado, FormularioTermino } from "./formularios";
+import {
+  AgregarApoderado,
+  FormularioContacto,
+  FormularioTermino,
+} from "./formularios";
 
 export const metadata: Metadata = { title: "Apoderados del estudiante" };
 const fecha = (valor: string | null) =>
@@ -18,6 +22,13 @@ const NOMBRE_VIGENCIA = {
   VIGENTE: "Vigente",
   FUTURO: "Comienza después",
   TERMINADO: "Terminado",
+};
+const AVISO_VINCULO: Record<string, string> = {
+  creado: "Vínculo registrado, no se otorgó acceso al portal",
+  terminado:
+    "Fecha de término guardada, el vínculo y sus antecedentes se conservaron",
+  corregido:
+    "Datos del contacto corregidos, el cambio quedó registrado con tu nombre y la fecha",
 };
 
 export default async function PaginaApoderados({
@@ -56,11 +67,9 @@ export default async function PaginaApoderados({
           descripcion="Registra su relación y las condiciones de contacto, este vínculo no crea una cuenta ni habilita el portal"
         />
       </div>
-      {["creado", "terminado"].includes(consulta.vinculo ?? "") && (
+      {consulta.vinculo && AVISO_VINCULO[consulta.vinculo] && (
         <p role="status" className="mb-6 rounded-xl bg-primary/10 p-3 text-sm">
-          {consulta.vinculo === "creado"
-            ? "Vínculo registrado, no se otorgó acceso al portal"
-            : "Fecha de término guardada, el vínculo y sus antecedentes se conservaron"}
+          {AVISO_VINCULO[consulta.vinculo]}
         </p>
       )}
       <div className="grid items-start gap-6 xl:grid-cols-2">
@@ -131,6 +140,14 @@ export default async function PaginaApoderados({
                       </div>
                       <div>
                         <dt className="inline text-muted-foreground">
+                          Dirección:{" "}
+                        </dt>
+                        <dd className="inline">
+                          {v.direccion ?? "Sin registrar"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="inline text-muted-foreground">
                           Desde:{" "}
                         </dt>
                         <dd className="inline">{fecha(v.activo_desde)}</dd>
@@ -149,6 +166,7 @@ export default async function PaginaApoderados({
                         ? "Puede ser contactado"
                         : "No puede ser contactado"}
                     </p>
+                    <FormularioContacto estudianteId={ficha.id} vinculo={v} />
                     {!v.activo_hasta && (
                       <FormularioTermino
                         estudianteId={ficha.id}

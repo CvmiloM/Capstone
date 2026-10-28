@@ -122,12 +122,17 @@ export type PersonaApoderada = {
 
 export type VinculoApoderado = PersonaApoderada & {
   persona_apoderado_id: string;
+  direccion: string | null;
   tipo_relacion: string | null;
   es_principal: boolean;
   puede_ser_contactado: boolean;
   activo_desde: string | null;
   activo_hasta: string | null;
   vigencia: "VIGENTE" | "FUTURO" | "TERMINADO";
+  /** PB-021: otros estudiantes con los que está vinculada la misma persona. */
+  otros_estudiantes: number;
+  /** PB-021: tiene cuenta o invitación en CONVI. */
+  tiene_cuenta: boolean;
 };
 
 export function obtenerApoderados(id: string, buscar: string) {

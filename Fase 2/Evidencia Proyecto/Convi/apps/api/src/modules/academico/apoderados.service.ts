@@ -8,7 +8,19 @@ import type { PoolClient } from 'pg';
 import type { Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { errorDeCampos, texto } from './curso.js';
-import { validarFinVinculo, validarVinculo } from './apoderado.js';
+import {
+  validarFinVinculo,
+  validarPersona,
+  validarVinculo,
+} from './apoderado.js';
+import {
+  errorOtraPersona,
+  esOtraPersona,
+  type IdentidadPersona,
+} from './correccion-persona.js';
+
+const MENSAJE_CONTACTO =
+  'Revisa los datos marcados, no se guardaron los datos del contacto';
 
 export type PersonaApoderada = {
   id: string;
@@ -20,12 +32,17 @@ export type PersonaApoderada = {
 };
 export type VinculoApoderado = PersonaApoderada & {
   persona_apoderado_id: string;
+  direccion: string | null;
   tipo_relacion: string | null;
   es_principal: boolean;
   puede_ser_contactado: boolean;
   activo_desde: string | null;
   activo_hasta: string | null;
   vigencia: 'VIGENTE' | 'FUTURO' | 'TERMINADO';
+  /** PB-021: otros estudiantes con los que está vinculada la misma persona. */
+  otros_estudiantes: number;
+  /** PB-021: tiene cuenta o invitación en CONVI. */
+  tiene_cuenta: boolean;
 };
 
 @Injectable()
@@ -37,11 +54,14 @@ export class ApoderadosService {
     return this.operar(sesion, async (db) => {
       await this.estudiante(db, estudianteId);
       const vinculos = await db.query<VinculoApoderado>(
-        `SELECT a.id, a.persona_apoderado_id, p.nombres, p.apellidos, p.rut, p.correo, p.telefono,
+        `SELECT a.id, a.persona_apoderado_id, p.nombres, p.apellidos, p.rut, p.correo, p.telefono, p.direccion,
                 a.tipo_relacion, a.es_principal, a.puede_ser_contactado,
                 a.activo_desde::text, a.activo_hasta::text,
                 CASE WHEN a.activo_hasta < current_date THEN 'TERMINADO'
-                     WHEN a.activo_desde > current_date THEN 'FUTURO' ELSE 'VIGENTE' END AS vigencia
+                     WHEN a.activo_desde > current_date THEN 'FUTURO' ELSE 'VIGENTE' END AS vigencia,
+                (SELECT count(DISTINCT o.estudiante_id)::int FROM convi.apoderados_estudiante o
+                 WHERE o.persona_apoderado_id = p.id AND o.estudiante_id <> a.estudiante_id) AS otros_estudiantes,
+                EXISTS (SELECT 1 FROM convi.membresias_establecimiento m WHERE m.persona_id = p.id) AS tiene_cuenta
          FROM convi.apoderados_estudiante a JOIN convi.personas p ON p.id = a.persona_apoderado_id
          WHERE a.estudiante_id = $1 ORDER BY a.es_principal DESC, p.apellidos, p.nombres, a.id`,
         [estudianteId],
@@ -157,6 +177,63 @@ export class ApoderadosService {
         [id, fecha],
       );
       return { id };
+    });
+  }
+
+  // PB-021 (HU-016): corrige los datos personales del contacto de un vínculo.
+  // Es la misma persona en todos sus vínculos y la base guarda en la
+  // auditoría el valor anterior, el nuevo, quién y cuándo (CA1). CA4: no
+  // cambia la relación, las fechas del vínculo ni el acceso al portal.
+  corregir(sesion: Sesion, estudianteId: string, id: string, cuerpo: unknown) {
+    const datos = validarPersona(cuerpo, MENSAJE_CONTACTO);
+    return this.operar(sesion, async (db) => {
+      await this.estudiante(db, estudianteId);
+      const actual = (
+        await db.query<IdentidadPersona & { id: string }>(
+          `SELECT p.id, p.nombres, p.apellidos, p.rut
+           FROM convi.apoderados_estudiante a JOIN convi.personas p ON p.id = a.persona_apoderado_id
+           WHERE a.id = $1 AND a.estudiante_id = $2 FOR UPDATE OF p`,
+          [id, estudianteId],
+        )
+      ).rows[0];
+      if (!actual)
+        throw new NotFoundException(
+          'No encontramos ese vínculo en el estudiante',
+        );
+      // CA2: no se convierte la ficha en la de otra persona
+      if (esOtraPersona(actual, datos))
+        throw errorOtraPersona(
+          'Cambiaste nombres y apellidos a la vez, eso sería otra persona: agrégala como un apoderado nuevo. No se guardaron los datos del contacto',
+        );
+      // CA3: el RUT no se repite en la escuela
+      if (
+        datos.rut &&
+        (
+          await db.query(
+            'SELECT 1 FROM convi.personas WHERE rut = $1 AND id <> $2',
+            [datos.rut, actual.id],
+          )
+        ).rows.length
+      )
+        throw errorDeCampos(
+          { rut: 'Ese RUT ya está registrado en otra persona de tu escuela' },
+          MENSAJE_CONTACTO,
+        );
+      await db.query(
+        `UPDATE convi.personas
+         SET nombres = $2, apellidos = $3, rut = $4, correo = $5, telefono = $6, direccion = $7
+         WHERE id = $1`,
+        [
+          actual.id,
+          datos.nombres,
+          datos.apellidos,
+          datos.rut,
+          datos.correo,
+          datos.telefono,
+          datos.direccion,
+        ],
+      );
+      return { id: actual.id };
     });
   }
 
