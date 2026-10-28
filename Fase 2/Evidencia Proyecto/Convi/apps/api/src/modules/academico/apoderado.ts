@@ -45,7 +45,8 @@ export function validarVinculo(cuerpo: unknown) {
   };
 }
 
-function validarPersona(cuerpo: unknown) {
+// También valida la corrección de un contacto (PB-021), con su propio mensaje.
+export function validarPersona(cuerpo: unknown, mensaje = MENSAJE) {
   const datos = objeto(cuerpo);
   const errores: Record<string, string> = {};
   const campos = [
@@ -82,7 +83,7 @@ function validarPersona(cuerpo: unknown) {
       valores.telefono.replace(/\D/g, '').length < 8)
   )
     errores.telefono = 'Ingresa un teléfono válido';
-  if (Object.keys(errores).length) throw errorDeCampos(errores, MENSAJE);
+  if (Object.keys(errores).length) throw errorDeCampos(errores, mensaje);
   return {
     ...valores,
     rut,

@@ -14,12 +14,13 @@ import {
   claseBotonSecundario,
 } from "@/app/components/formulario";
 import {
+  corregirContacto,
   terminarVinculo,
   vincularApoderado,
   buscarPersonasApoderadas,
   type EstadoFormulario,
 } from "../../acciones";
-import type { PersonaApoderada } from "../../datos";
+import type { PersonaApoderada, VinculoApoderado } from "../../datos";
 
 export function AgregarApoderado({
   estudianteId,
@@ -348,6 +349,124 @@ export function FormularioTermino({
         />
         <BotonEnviar pendiente={pendiente} textoPendiente="Guardando término…">
           Confirmar término
+        </BotonEnviar>
+      </form>
+    </details>
+  );
+}
+
+// PB-021 (HU-016): corrige los datos de la persona, no el vínculo. Si la API
+// rechaza algo, el formulario queda abierto con lo escrito y sus errores.
+export function FormularioContacto({
+  estudianteId,
+  vinculo,
+}: {
+  estudianteId: string;
+  vinculo: VinculoApoderado;
+}) {
+  const id = useId();
+  const [estado, accion, pendiente] = useActionState<
+    EstadoFormulario,
+    FormData
+  >(
+    corregirContacto.bind(null, estudianteId, vinculo.id),
+    {},
+    `/admin/estudiantes/${estudianteId}/apoderados?corregir=${vinculo.id}`,
+  );
+  const valores = estado.valores ?? {
+    nombres: vinculo.nombres,
+    apellidos: vinculo.apellidos,
+    rut: vinculo.rut ?? "",
+    correo: vinculo.correo ?? "",
+    telefono: vinculo.telefono ?? "",
+    direccion: vinculo.direccion ?? "",
+  };
+  const errores = estado.errores ?? {};
+  return (
+    <details className="mt-4 text-sm" open={Boolean(estado.mensaje)}>
+      <summary className="w-fit cursor-pointer font-medium text-primary">
+        Corregir datos del contacto
+      </summary>
+      <form action={accion} noValidate className="mt-3 space-y-4">
+        <p className="text-muted-foreground">
+          Corrige cómo está escrita su ficha, el cambio queda registrado con tu
+          nombre y la fecha. Si es otra persona, agrégala como un apoderado
+          nuevo
+        </p>
+        {vinculo.otros_estudiantes > 0 && (
+          <p className="rounded-xl bg-muted p-3 text-muted-foreground">
+            También es apoderado de{" "}
+            {vinculo.otros_estudiantes === 1
+              ? "otro estudiante"
+              : `${vinculo.otros_estudiantes} estudiantes más`}
+            , la corrección se verá en todas sus fichas
+          </p>
+        )}
+        {vinculo.tiene_cuenta && (
+          <p className="rounded-xl bg-muted p-3 text-muted-foreground">
+            Tiene una cuenta en CONVI, esta corrección no cambia el correo con
+            el que ingresa
+          </p>
+        )}
+        {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo
+            id={`${id}-nombres`}
+            name="nombres"
+            etiqueta="Nombres"
+            required
+            maxLength={100}
+            defaultValue={valores.nombres}
+            error={errores.nombres}
+          />
+          <Campo
+            id={`${id}-apellidos`}
+            name="apellidos"
+            etiqueta="Apellidos"
+            required
+            maxLength={120}
+            defaultValue={valores.apellidos}
+            error={errores.apellidos}
+          />
+          <Campo
+            id={`${id}-rut`}
+            name="rut"
+            etiqueta="RUT (opcional)"
+            defaultValue={valores.rut}
+            error={errores.rut}
+          />
+          <Campo
+            id={`${id}-correo`}
+            name="correo"
+            etiqueta="Correo (opcional)"
+            type="email"
+            maxLength={180}
+            defaultValue={valores.correo}
+            error={errores.correo}
+          />
+          <Campo
+            id={`${id}-telefono`}
+            name="telefono"
+            etiqueta="Teléfono (opcional)"
+            type="tel"
+            maxLength={40}
+            defaultValue={valores.telefono}
+            error={errores.telefono}
+          />
+          <Campo
+            id={`${id}-direccion`}
+            name="direccion"
+            etiqueta="Dirección (opcional)"
+            maxLength={200}
+            defaultValue={valores.direccion}
+            error={errores.direccion}
+          />
+        </div>
+        <BotonEnviar
+          pendiente={pendiente}
+          textoPendiente="Guardando corrección…"
+        >
+          Guardar corrección
         </BotonEnviar>
       </form>
     </details>

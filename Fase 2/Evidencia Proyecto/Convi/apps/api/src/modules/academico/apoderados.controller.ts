@@ -48,4 +48,16 @@ export class ApoderadosController {
   ) {
     return this.apoderados.terminar(peticion.sesion, estudianteId, id, cuerpo);
   }
+
+  // PB-021 (HU-016). Cuerpo: { nombres, apellidos, rut, correo, telefono,
+  // direccion }. Corrige la persona del vínculo, no el vínculo.
+  @Patch(':id/persona')
+  corregir(
+    @Req() peticion: PeticionConSesion,
+    @Param('estudianteId', ParseUUIDPipe) estudianteId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.apoderados.corregir(peticion.sesion, estudianteId, id, cuerpo);
+  }
 }
