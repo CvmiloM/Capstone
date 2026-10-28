@@ -7,6 +7,7 @@ import {
   reenviarInvitacion,
   suspenderCuenta,
   reactivarCuenta,
+  restablecerSegundoFactor,
 } from "./datos";
 import { NOMBRE_PERFIL } from "./opciones";
 
@@ -83,11 +84,28 @@ export async function reactivarUsuario(
 
 function destinoUsuarios(
   formData: FormData,
-  resultado: "suspension" | "reactivacion",
+  resultado: "suspension" | "reactivacion" | "autenticador",
 ) {
   const consulta = new URLSearchParams({ [resultado]: "realizada" });
   const perfil = leerTexto(formData, "perfil");
   if (Object.hasOwn(NOMBRE_PERFIL, perfil)) consulta.set("perfil", perfil);
   if (formData.get("suspendidas") === "1") consulta.set("suspendidas", "1");
   return `/admin/usuarios?${consulta}`;
+}
+
+export async function restablecerAutenticador(
+  id: string,
+  solicitudId: string,
+  _anterior: EstadoSuspension,
+  formData: FormData,
+): Promise<EstadoSuspension> {
+  const resultado = await restablecerSegundoFactor(id, {
+    solicitud_id: solicitudId,
+    identidad_verificada: formData.get("identidad_verificada") === "si",
+    medio: leerTexto(formData, "medio"),
+    motivo: leerTexto(formData, "motivo"),
+  });
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  revalidatePath("/admin/usuarios");
+  redirect(destinoUsuarios(formData, "autenticador"));
 }

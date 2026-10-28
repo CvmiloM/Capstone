@@ -6,6 +6,7 @@ import { NOMBRE_ESTADO, NOMBRE_PERFIL } from "./opciones";
 import { BotonReenvio } from "./boton-reenvio";
 import { BotonSuspension } from "./boton-suspension";
 import { FormularioReactivacion } from "./formulario-reactivacion";
+import { FormularioRestablecimiento } from "./formulario-restablecimiento";
 
 const CLASE_ESTADO: Record<string, string> = {
   PENDIENTE: "bg-naranjo text-tinta",
@@ -149,11 +150,13 @@ function FechaCuenta({
 
 export function ListaCuentas({
   cuentas,
+  solicitudes,
   zonaHoraria,
   perfilInicial,
   suspendidasInicial,
 }: {
   cuentas: CuentaEscuela[];
+  solicitudes: Record<string, string>;
   zonaHoraria: string;
   perfilInicial: string;
   suspendidasInicial: boolean;
@@ -277,6 +280,9 @@ export function ListaCuentas({
                       nombre={nombre}
                       filtros={filtros}
                     />
+                  )}
+                  {solicitudes[cuenta.id] && (
+                    <FormularioRestablecimiento cuentaId={cuenta.id} solicitudId={solicitudes[cuenta.id]} nombre={nombre} filtros={filtros} />
                   )}
                 </div>
               </details>

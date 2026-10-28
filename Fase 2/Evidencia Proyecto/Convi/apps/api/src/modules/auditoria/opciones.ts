@@ -1,4 +1,6 @@
 export const ACCIONES: Record<string, string> = {
+  MFA_RESTABLECIMIENTO_SOLICITADO: 'Recuperación del autenticador solicitada',
+  MFA_RESTABLECIDO: 'Segundo factor restablecido',
   REPUBLICACION_DOCUMENTO: 'Documento publicado nuevamente',
   REGISTRO_ESTABLECIMIENTO: 'Establecimiento registrado',
   MODIFICACION: 'Registro actualizado',
@@ -28,6 +30,7 @@ export const ACCIONES: Record<string, string> = {
 };
 
 export const RESULTADOS: Record<string, string> = {
+  PENDIENTE: 'Pendiente de completar',
   OK: 'Realizado',
   EXITO: 'Realizado',
   ERROR: 'No completado',

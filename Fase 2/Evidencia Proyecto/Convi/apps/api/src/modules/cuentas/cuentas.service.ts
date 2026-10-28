@@ -12,9 +12,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { errorDeCampos, validarInvitacion } from './nueva-invitacion.js';
+import {
+  ejecutarRestablecimiento,
+  prepararRestablecimiento,
+  validarRestablecimiento,
+} from './restablecimiento-segundo-factor.js';
 
 // Cliente de Supabase Auth con la clave secreta: solo vive en la API y solo
-// se usa para enviar invitaciones (PB-128). Nunca llega al navegador.
+// se usa para invitaciones y recuperación del autenticador, nunca llega al navegador.
 export const SUPABASE_ADMIN = Symbol('supabase-admin');
 
 // PB-010 (HU-009): cuentas de la escuela e invitaciones. La seguridad por fila
@@ -97,7 +102,31 @@ export class CuentasService {
     );
   }
 
-  // PB-007: solo cambia la membresía; Auth y los registros históricos se conservan.
+  // PB-154: conservar la solicitud aunque Auth no alcance a completar el cambio.
+  async restablecerSegundoFactor(sesion: Sesion, id: string, cuerpo: unknown) {
+    const solicitud = validarRestablecimiento(cuerpo);
+    const contexto = {
+      escuela: sesion.establecimiento_id,
+      actor: sesion.membresia_id,
+    };
+    const acceso = { tipo: 'establecimiento' as const, perfiles: PERFILES };
+    await this.cuentas.operar(
+      sesion,
+      acceso,
+      (db) =>
+        prepararRestablecimiento(db, this.supabase, id, solicitud, contexto),
+      'READ COMMITTED',
+    );
+    return this.cuentas.operar(
+      sesion,
+      acceso,
+      (db) =>
+        ejecutarRestablecimiento(db, this.supabase, id, solicitud, contexto),
+      'READ COMMITTED',
+    );
+  }
+
+  // PB-007: solo cambia la membresía, conserva Auth y los registros históricos.
   suspender(sesion: Sesion, id: string) {
     return this.cambiarEstado(sesion, id, 'SUSPENDIDO');
   }

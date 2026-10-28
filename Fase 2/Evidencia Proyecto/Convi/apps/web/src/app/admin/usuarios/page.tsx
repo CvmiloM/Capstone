@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { randomUUID } from "node:crypto";
 import { Encabezado } from "@/app/components/formulario";
 import { obtenerContextoAdmin } from "../datos";
 import { obtenerCuentas } from "./datos";
@@ -14,6 +15,7 @@ export default async function PaginaUsuarios({
   searchParams: Promise<{
     suspension?: string;
     reactivacion?: string;
+    autenticador?: string;
     perfil?: string;
     suspendidas?: string;
   }>;
@@ -30,7 +32,9 @@ export default async function PaginaUsuarios({
       ? "Cuenta suspendida, sus registros históricos se conservaron"
       : parametros.reactivacion === "realizada"
         ? "Cuenta reactivada, recuperó su acceso con el mismo correo y contraseña"
-        : null;
+        : parametros.autenticador === "realizada"
+          ? "Segundo factor restablecido, la persona debe iniciar sesión y configurar una nueva aplicación autenticadora"
+          : null;
 
   return (
     <>
@@ -46,6 +50,7 @@ export default async function PaginaUsuarios({
       <div className="grid gap-6 lg:grid-cols-3">
         <ListaCuentas
           cuentas={cuentas}
+          solicitudes={Object.fromEntries(cuentas.filter((c) => c.estado === "ACTIVO" && !c.es_propia && ["ADMIN", "CONVIVENCIA"].includes(c.perfil)).map((c) => [c.id, randomUUID()]))}
           zonaHoraria={contexto.escuela.zonaHoraria}
           perfilInicial={perfil}
           suspendidasInicial={parametros.suspendidas === "1"}

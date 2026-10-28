@@ -35,6 +35,16 @@ export class CuentasController {
     return this.cuentas.suspender(peticion.sesion, id);
   }
 
+  @Post(':id/restablecer-segundo-factor')
+  @HttpCode(200)
+  restablecerSegundoFactor(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.cuentas.restablecerSegundoFactor(peticion.sesion, id, cuerpo);
+  }
+
   @Post(':id/reactivar')
   @HttpCode(200)
   reactivar(

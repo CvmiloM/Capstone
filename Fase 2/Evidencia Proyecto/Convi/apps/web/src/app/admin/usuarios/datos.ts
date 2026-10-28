@@ -84,6 +84,26 @@ export async function reactivarCuenta(id: string, motivo: string) {
   return cambiarEstado(id, "reactivar", motivo);
 }
 
+export async function restablecerSegundoFactor(id: string, cuerpo: {
+  solicitud_id: string; identidad_verificada: boolean; medio: string; motivo: string;
+}): Promise<{ ok: true } | { ok: false; mensaje: string }> {
+  const token = await tokenDeSesion();
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(`${URL_API}/admin/cuentas/${encodeURIComponent(id)}/restablecer-segundo-factor`, {
+      method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo), cache: "no-store", signal: AbortSignal.timeout(30000),
+    });
+  } catch {
+    return { ok: false, mensaje: "No pudimos confirmar el resultado, reintenta desde este mismo formulario para completar la solicitud" };
+  }
+  if (respuesta.status === 401) redirect("/login");
+  if (respuesta.ok) return { ok: true };
+  const datos = await respuesta.json().catch(() => null);
+  return { ok: false, mensaje: [400, 403, 404, 409, 503].includes(respuesta.status) && typeof datos?.message === "string"
+    ? datos.message : "No pudimos confirmar el resultado, reintenta desde este mismo formulario" };
+}
+
 async function cambiarEstado(
   id: string,
   accion: "suspender" | "reactivar",

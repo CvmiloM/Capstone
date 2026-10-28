@@ -27,6 +27,13 @@ import { CuentasService, SUPABASE_ADMIN } from './cuentas.service.js';
             'Falta configurar SUPABASE_URL o SUPABASE_SECRET_KEY en la API.',
           );
         return createClient(url, clave, {
+          global: {
+            fetch: (entrada, opciones) =>
+              fetch(entrada, {
+                ...opciones,
+                signal: AbortSignal.timeout(10000),
+              }),
+          },
           // Cliente del servidor: no guarda ni renueva sesiones de personas.
           auth: {
             persistSession: false,
