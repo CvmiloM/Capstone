@@ -6,12 +6,17 @@ import { obtenerCursos } from "../../cursos/datos";
 import { ANIOS_EDITABLES } from "../../cursos/opciones";
 import { obtenerContextoAdmin } from "../../datos";
 import { obtenerFicha } from "../datos";
+import { FormularioCambio } from "../formulario-cambio";
 import { FormularioEstudiante } from "../formulario-estudiante";
 import {
   FormularioMatricula,
   type OpcionesMatricula,
 } from "../formulario-matricula";
-import { NOMBRE_ESTADO_ESTUDIANTE, NOMBRE_ESTADO_MATRICULA } from "../opciones";
+import {
+  MOVIMIENTOS_MATRICULA,
+  NOMBRE_ESTADO_ESTUDIANTE,
+  NOMBRE_ESTADO_MATRICULA,
+} from "../opciones";
 
 export const metadata: Metadata = { title: "Ficha del estudiante" };
 
@@ -29,13 +34,18 @@ function formatearFecha(fecha: string | null) {
 }
 
 // PB-017 y PB-018 (HU-014): ficha administrativa del estudiante. CA4: muestra
-// su matrícula y sus datos de contacto, pero nada de convivencia.
+// su matrícula y sus datos de contacto, pero nada de convivencia. PB-022 y
+// PB-031: con matrícula vigente, permite cambiarla (?cambio= confirma el
+// movimiento recién guardado).
 export default async function PaginaEstudiante({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ cambio?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { cambio }] = await Promise.all([params, searchParams]);
+  const guardado = MOVIMIENTOS_MATRICULA.find((m) => m.tipo === cambio);
   const [ficha, anios, { escuela }] = await Promise.all([
     obtenerFicha(id),
     obtenerAnios(),
@@ -67,8 +77,10 @@ export default async function PaginaEstudiante({
   const opciones: OpcionesMatricula = (
     await Promise.all(
       editables.map(async (a) => ({
+        id: a.id,
         anio: a.anio,
         estado: a.estado,
+        fecha_inicio: a.fecha_inicio,
         cursos: (await obtenerCursos(a.id))
           .filter((c) => !["CERRADO", "ARCHIVADO"].includes(c.estado))
           .map((c) => ({ id: c.id, codigo: c.codigo, nombre: c.nombre })),
@@ -97,6 +109,15 @@ export default async function PaginaEstudiante({
           descripcion={`Código ${ficha.codigo_estudiante}${ficha.rut ? ` · RUT ${ficha.rut}` : ""} · ${nombreEstado}`}
         />
       </div>
+
+      {guardado && (
+        <p
+          role="status"
+          className="mb-6 rounded-lg border border-verde/30 bg-verde/10 px-3 py-2.5 text-sm"
+        >
+          {guardado.listo}
+        </p>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
@@ -193,7 +214,9 @@ export default async function PaginaEstudiante({
             className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
           >
             <h2 id="titulo-matricular" className="mb-4 text-lg font-semibold">
-              Matricular
+              {ficha.estado === "ACTIVO" && vigente
+                ? "Cambiar matrícula"
+                : "Matricular"}
             </h2>
             {ficha.estado !== "ACTIVO" ? (
               <p className="text-sm text-muted-foreground">
@@ -201,11 +224,20 @@ export default async function PaginaEstudiante({
                 matricular.
               </p>
             ) : vigente ? (
-              <p className="text-sm text-muted-foreground">
-                Está matriculado en {vigente.curso_nombre} ({vigente.anio})
-                desde el {formatearFecha(vigente.matriculado_en)}. Un estudiante
-                tiene una sola matrícula vigente.
-              </p>
+              <>
+                <p className="mb-5 text-sm text-muted-foreground">
+                  Está matriculado en {vigente.curso_nombre} ({vigente.anio})
+                  desde el {formatearFecha(vigente.matriculado_en)}. Un
+                  estudiante tiene una sola matrícula vigente: para cambiarla,
+                  regístralo aquí y las anteriores se conservan.
+                </p>
+                <FormularioCambio
+                  estudianteId={ficha.id}
+                  vigente={vigente}
+                  opciones={opciones}
+                  hoy={hoy}
+                />
+              </>
             ) : opciones.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No hay cursos en años planificados o activos.{" "}

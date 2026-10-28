@@ -189,3 +189,14 @@ export function validarFiltro(
     pagina: Number.isInteger(numero) && numero >= 1 ? numero : 1,
   };
 }
+
+export const ESTADOS_NOMINA = ['ACTIVO', 'INACTIVO', 'EGRESADO', 'TODOS'];
+
+/**
+ * PB-031 (HU-024 CA2): el estudiante retirado deja de aparecer en la nómina
+ * activa. Sin estado, o con uno desconocido, se muestran los Activos.
+ */
+export function validarEstadoNomina(estado: unknown) {
+  const elegido = texto(estado).toUpperCase();
+  return ESTADOS_NOMINA.includes(elegido) ? elegido : 'ACTIVO';
+}

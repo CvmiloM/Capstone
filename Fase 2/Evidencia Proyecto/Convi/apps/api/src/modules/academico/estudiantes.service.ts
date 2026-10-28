@@ -16,6 +16,7 @@ import { errorDeCampos } from './curso.js';
 import {
   type DatosEstudiante,
   normalizarRut,
+  validarEstadoNomina,
   validarEstudiante,
   validarFiltro,
 } from './estudiante.js';
@@ -92,15 +93,16 @@ const DESDE_NOMINA = `
 export const sinTildes = (sql: string) =>
   `translate(${sql}, 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')`;
 
-// $1 texto con comodines, $2 RUT sin guion con comodín ('' si no parece RUT)
-// y $3 el curso (o null).
+// $1 texto con comodines, $2 RUT sin guion con comodín ('' si no parece RUT),
+// $3 el curso (o null) y $4 el estado del estudiante (o TODOS).
 const FILTRO_NOMINA = `
   WHERE ($1 = '%%'
          OR ${sinTildes(`p.nombres || ' ' || p.apellidos`)} ILIKE ${sinTildes('$1')}
          OR ${sinTildes(`p.apellidos || ' ' || p.nombres`)} ILIKE ${sinTildes('$1')}
          OR e.codigo_estudiante ILIKE $1
          OR ($2 <> '' AND replace(p.rut, '-', '') LIKE $2))
-    AND ($3::uuid IS NULL OR actual.curso_id = $3::uuid)`;
+    AND ($3::uuid IS NULL OR actual.curso_id = $3::uuid)
+    AND ($4 = 'TODOS' OR e.estado = $4)`;
 
 const COLUMNAS_FICHA = `
   e.id, e.codigo_estudiante, p.nombres, p.apellidos, p.rut,
@@ -112,29 +114,38 @@ export class EstudiantesService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
   // Nómina por apellidos, de a 50, buscando por nombre, código o RUT y, si se
-  // pide, solo los matriculados hoy en un curso.
+  // pide, solo los matriculados hoy en un curso. PB-031 (HU-024 CA2): por
+  // defecto solo muestra a los estudiantes Activos.
   listar(
     sesion: Sesion,
     buscar: unknown,
     curso: unknown,
     pagina: unknown,
+    estado?: unknown,
   ): Promise<Nomina> {
     const filtro = validarFiltro(buscar, curso, pagina);
+    const estadoNomina = validarEstadoNomina(estado);
     // Los comodines que escriba la persona se buscan como texto.
     const texto = `%${filtro.buscar.replace(/[\\%_]/g, '\\$&')}%`;
     const rut = normalizarParcial(filtro.buscar);
     return this.operar(sesion, async (db) => {
       const total = await db.query<{ total: number }>(
         `SELECT count(*)::int AS total ${DESDE_NOMINA} ${FILTRO_NOMINA}`,
-        [texto, rut, filtro.curso],
+        [texto, rut, filtro.curso, estadoNomina],
       );
       const estudiantes = await db.query<Estudiante>(
         `SELECT e.id, e.codigo_estudiante, p.nombres, p.apellidos, p.rut,
                 e.estado, actual.curso_id, actual.curso_nombre, actual.anio
          ${DESDE_NOMINA} ${FILTRO_NOMINA}
          ORDER BY p.apellidos, p.nombres, e.codigo_estudiante
-         LIMIT ${POR_PAGINA} OFFSET $4`,
-        [texto, rut, filtro.curso, (filtro.pagina - 1) * POR_PAGINA],
+         LIMIT ${POR_PAGINA} OFFSET $5`,
+        [
+          texto,
+          rut,
+          filtro.curso,
+          estadoNomina,
+          (filtro.pagina - 1) * POR_PAGINA,
+        ],
       );
       return {
         estudiantes: estudiantes.rows,
