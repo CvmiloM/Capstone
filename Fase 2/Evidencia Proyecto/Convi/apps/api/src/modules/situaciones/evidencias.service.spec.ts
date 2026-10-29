@@ -47,6 +47,49 @@ function preparar() {
 }
 
 describe('PB-143: descarga privada de evidencias', () => {
+  it('PB-114 autoriza estudiante y caso antes de descargar la evidencia asociada', async () => {
+    const { servicio, operar, query, download } = preparar();
+    await servicio.descargarApoderado(
+      { ...sesion, codigo_perfil: 'APODERADO' },
+      evidencia,
+      escuela,
+      evidencia,
+    );
+    expect(operar).toHaveBeenCalledWith(
+      expect.objectContaining({ codigo_perfil: 'APODERADO' }),
+      {
+        tipo: 'caso',
+        id: escuela,
+        estudianteId: evidencia,
+        perfiles: ['APODERADO'],
+      },
+      expect.any(Function),
+    );
+    expect(query).toHaveBeenLastCalledWith(
+      expect.stringContaining('ev.id=$1 AND ev.caso_contexto_id=$2'),
+      [evidencia, escuela],
+    );
+    expect(download).toHaveBeenCalledTimes(1);
+  });
+  it('PB-114 no lee Storage para una evidencia de otro caso o un archivo administrativo', async () => {
+    const { servicio, query, from } = preparar();
+    query
+      .mockResolvedValueOnce({ rows: [{ id: escuela }] })
+      .mockResolvedValueOnce({ rows: [] });
+    await expect(
+      servicio.descargarApoderado(sesion, evidencia, escuela, evidencia),
+    ).rejects.toThrow(NotFoundException);
+    expect(from).not.toHaveBeenCalled();
+  });
+  it('PB-114 vuelve a autorizar después de revocar, sin reutilizar el archivo descargado', async () => {
+    const { servicio, operar, download } = preparar();
+    await servicio.descargarApoderado(sesion, evidencia, escuela, evidencia);
+    operar.mockRejectedValueOnce(new ForbiddenException());
+    await expect(
+      servicio.descargarApoderado(sesion, evidencia, escuela, evidencia),
+    ).rejects.toThrow(ForbiddenException);
+    expect(download).toHaveBeenCalledTimes(1);
+  });
   it('entrega el contenido autorizado sin publicar la ruta de Storage', async () => {
     const { servicio, from, download, operar } = preparar();
     const resultado = await servicio.descargar(

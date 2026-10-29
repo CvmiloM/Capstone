@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import { comprobarCasoHijo } from './portal-apoderado.js';
 import {
   validarEvidencia,
   type ArchivoSubido,
@@ -237,6 +238,45 @@ export class EvidenciasService {
         return fila.rows[0];
       },
     );
+    return this.leerArchivo(sesion, archivo);
+  }
+
+  descargarApoderado(
+    sesion: Sesion,
+    estudianteId: string,
+    casoId: string,
+    evidenciaId: string,
+  ) {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'caso', id: casoId, estudianteId, perfiles: ['APODERADO'] },
+      async (db) => {
+        await comprobarCasoHijo(db, estudianteId, casoId);
+        const { rows } = await db.query<{
+          nombre: string;
+          mime: string;
+          clave: string;
+          espacio: string;
+        }>(
+          `SELECT ar.nombre_original AS nombre,ar.tipo_mime AS mime,ar.clave_almacenamiento AS clave,ar.bucket_id AS espacio
+         FROM convi.vw_evidencias_contexto ev JOIN convi.archivos ar ON ar.id=ev.archivo_id
+         WHERE ev.id=$1 AND ev.caso_contexto_id=$2`,
+          [evidenciaId, casoId],
+        );
+        if (!rows[0])
+          throw new NotFoundException(
+            'La evidencia no existe o no tienes permiso para descargarla',
+          );
+        // La cuenta y el vínculo se comprueban en cada descarga, sin emitir URLs reutilizables.
+        return this.leerArchivo(sesion, rows[0]);
+      },
+    );
+  }
+
+  private async leerArchivo(
+    sesion: Sesion,
+    archivo: { nombre: string; mime: string; clave: string; espacio: string },
+  ) {
     // PB-143: la credencial de Storage no debe leer fuera del espacio de esta escuela.
     if (
       archivo.espacio !== ESPACIO ||
