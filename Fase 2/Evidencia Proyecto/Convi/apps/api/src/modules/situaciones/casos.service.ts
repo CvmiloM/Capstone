@@ -53,6 +53,14 @@ import {
   type PlanIntervencion,
 } from './plan-intervencion.js';
 import {
+  accionesParaEncuentro,
+  asistentesPosibles,
+  encuentrosDelCaso,
+  responsablesDeEncuentro,
+  type AsistentePosible,
+  type Encuentro,
+} from './encuentros.js';
+import {
   comprobarNormativaVigente,
   opcionesNormativa,
   validarRevisionNormativa,
@@ -146,6 +154,15 @@ export type DetalleCaso = CasoLista & {
   responsables_accion: { id: string; nombre: string; perfiles: string[] }[];
   /** AAAA-MM-DD en la zona horaria de la escuela, para los días del plan. */
   hoy: string;
+  /** AAAA-MM-DDTHH:MM en la hora de la escuela, tope de las fechas reales. */
+  ahora: string;
+  /** PB-063 y PB-064 (HU-055): encuentros del caso con sus asistentes. */
+  encuentros: Encuentro[];
+  opciones_encuentro: {
+    responsables: { id: string; nombre: string }[];
+    asistentes: AsistentePosible[];
+    acciones_plan: { id: string; descripcion: string }[];
+  };
 };
 
 // 40001: otra transacción cambió la fila bloqueada; 23505 en el código: otro
@@ -263,8 +280,10 @@ export class CasosService {
           [id],
         );
         const permitidos = await estadosPermitidos(db, caso.estado_actual);
-        const hoy = await db.query<{ hoy: string }>(
-          `SELECT ${HOY_ESCUELA}::text AS hoy`,
+        const hoy = await db.query<{ hoy: string; ahora: string }>(
+          `SELECT ${HOY_ESCUELA}::text AS hoy,
+                  to_char(now() AT TIME ZONE (SELECT zona_horaria FROM convi.establecimientos
+                    WHERE id = convi.establecimiento_actual()), 'YYYY-MM-DD"T"HH24:MI') AS ahora`,
         );
         return {
           ...caso,
@@ -284,6 +303,13 @@ export class CasosService {
           planes_intervencion: await planesDelCaso(db, id),
           responsables_accion: await responsablesDeAccion(db),
           hoy: hoy.rows[0].hoy,
+          ahora: hoy.rows[0].ahora,
+          encuentros: await encuentrosDelCaso(db, id),
+          opciones_encuentro: {
+            responsables: await responsablesDeEncuentro(db),
+            asistentes: await asistentesPosibles(db, id),
+            acciones_plan: await accionesParaEncuentro(db, id),
+          },
         };
       },
     );
