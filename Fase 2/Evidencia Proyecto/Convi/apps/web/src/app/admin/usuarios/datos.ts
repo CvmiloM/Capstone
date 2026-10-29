@@ -74,6 +74,10 @@ export async function reenviarInvitacion(
   return enviar(`/admin/cuentas/${encodeURIComponent(id)}/reenviar-invitacion`);
 }
 
+export async function invitarApoderado(vinculoId: string): Promise<ResultadoInvitacion> {
+  return enviar(`/admin/cuentas/apoderados/${encodeURIComponent(vinculoId)}/invitacion`);
+}
+
 export async function suspenderCuenta(
   id: string,
 ): Promise<{ ok: true } | { ok: false; mensaje: string }> {

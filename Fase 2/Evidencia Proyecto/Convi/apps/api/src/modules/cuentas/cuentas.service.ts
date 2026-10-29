@@ -317,27 +317,69 @@ export class CuentasService {
           });
         const invitacion = membresia.rows[0];
 
-        // La plantilla supabase/templates/invitacion.html arma el enlace con
-        // {{ .Data.membresia_id }}, que luego usa la activación (PB-003).
-        const { error } = await this.supabase.auth.admin.inviteUserByEmail(
-          datos.correo,
-          { data: { membresia_id: invitacion.id } },
-        );
-        if (error) {
-          if (error.code === 'email_exists' || error.status === 422)
-            throw errorDeCampos({ correo: CORREO_CON_IDENTIDAD });
-          // Solo el código del error: el correo es un dato personal.
-          this.registro.warn(
-            `Supabase rechazó una invitación (${error.status ?? '?'} ${error.code ?? ''}).`,
-          );
-          throw new ServiceUnavailableException(
-            error.status === 429
-              ? 'Se enviaron demasiados correos en poco tiempo. Espera unos minutos e inténtalo nuevamente.'
-              : 'No se pudo enviar la invitación. Inténtalo nuevamente.',
-          );
-        }
+        await this.enviarInvitacionAuth(invitacion);
         return invitacion;
       },
+    );
+  }
+
+  // PB-115 completa la invitación de PB-010 desde una persona ya vinculada.
+  invitarApoderado(sesion: Sesion, vinculoId: string) {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const persona = (
+          await db.query<{ id: string; correo: string | null }>(
+            `SELECT p.id,p.correo FROM convi.apoderados_estudiante a JOIN convi.personas p ON p.id=a.persona_apoderado_id
+         WHERE a.id=$1 AND p.estado='ACTIVO' AND (a.activo_hasta IS NULL OR a.activo_hasta>=current_date) FOR UPDATE OF a,p`,
+            [vinculoId],
+          )
+        ).rows[0];
+        if (!persona)
+          throw new NotFoundException(
+            'No encontramos un vínculo disponible en tu escuela',
+          );
+        if (!persona.correo)
+          throw new BadRequestException(
+            'Primero registra el correo del apoderado en su ficha de contacto',
+          );
+        const existente = await db.query(
+          'SELECT id FROM convi.membresias_establecimiento WHERE persona_id=$1 OR lower(correo_invitacion)=lower($2)',
+          [persona.id, persona.correo],
+        );
+        if (existente.rowCount)
+          throw new ConflictException(
+            'Esta persona o su correo ya tienen una cuenta, revisa Usuarios y el perfil antes de volver a invitar',
+          );
+        const resultado = await db.query<InvitacionEnviada>(
+          `INSERT INTO convi.membresias_establecimiento(establecimiento_id,persona_id,codigo_perfil,estado,invitado_por,invitado_en,correo_invitacion)
+         VALUES(convi.establecimiento_actual(),$1,'APODERADO','PENDIENTE',convi.membresia_actual(),now(),lower($2))
+         RETURNING id,correo_invitacion AS correo,codigo_perfil AS perfil,estado`,
+          [persona.id, persona.correo],
+        );
+        await this.enviarInvitacionAuth(resultado.rows[0]);
+        return resultado.rows[0];
+      },
+      'READ COMMITTED',
+    );
+  }
+
+  private async enviarInvitacionAuth(invitacion: InvitacionEnviada) {
+    const { error } = await this.supabase.auth.admin.inviteUserByEmail(
+      invitacion.correo,
+      { data: { membresia_id: invitacion.id } },
+    );
+    if (!error) return;
+    if (error.code === 'email_exists' || error.status === 422)
+      throw errorDeCampos({ correo: CORREO_CON_IDENTIDAD });
+    this.registro.warn(
+      `Supabase rechazó una invitación (${error.status ?? '?'} ${error.code ?? ''}).`,
+    );
+    throw new ServiceUnavailableException(
+      error.status === 429
+        ? 'Se enviaron demasiados correos en poco tiempo, espera unos minutos e inténtalo nuevamente'
+        : 'No se pudo enviar la invitación, inténtalo nuevamente',
     );
   }
 }

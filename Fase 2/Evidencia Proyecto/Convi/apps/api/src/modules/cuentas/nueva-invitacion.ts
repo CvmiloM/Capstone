@@ -4,7 +4,7 @@ import { BadRequestException } from '@nestjs/common';
 // Se validan aquí aunque el formulario también lo haga (HU-119).
 
 // Los apoderados (CA3) se invitarán desde su vínculo con el estudiante, cuando
-// exista esa pantalla; por ahora solo se invita al equipo de la escuela.
+// corresponda esa persona, el formulario general invita al equipo de la escuela.
 export const PERFILES_INVITABLES = ['PROFESOR', 'CONVIVENCIA'] as const;
 
 // Largos de personas y membresias_establecimiento en el modelo.

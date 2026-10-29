@@ -89,9 +89,12 @@ export class AuditoriaService {
                  JOIN convi.cursos curso ON curso.id = asignacion.curso_id AND curso.establecimiento_id = asignacion.establecimiento_id
                  WHERE asignacion.id = e.recurso_id AND asignacion.establecimiento_id = e.establecimiento_id)
              WHEN 'accesos_apoderado' THEN
-               (SELECT persona.nombres || ' ' || persona.apellidos FROM convi.accesos_apoderado acceso
+               (SELECT persona.nombres || ' ' || persona.apellidos || ' — ' || alumno.nombres || ' ' || alumno.apellidos FROM convi.accesos_apoderado acceso
                  JOIN convi.membresias_establecimiento cuenta ON cuenta.id = acceso.membresia_apoderado_id AND cuenta.establecimiento_id = acceso.establecimiento_id
                  JOIN convi.personas persona ON persona.id = cuenta.persona_id AND persona.establecimiento_id = cuenta.establecimiento_id
+                 JOIN convi.apoderados_estudiante vinculo ON vinculo.id = acceso.apoderado_estudiante_id AND vinculo.establecimiento_id = acceso.establecimiento_id
+                 JOIN convi.estudiantes estudiante ON estudiante.id = vinculo.estudiante_id AND estudiante.establecimiento_id = vinculo.establecimiento_id
+                 JOIN convi.personas alumno ON alumno.id = estudiante.persona_id AND alumno.establecimiento_id = estudiante.establecimiento_id
                  WHERE acceso.id = e.recurso_id AND acceso.establecimiento_id = e.establecimiento_id)
              WHEN 'categorias_convivencia' THEN coalesce(e.metadatos->'despues'->>'nombre', e.metadatos->'antes'->>'nombre')
              WHEN 'protocolos' THEN coalesce(e.metadatos->'despues'->>'nombre', e.metadatos->'antes'->>'nombre')

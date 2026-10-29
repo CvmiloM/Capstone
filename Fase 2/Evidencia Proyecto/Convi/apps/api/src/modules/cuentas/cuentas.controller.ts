@@ -68,4 +68,12 @@ export class CuentasController {
   ) {
     return this.cuentas.reenviar(peticion.sesion, id);
   }
+
+  @Post('apoderados/:vinculoId/invitacion')
+  invitarApoderado(
+    @Req() peticion: PeticionConSesion,
+    @Param('vinculoId', new ParseUUIDPipe()) vinculoId: string,
+  ) {
+    return this.cuentas.invitarApoderado(peticion.sesion, vinculoId);
+  }
 }
