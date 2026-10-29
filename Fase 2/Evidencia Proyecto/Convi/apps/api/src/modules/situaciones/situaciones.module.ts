@@ -17,6 +17,8 @@ import { HistorialController } from './historial.controller.js';
 import { HistorialService } from './historial.service.js';
 import { PlanesController } from './planes.controller.js';
 import { PlanesService } from './planes.service.js';
+import { ApoderadoController } from './apoderado.controller.js';
+import { ApoderadoService } from './apoderado.service.js';
 import { ProfesorController } from './profesor.controller.js';
 import { ProfesorService } from './profesor.service.js';
 
@@ -33,6 +35,7 @@ import { ProfesorService } from './profesor.service.js';
 @Module({
   imports: [AuthModule, AlertasModule],
   controllers: [
+    ApoderadoController,
     ProfesorController,
     ConvivenciaController,
     HistorialController,
@@ -43,6 +46,7 @@ import { ProfesorService } from './profesor.service.js';
     EvidenciasProfesorController,
   ],
   providers: [
+    ApoderadoService,
     ProfesorService,
     ConvivenciaService,
     HistorialService,
