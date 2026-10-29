@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AccesosApoderadoController } from './accesos-apoderado.controller.js';
+import { AccesosApoderadoService } from './accesos-apoderado.service.js';
 import { ApoderadosController } from './apoderados.controller.js';
 import { ApoderadosService } from './apoderados.service.js';
 import { AuthModule } from '../auth/auth.module.js';
@@ -22,6 +24,7 @@ import { NivelesService } from './niveles.service.js';
 @Module({
   imports: [AuthModule],
   controllers: [
+    AccesosApoderadoController,
     ApoderadosController,
     AniosController,
     NivelesController,
@@ -30,6 +33,7 @@ import { NivelesService } from './niveles.service.js';
     EstudiantesController,
   ],
   providers: [
+    AccesosApoderadoService,
     ApoderadosService,
     AniosService,
     NivelesService,

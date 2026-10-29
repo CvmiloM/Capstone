@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Encabezado, claseEnlace } from "@/app/components/formulario";
 import { obtenerContextoAdmin } from "../../../datos";
+import { AccesoPortal } from "../../../apoderados/acceso-portal";
 import { obtenerApoderados, obtenerFicha } from "../../datos";
 import {
   AgregarApoderado,
@@ -30,13 +31,19 @@ const AVISO_VINCULO: Record<string, string> = {
   corregido:
     "Datos del contacto corregidos, el cambio quedó registrado con tu nombre y la fecha",
 };
+const AVISO_ACCESO: Record<string, string> = {
+  invitar: "Invitación enviada, cuando active su cuenta podrás otorgarle acceso a este estudiante",
+  otorgar: "Acceso otorgado para este estudiante, el permiso quedó registrado en Auditoría",
+  renovar: "Vencimiento ampliado, la renovación quedó registrada en Auditoría",
+  revocar: "Acceso revocado para este estudiante, el vínculo familiar y sus antecedentes se conservaron",
+};
 
 export default async function PaginaApoderados({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ buscar?: string; vinculo?: string }>;
+  searchParams: Promise<{ buscar?: string; vinculo?: string; apoderado?: string; acceso?: string }>;
 }) {
   const { id } = await params;
   const consulta = await searchParams;
@@ -92,7 +99,7 @@ export default async function PaginaApoderados({
           <ul className="space-y-4">
             {datos.vinculos.map((v) => (
               <li key={v.id}>
-                <details className="group rounded-2xl border border-border bg-card p-5 shadow-tarjeta">
+                <details id={`vinculo-${v.id}`} open={consulta.apoderado === v.id} className="group scroll-mt-6 rounded-2xl border border-border bg-card p-5 shadow-tarjeta">
                   <summary className="flex cursor-pointer list-none items-start gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold">
@@ -106,8 +113,13 @@ export default async function PaginaApoderados({
                         {v.correo ?? "Correo sin registrar"}
                       </span>
                     </span>
-                    <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs">
-                      {NOMBRE_VIGENCIA[v.vigencia]}
+                    <span className="flex shrink-0 flex-col items-end gap-1.5">
+                      <span className="rounded-full bg-muted px-2.5 py-1 text-xs">
+                        {NOMBRE_VIGENCIA[v.vigencia]}
+                      </span>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${v.acceso_habilitado ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}>
+                        {v.acceso_habilitado ? "Con acceso al portal" : "Sin acceso al portal"}
+                      </span>
                     </span>
                     <span
                       aria-hidden="true"
@@ -167,6 +179,7 @@ export default async function PaginaApoderados({
                         : "No puede ser contactado"}
                     </p>
                     <FormularioContacto estudianteId={ficha.id} vinculo={v} />
+                    <AccesoPortal estudianteId={ficha.id} vinculo={v} zonaHoraria={escuela.zonaHoraria} hoy={hoy} aviso={consulta.apoderado === v.id ? AVISO_ACCESO[consulta.acceso ?? ""] : undefined} />
                     {!v.activo_hasta && (
                       <FormularioTermino
                         estudianteId={ficha.id}

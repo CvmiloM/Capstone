@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { ResumenAccesoPortal } from "../apoderados/datos";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { pedirAdmin } from "../datos";
 
@@ -125,7 +126,7 @@ export type PersonaApoderada = {
   telefono: string | null;
 };
 
-export type VinculoApoderado = PersonaApoderada & {
+export type VinculoApoderado = PersonaApoderada & ResumenAccesoPortal & {
   persona_apoderado_id: string;
   direccion: string | null;
   tipo_relacion: string | null;

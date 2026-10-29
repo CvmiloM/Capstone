@@ -5,6 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { PoolClient } from 'pg';
+import {
+  CAMPOS_ACCESO_APODERADO,
+  UNIONES_ACCESO_APODERADO,
+  type ResumenAccesoApoderado,
+} from './acceso-apoderado.js';
 import type { Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { errorDeCampos, texto } from './curso.js';
@@ -30,20 +35,21 @@ export type PersonaApoderada = {
   correo: string | null;
   telefono: string | null;
 };
-export type VinculoApoderado = PersonaApoderada & {
-  persona_apoderado_id: string;
-  direccion: string | null;
-  tipo_relacion: string | null;
-  es_principal: boolean;
-  puede_ser_contactado: boolean;
-  activo_desde: string | null;
-  activo_hasta: string | null;
-  vigencia: 'VIGENTE' | 'FUTURO' | 'TERMINADO';
-  /** PB-021: otros estudiantes con los que está vinculada la misma persona. */
-  otros_estudiantes: number;
-  /** PB-021: tiene cuenta o invitación en CONVI. */
-  tiene_cuenta: boolean;
-};
+export type VinculoApoderado = PersonaApoderada &
+  ResumenAccesoApoderado & {
+    persona_apoderado_id: string;
+    direccion: string | null;
+    tipo_relacion: string | null;
+    es_principal: boolean;
+    puede_ser_contactado: boolean;
+    activo_desde: string | null;
+    activo_hasta: string | null;
+    vigencia: 'VIGENTE' | 'FUTURO' | 'TERMINADO';
+    /** PB-021: otros estudiantes con los que está vinculada la misma persona. */
+    otros_estudiantes: number;
+    /** PB-021: tiene cuenta o invitación en CONVI. */
+    tiene_cuenta: boolean;
+  };
 
 @Injectable()
 export class ApoderadosService {
@@ -61,8 +67,10 @@ export class ApoderadosService {
                      WHEN a.activo_desde > current_date THEN 'FUTURO' ELSE 'VIGENTE' END AS vigencia,
                 (SELECT count(DISTINCT o.estudiante_id)::int FROM convi.apoderados_estudiante o
                  WHERE o.persona_apoderado_id = p.id AND o.estudiante_id <> a.estudiante_id) AS otros_estudiantes,
-                EXISTS (SELECT 1 FROM convi.membresias_establecimiento m WHERE m.persona_id = p.id) AS tiene_cuenta
+                EXISTS (SELECT 1 FROM convi.membresias_establecimiento m WHERE m.persona_id = p.id) AS tiene_cuenta,
+                ${CAMPOS_ACCESO_APODERADO}
          FROM convi.apoderados_estudiante a JOIN convi.personas p ON p.id = a.persona_apoderado_id
+         ${UNIONES_ACCESO_APODERADO}
          WHERE a.estudiante_id = $1 ORDER BY a.es_principal DESC, p.apellidos, p.nombres, a.id`,
         [estudianteId],
       );
