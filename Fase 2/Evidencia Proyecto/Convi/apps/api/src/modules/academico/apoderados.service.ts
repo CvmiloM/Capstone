@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import {
+  APODERADO_REGISTRADO,
+  comprobarCorreoApoderado,
+} from './correo-apoderado.js';
+import {
   CAMPOS_ACCESO_APODERADO,
   UNIONES_ACCESO_APODERADO,
   type ResumenAccesoApoderado,
@@ -82,6 +86,7 @@ export class ApoderadosService {
                 `SELECT p.id, p.nombres, p.apellidos, p.rut, p.correo, p.telefono
          FROM convi.personas p
          WHERE p.estado = 'ACTIVO'
+           AND ${APODERADO_REGISTRADO}
            AND NOT EXISTS (SELECT 1 FROM convi.estudiantes e WHERE e.persona_id = p.id)
            AND NOT EXISTS (SELECT 1 FROM convi.apoderados_estudiante a WHERE a.estudiante_id = $1 AND a.persona_apoderado_id = p.id)
            AND (p.nombres || ' ' || p.apellidos ILIKE $2 OR p.rut ILIKE $2 OR p.correo ILIKE $2)
@@ -99,17 +104,20 @@ export class ApoderadosService {
       await this.estudiante(db, estudianteId);
       let personaId = datos.persona_apoderado_id;
       if (personaId) {
-        const persona = await db.query(
-          `SELECT p.id FROM convi.personas p WHERE p.id = $1 AND p.estado = 'ACTIVO'
+        const persona = await db.query<{ id: string; correo: string | null }>(
+          `SELECT p.id,p.correo FROM convi.personas p WHERE p.id = $1 AND p.estado = 'ACTIVO'
+           AND ${APODERADO_REGISTRADO}
            AND NOT EXISTS (SELECT 1 FROM convi.estudiantes e WHERE e.persona_id = p.id) FOR SHARE OF p`,
           [personaId],
         );
         if (!persona.rows.length)
           throw new NotFoundException(
-            'No encontramos esa persona disponible en tu escuela',
+            'No encontramos ese apoderado disponible en tu escuela',
           );
+        await comprobarCorreoApoderado(db, persona.rows[0].correo);
       } else {
         const p = datos.persona!;
+        await comprobarCorreoApoderado(db, p.correo);
         if (
           !p.rut &&
           p.correo &&
@@ -209,6 +217,7 @@ export class ApoderadosService {
           'No encontramos ese vínculo en el estudiante',
         );
       // CA2: no se convierte la ficha en la de otra persona
+      await comprobarCorreoApoderado(db, datos.correo);
       if (esOtraPersona(actual, datos))
         throw errorOtraPersona(
           'Cambiaste nombres y apellidos a la vez, eso sería otra persona: agrégala como un apoderado nuevo. No se guardaron los datos del contacto',
