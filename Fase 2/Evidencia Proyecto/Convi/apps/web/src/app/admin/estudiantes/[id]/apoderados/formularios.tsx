@@ -31,6 +31,19 @@ export function AgregarApoderado({
   personasIniciales: PersonaApoderada[];
   buscarInicial: string;
 }) {
+  const formularioId = useId();
+  const [estado, accion, pendiente] = useActionState<
+    EstadoFormulario,
+    FormData
+  >(
+    vincularApoderado.bind(null, estudianteId),
+    {},
+    `/admin/estudiantes/${estudianteId}/apoderados`,
+  );
+  const [seleccion, setModo] = useState<string | null>(null);
+  const valores = estado.valores ?? {};
+  const modo = seleccion ?? valores.modo ?? "existente";
+  const errores = estado.errores ?? {};
   const [buscar, setBuscar] = useState(buscarInicial);
   const [personas, setPersonas] = useState(personasIniciales);
   const [mensaje, setMensaje] = useState("");
@@ -55,8 +68,8 @@ export function AgregarApoderado({
         setPersonas(resultado.personas);
         setMensaje(
           resultado.personas.length
-            ? `${resultado.personas.length} ${resultado.personas.length === 1 ? "persona disponible" : "personas disponibles"} para «${texto}»`
-            : `No encontramos personas disponibles para «${texto}», las ya vinculadas con este estudiante no aparecen en la búsqueda`,
+            ? `${resultado.personas.length} ${resultado.personas.length === 1 ? "apoderado disponible" : "apoderados disponibles"} para «${texto}»`
+            : `No encontramos apoderados disponibles para «${texto}», los ya vinculados con este estudiante no aparecen en la búsqueda`,
         );
       } catch {
         setMensaje("No pudimos completar la búsqueda, inténtalo nuevamente");
@@ -65,84 +78,12 @@ export function AgregarApoderado({
   }
 
   return (
-    <>
-      <form
-        onSubmit={enviarBusqueda}
-        role="search"
-        className="mb-5 space-y-3 rounded-xl bg-muted p-4"
-      >
-        <Campo
-          name="buscar"
-          etiqueta="Buscar persona registrada"
-          type="search"
-          value={buscar}
-          onChange={(e) => setBuscar(e.target.value)}
-          disabled={buscando}
-          required
-          minLength={2}
-          maxLength={100}
-          ayuda="Nombre, RUT sin puntos o correo, se muestran hasta 20 resultados"
-        />
-        <button
-          type="submit"
-          disabled={buscando || buscar.trim().length < 2}
-          className={`${claseBotonSecundario} disabled:cursor-not-allowed disabled:opacity-60`}
-        >
-          {buscando ? "Buscando…" : "Buscar persona"}
-        </button>
-        <p
-          role="status"
-          aria-live="polite"
-          className="text-sm text-muted-foreground"
-        >
-          {buscando
-            ? "Buscando personas, los vínculos registrados se mantienen"
-            : mensaje}
-        </p>
-      </form>
-      <FormularioVinculo
-        estudianteId={estudianteId}
-        personas={personas}
-        buscar=""
-      />
-    </>
-  );
-}
-
-export function FormularioVinculo({
-  estudianteId,
-  personas,
-  buscar,
-}: {
-  estudianteId: string;
-  personas: PersonaApoderada[];
-  buscar: string;
-}) {
-  const [estado, accion, pendiente] = useActionState<
-    EstadoFormulario,
-    FormData
-  >(
-    vincularApoderado.bind(null, estudianteId),
-    {},
-    `/admin/estudiantes/${estudianteId}/apoderados${buscar ? `?${new URLSearchParams({ buscar })}` : ""}`,
-  );
-  const [seleccion, setModo] = useState<string | null>(null);
-  const valores = estado.valores ?? {};
-  const modo = seleccion ?? valores.modo ?? "existente";
-  const errores = estado.errores ?? {};
-  return (
-    <form
-      action={accion}
-      noValidate
-      onReset={(evento) => evento.preventDefault()}
-      className="space-y-5"
-    >
-      {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
+    <div className="space-y-5">
       <fieldset className="space-y-2">
-        <legend className="mb-2 text-sm font-medium">Persona apoderada</legend>
+        <legend className="sr-only">Cómo agregar al apoderado</legend>
         {[
-          ["existente", "Usar una persona registrada"],
-          ["nueva", "Registrar una persona nueva"],
+          ["existente", "Usar un apoderado registrado"],
+          ["nueva", "Registrar un apoderado nuevo"],
         ].map(([valor, nombre]) => (
           <label
             key={valor}
@@ -151,6 +92,7 @@ export function FormularioVinculo({
             <input
               type="radio"
               name="modo"
+              form={formularioId}
               value={valor}
               checked={modo === valor}
               onChange={() => setModo(valor)}
@@ -160,147 +102,193 @@ export function FormularioVinculo({
           </label>
         ))}
       </fieldset>
-      {modo === "existente" ? (
-        <fieldset className="space-y-2">
-          <legend className="mb-2 text-sm font-medium">
-            Resultados de la búsqueda
-          </legend>
-          {personas.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Busca arriba por nombre, RUT o correo, si no existe su ficha
-              puedes registrar una persona nueva
-            </p>
-          )}
-          {personas.map((p) => (
-            <label
-              key={p.id}
-              className="flex cursor-pointer items-start gap-3 rounded-xl border border-input p-3 text-sm"
-            >
-              <input
-                type="radio"
-                name="persona_apoderado_id"
-                value={p.id}
-                defaultChecked={valores.persona_apoderado_id === p.id}
-                className="mt-1 accent-primary"
-              />
-              <span>
-                <span className="block font-medium">
-                  {p.nombres} {p.apellidos}
-                </span>
-                <span className="text-muted-foreground">
-                  {[p.rut, p.correo, p.telefono].filter(Boolean).join(" · ") ||
-                    "Sin datos de contacto"}
-                </span>
-              </span>
-            </label>
-          ))}
-          {errores.persona_apoderado_id && (
-            <p role="alert" className="text-sm text-destructive">
-              {errores.persona_apoderado_id}
-            </p>
-          )}
-        </fieldset>
-      ) : (
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-3 text-sm font-medium">
-            Datos de la persona
-          </legend>
+      {modo === "existente" && (
+        <form
+          onSubmit={enviarBusqueda}
+          role="search"
+          className="mb-5 space-y-3 rounded-xl bg-muted p-4"
+        >
           <Campo
-            name="nombres"
-            etiqueta="Nombres"
+            name="buscar"
+            etiqueta="Buscar apoderado registrado"
+            type="search"
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            disabled={buscando}
             required
+            minLength={2}
             maxLength={100}
-            defaultValue={valores.nombres}
-            error={errores.nombres}
+            ayuda="Nombre, RUT sin puntos o correo, se muestran hasta 20 resultados"
           />
-          <Campo
-            name="apellidos"
-            etiqueta="Apellidos"
-            required
-            maxLength={120}
-            defaultValue={valores.apellidos}
-            error={errores.apellidos}
-          />
-          <Campo
-            name="rut"
-            etiqueta="RUT (opcional)"
-            defaultValue={valores.rut}
-            error={errores.rut}
-          />
-          <Campo
-            name="correo"
-            etiqueta="Correo (opcional)"
-            type="email"
-            maxLength={180}
-            defaultValue={valores.correo}
-            error={errores.correo}
-          />
-          <Campo
-            name="telefono"
-            etiqueta="Teléfono (opcional)"
-            type="tel"
-            maxLength={40}
-            defaultValue={valores.telefono}
-            error={errores.telefono}
-          />
-          <Campo
-            name="direccion"
-            etiqueta="Dirección (opcional)"
-            maxLength={200}
-            defaultValue={valores.direccion}
-            error={errores.direccion}
-          />
-        </fieldset>
+          <button
+            type="submit"
+            disabled={buscando || buscar.trim().length < 2}
+            className={`${claseBotonSecundario} disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            {buscando ? "Buscando…" : "Buscar apoderado"}
+          </button>
+          <p
+            role="status"
+            aria-live="polite"
+            className="text-sm text-muted-foreground"
+          >
+            {buscando
+              ? "Buscando apoderados, los vínculos registrados se mantienen"
+              : mensaje}
+          </p>
+        </form>
       )}
-      <Campo
-        name="tipo_relacion"
-        etiqueta="Relación con el estudiante"
-        ayuda="Escríbela como corresponda, por ejemplo madre, padre, abuela o tutor"
-        required
-        maxLength={60}
-        defaultValue={valores.tipo_relacion}
-        error={errores.tipo_relacion}
-      />
-      <div className="space-y-3 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="es_principal"
-            defaultChecked={valores.es_principal === "1"}
-            className="accent-primary"
-          />
-          Es apoderado principal
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="puede_ser_contactado"
-            defaultChecked={valores.puede_ser_contactado !== "0"}
-            className="accent-primary"
-          />
-          Puede ser contactado
-        </label>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <form
+        id={formularioId}
+        action={accion}
+        noValidate
+        onReset={(evento) => evento.preventDefault()}
+        className="space-y-5"
+      >
+        {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
+        {modo === "existente" ? (
+          <fieldset className="space-y-2">
+            <legend className="mb-2 text-sm font-medium">
+              Resultados de la búsqueda
+            </legend>
+            {personas.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Busca arriba por nombre, RUT o correo, si no existe su ficha
+                puedes registrar un apoderado nuevo
+              </p>
+            )}
+            {personas.map((p) => (
+              <label
+                key={p.id}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-input p-3 text-sm"
+              >
+                <input
+                  type="radio"
+                  name="persona_apoderado_id"
+                  value={p.id}
+                  defaultChecked={valores.persona_apoderado_id === p.id}
+                  className="mt-1 accent-primary"
+                />
+                <span>
+                  <span className="block font-medium">
+                    {p.nombres} {p.apellidos}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {[p.rut, p.correo, p.telefono]
+                      .filter(Boolean)
+                      .join(" · ") || "Sin datos de contacto"}
+                  </span>
+                </span>
+              </label>
+            ))}
+            {errores.persona_apoderado_id && (
+              <p role="alert" className="text-sm text-destructive">
+                {errores.persona_apoderado_id}
+              </p>
+            )}
+          </fieldset>
+        ) : (
+          <fieldset className="grid gap-4 sm:grid-cols-2">
+            <legend className="mb-3 text-sm font-medium">
+              Datos del apoderado
+            </legend>
+            <Campo
+              name="nombres"
+              etiqueta="Nombres"
+              required
+              maxLength={100}
+              defaultValue={valores.nombres}
+              error={errores.nombres}
+            />
+            <Campo
+              name="apellidos"
+              etiqueta="Apellidos"
+              required
+              maxLength={120}
+              defaultValue={valores.apellidos}
+              error={errores.apellidos}
+            />
+            <Campo
+              name="rut"
+              etiqueta="RUT (opcional)"
+              defaultValue={valores.rut}
+              error={errores.rut}
+            />
+            <Campo
+              name="correo"
+              etiqueta="Correo (opcional)"
+              type="email"
+              maxLength={180}
+              defaultValue={valores.correo}
+              error={errores.correo}
+            />
+            <Campo
+              name="telefono"
+              etiqueta="Teléfono (opcional)"
+              type="tel"
+              maxLength={40}
+              defaultValue={valores.telefono}
+              error={errores.telefono}
+            />
+            <Campo
+              name="direccion"
+              etiqueta="Dirección (opcional)"
+              maxLength={200}
+              defaultValue={valores.direccion}
+              error={errores.direccion}
+            />
+          </fieldset>
+        )}
         <Campo
-          name="activo_desde"
-          etiqueta="Desde (opcional)"
-          type="date"
-          defaultValue={valores.activo_desde}
-          error={errores.activo_desde}
+          name="tipo_relacion"
+          etiqueta="Relación con el estudiante"
+          ayuda="Escríbela como corresponda, por ejemplo madre, padre, abuela o tutor"
+          required
+          maxLength={60}
+          defaultValue={valores.tipo_relacion}
+          error={errores.tipo_relacion}
         />
-        <Campo
-          name="activo_hasta"
-          etiqueta="Hasta (opcional)"
-          type="date"
-          defaultValue={valores.activo_hasta}
-          error={errores.activo_hasta}
-        />
-      </div>
-      <BotonEnviar pendiente={pendiente} textoPendiente="Guardando vínculo…">
-        Guardar vínculo
-      </BotonEnviar>
-    </form>
+        <div className="space-y-3 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="es_principal"
+              defaultChecked={valores.es_principal === "1"}
+              className="accent-primary"
+            />
+            Es apoderado principal
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="puede_ser_contactado"
+              defaultChecked={valores.puede_ser_contactado !== "0"}
+              className="accent-primary"
+            />
+            Puede ser contactado
+          </label>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo
+            name="activo_desde"
+            etiqueta="Desde (opcional)"
+            type="date"
+            defaultValue={valores.activo_desde}
+            error={errores.activo_desde}
+          />
+          <Campo
+            name="activo_hasta"
+            etiqueta="Hasta (opcional)"
+            type="date"
+            defaultValue={valores.activo_hasta}
+            error={errores.activo_hasta}
+          />
+        </div>
+        <BotonEnviar pendiente={pendiente} textoPendiente="Guardando vínculo…">
+          Guardar vínculo
+        </BotonEnviar>
+      </form>
+    </div>
   );
 }
 

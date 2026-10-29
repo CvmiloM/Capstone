@@ -199,7 +199,7 @@ export default async function PaginaApoderados({
           className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
         >
           <h2 id="titulo-vincular" className="mb-4 text-lg font-semibold">
-            Agregar un apoderado
+            Agregar apoderado
           </h2>
           <AgregarApoderado
             estudianteId={ficha.id}

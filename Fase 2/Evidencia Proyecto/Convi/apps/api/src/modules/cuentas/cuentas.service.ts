@@ -9,6 +9,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { comprobarCorreoApoderado } from '../academico/correo-apoderado.js';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { errorDeCampos, validarInvitacion } from './nueva-invitacion.js';
@@ -344,6 +345,7 @@ export class CuentasService {
           throw new BadRequestException(
             'Primero registra el correo del apoderado en su ficha de contacto',
           );
+        await comprobarCorreoApoderado(db, persona.correo);
         const existente = await db.query(
           'SELECT id FROM convi.membresias_establecimiento WHERE persona_id=$1 OR lower(correo_invitacion)=lower($2)',
           [persona.id, persona.correo],

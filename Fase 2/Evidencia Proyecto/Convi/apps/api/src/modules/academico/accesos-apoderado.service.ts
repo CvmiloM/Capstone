@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { PoolClient } from 'pg';
+import { comprobarCorreoApoderado } from './correo-apoderado.js';
 import type { Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { errorDeCampos } from './curso.js';
@@ -202,10 +203,12 @@ export class AccesosApoderadoService {
         const { rows } = await db.query<{
           persona_apoderado_id: string;
           vigente: boolean;
+          correo: string | null;
         }>(
-          `SELECT persona_apoderado_id, (activo_desde IS NULL OR activo_desde<=current_date)
+          `SELECT persona_apoderado_id,p.correo, (activo_desde IS NULL OR activo_desde<=current_date)
            AND (activo_hasta IS NULL OR activo_hasta>=current_date) AS vigente
-         FROM convi.apoderados_estudiante WHERE id=$1 FOR UPDATE`,
+         FROM convi.apoderados_estudiante a JOIN convi.personas p ON p.id=a.persona_apoderado_id
+         WHERE a.id=$1 FOR UPDATE OF a,p`,
           [vinculoId],
         );
         if (!rows[0])
@@ -213,11 +216,20 @@ export class AccesosApoderadoService {
             'No encontramos ese vínculo en tu escuela',
           );
         const cuenta = (
-          await db.query<{ id: string; codigo_perfil: string; estado: string }>(
-            'SELECT id,codigo_perfil,estado FROM convi.membresias_establecimiento WHERE persona_id=$1 FOR SHARE',
+          await db.query<{
+            id: string;
+            codigo_perfil: string;
+            estado: string;
+            correo_invitacion: string;
+          }>(
+            'SELECT id,codigo_perfil,estado,correo_invitacion FROM convi.membresias_establecimiento WHERE persona_id=$1 FOR SHARE',
             [rows[0].persona_apoderado_id],
           )
         ).rows[0];
+        if (!soloRevocar) {
+          await comprobarCorreoApoderado(db, rows[0].correo);
+          await comprobarCorreoApoderado(db, cuenta?.correo_invitacion ?? null);
+        }
         if (
           !soloRevocar &&
           (!cuenta ||

@@ -149,7 +149,7 @@ export async function vincularApoderado(
   if (existente && !valores.persona_apoderado_id)
     return {
       valores,
-      errores: { persona_apoderado_id: "Busca y selecciona una persona" },
+      errores: { persona_apoderado_id: "Busca y selecciona un apoderado" },
       mensaje: "No se guardó el vínculo",
     };
   const resultado = await enviarCambio(
@@ -168,7 +168,7 @@ export async function vincularApoderado(
     },
   );
   if (!resultado.ok)
-    return { valores, mensaje: resultado.mensaje, errores: resultado.errores };
+    return { valores, mensaje: resultado.errores?.correo ?? resultado.mensaje, errores: resultado.errores };
   revalidatePath(`/admin/estudiantes/${estudianteId}`, "layout");
   redirect(
     `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados?vinculo=creado`,
