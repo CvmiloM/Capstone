@@ -6,6 +6,8 @@ import { CasosController } from './casos.controller.js';
 import { CasosService } from './casos.service.js';
 import { ConvivenciaController } from './convivencia.controller.js';
 import { ConvivenciaService } from './convivencia.service.js';
+import { EncuentrosController } from './encuentros.controller.js';
+import { EncuentrosService } from './encuentros.service.js';
 import {
   EvidenciasConvivenciaController,
   EvidenciasProfesorController,
@@ -32,6 +34,7 @@ import { ProfesorService } from './profesor.service.js';
 // PB-090 (Camilo): AlertasModule evalúa las reglas de cantidad después de
 // registrar una situación.
 // PB-061 y PB-062: el plan de intervención del caso y sus acciones.
+// PB-063 y PB-064: los encuentros del caso (entrevistas, reuniones y otros).
 @Module({
   imports: [AuthModule, AlertasModule],
   controllers: [
@@ -42,6 +45,7 @@ import { ProfesorService } from './profesor.service.js';
     ExpedientesController,
     CasosController,
     PlanesController,
+    EncuentrosController,
     EvidenciasConvivenciaController,
     EvidenciasProfesorController,
   ],
@@ -53,6 +57,7 @@ import { ProfesorService } from './profesor.service.js';
     ExpedientesService,
     CasosService,
     PlanesService,
+    EncuentrosService,
     EvidenciasService,
     {
       provide: ALMACENAMIENTO,

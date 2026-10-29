@@ -21,6 +21,7 @@ import {
   FormularioCierre,
   FormularioEstado,
 } from "./formularios";
+import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
 import { PlanIntervencion } from "./plan-intervencion";
 
@@ -49,6 +50,15 @@ const AVISOS: Record<string, string> = {
   "accion-estado": "Registraste el avance de la acción.",
   "accion-corregida":
     "Corregiste la acción. La auditoría guarda el valor anterior, el nuevo y el motivo.",
+  // PB-063 y PB-064 (HU-055): encuentros del caso.
+  encuentro:
+    "Programaste el encuentro. Quedó Planificado con tu nombre como autor y sus asistentes Pendientes.",
+  "encuentro-asistentes": "Agregaste asistentes al encuentro. Quedaron Pendientes.",
+  "encuentro-reprogramado":
+    "Reprogramaste el encuentro. Quedó Pospuesto con la nueva fecha; la anterior y el motivo quedan en la auditoría.",
+  "encuentro-realizado":
+    "Registraste el encuentro como realizado, con su resultado y la asistencia de cada participante.",
+  "encuentro-cancelado": "Cancelaste el encuentro. El motivo queda en la auditoría.",
 };
 
 /** PB-082: estados del protocolo aplicado y de cada paso en el caso. */
@@ -404,6 +414,11 @@ export default async function PaginaCaso({
         {/* PB-061 y PB-062 (HU-054): plan de intervención con sus acciones. */}
         <Seccion titulo="Plan de intervención" className="lg:col-span-3" id="plan-intervencion">
           <PlanIntervencion caso={caso} formatearFecha={formatearFecha} />
+        </Seccion>
+
+        {/* PB-063 y PB-064 (HU-055): entrevistas, reuniones y otros encuentros. */}
+        <Seccion titulo="Encuentros" className="lg:col-span-3" id="encuentros">
+          <Encuentros caso={caso} formatearFecha={formatearFecha} />
         </Seccion>
 
         {/* PB-152 (HU-131 CA1) y PB-054 (HU-047 CA4): cada cambio queda en el historial. */}
