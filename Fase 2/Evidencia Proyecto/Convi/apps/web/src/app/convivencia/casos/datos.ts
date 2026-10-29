@@ -110,6 +110,60 @@ export type DetalleCaso = CasoLista & {
   responsables_accion: { id: string; nombre: string; perfiles: string[] }[];
   /** AAAA-MM-DD en la zona horaria de la escuela. */
   hoy: string;
+  /** AAAA-MM-DDTHH:MM en la hora de la escuela, tope de las fechas reales. */
+  ahora: string;
+  /** PB-063 y PB-064 (HU-055): encuentros del caso con sus asistentes. */
+  encuentros: Encuentro[];
+  opciones_encuentro: {
+    responsables: { id: string; nombre: string }[];
+    asistentes: AsistentePosible[];
+    acciones_plan: { id: string; descripcion: string }[];
+  };
+};
+
+/** Persona que puede asistir a un encuentro del caso, con su rol. */
+export type AsistentePosible = {
+  persona_id: string;
+  rol: string;
+  nombre: string;
+  /** Código del estudiante, estudiantes del apoderado o perfiles del equipo. */
+  detalle: string | null;
+};
+
+export type Encuentro = {
+  id: string;
+  tipo: string;
+  estado: string;
+  objetivo: string;
+  descripcion: string | null;
+  lugar: string | null;
+  responsable: string;
+  creado_por: string;
+  creado_en: string;
+  programado_en: string | null;
+  fin_programado_en: string | null;
+  /** AAAA-MM-DDTHH:MM en la hora de la escuela, para reprogramar. */
+  programado_local: string | null;
+  fin_programado_local: string | null;
+  realizado_en: string | null;
+  fin_real_en: string | null;
+  resultado: string | null;
+  /** Acción del plan a la que se ligó, si se ligó. */
+  accion: string | null;
+  /** CA5: cambios de fecha, con la fecha anterior y el motivo del último. */
+  reprogramaciones: number;
+  fecha_anterior: string | null;
+  motivo_reprogramacion: string | null;
+  motivo_cancelacion: string | null;
+  /** Huella de lo que se ve, para rechazar cambios sobre datos viejos (PB-139). */
+  version: string;
+  asistentes: {
+    participacion_id: string;
+    persona_id: string;
+    nombre: string;
+    rol: string;
+    estado_asistencia: string;
+  }[];
 };
 
 export type AccionPlan = {
@@ -194,6 +248,29 @@ export function enviarCorreccionAccionPlan(accionId: string, cuerpo: unknown) {
   return enviar(
     "PATCH",
     `/convivencia/acciones-plan/${encodeURIComponent(accionId)}`,
+    cuerpo,
+  );
+}
+
+// PB-063 y PB-064 (HU-055): la API vuelve a validar todo.
+
+export function enviarNuevoEncuentro(casoId: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/casos/${encodeURIComponent(casoId)}/encuentros`,
+    cuerpo,
+  );
+}
+
+/** Operación sobre un encuentro: asistentes, reprogramacion, realizacion o cancelacion. */
+export function enviarCambioEncuentro(
+  encuentroId: string,
+  operacion: "asistentes" | "reprogramacion" | "realizacion" | "cancelacion",
+  cuerpo: unknown,
+) {
+  return enviar(
+    "POST",
+    `/convivencia/encuentros/${encodeURIComponent(encuentroId)}/${operacion}`,
     cuerpo,
   );
 }

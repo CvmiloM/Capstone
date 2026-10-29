@@ -203,7 +203,8 @@ function Etiqueta({ vencida, children }: { vencida: boolean; children: ReactNode
   );
 }
 
-function Desplegable({ titulo, children }: { titulo: string; children: ReactNode }) {
+/** PB-063 y PB-064: también la usan los encuentros. */
+export function Desplegable({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <details className="group w-full sm:w-auto sm:min-w-80">
       <summary className="cursor-pointer text-sm font-medium text-primary underline-offset-4 hover:underline">
