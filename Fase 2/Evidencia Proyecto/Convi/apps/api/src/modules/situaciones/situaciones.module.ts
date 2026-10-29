@@ -15,6 +15,8 @@ import { ExpedientesController } from './expedientes.controller.js';
 import { ExpedientesService } from './expedientes.service.js';
 import { HistorialController } from './historial.controller.js';
 import { HistorialService } from './historial.service.js';
+import { PlanesController } from './planes.controller.js';
+import { PlanesService } from './planes.service.js';
 import { ProfesorController } from './profesor.controller.js';
 import { ProfesorService } from './profesor.service.js';
 
@@ -27,6 +29,7 @@ import { ProfesorService } from './profesor.service.js';
 // privado de Storage, como los archivos de las importaciones (PB-019).
 // PB-090 (Camilo): AlertasModule evalúa las reglas de cantidad después de
 // registrar una situación.
+// PB-061 y PB-062: el plan de intervención del caso y sus acciones.
 @Module({
   imports: [AuthModule, AlertasModule],
   controllers: [
@@ -35,6 +38,7 @@ import { ProfesorService } from './profesor.service.js';
     HistorialController,
     ExpedientesController,
     CasosController,
+    PlanesController,
     EvidenciasConvivenciaController,
     EvidenciasProfesorController,
   ],
@@ -44,6 +48,7 @@ import { ProfesorService } from './profesor.service.js';
     HistorialService,
     ExpedientesService,
     CasosService,
+    PlanesService,
     EvidenciasService,
     {
       provide: ALMACENAMIENTO,
