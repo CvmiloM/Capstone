@@ -48,6 +48,11 @@ import {
   type ProtocoloAplicado,
 } from './protocolo-caso.js';
 import {
+  planesDelCaso,
+  responsablesDeAccion,
+  type PlanIntervencion,
+} from './plan-intervencion.js';
+import {
   comprobarNormativaVigente,
   opcionesNormativa,
   validarRevisionNormativa,
@@ -135,6 +140,12 @@ export type DetalleCaso = CasoLista & {
   /** HU-071 CA2 y CA3: revisiones del caso sin protocolo. */
   revisiones_normativas: RevisionNormativa[];
   opciones_normativa: OpcionesNormativa;
+  /** PB-061 y PB-062 (HU-054): planes de intervención con sus acciones. */
+  planes_intervencion: PlanIntervencion[];
+  /** Personas que pueden ser responsables de una acción del plan. */
+  responsables_accion: { id: string; nombre: string; perfiles: string[] }[];
+  /** AAAA-MM-DD en la zona horaria de la escuela, para los días del plan. */
+  hoy: string;
 };
 
 // 40001: otra transacción cambió la fila bloqueada; 23505 en el código: otro
@@ -252,6 +263,9 @@ export class CasosService {
           [id],
         );
         const permitidos = await estadosPermitidos(db, caso.estado_actual);
+        const hoy = await db.query<{ hoy: string }>(
+          `SELECT ${HOY_ESCUELA}::text AS hoy`,
+        );
         return {
           ...caso,
           participantes: participantes.rows,
@@ -267,6 +281,9 @@ export class CasosService {
           protocolos_aplicables: await protocolosAplicables(db),
           revisiones_normativas: await revisionesNormativasDelCaso(db, id),
           opciones_normativa: await opcionesNormativa(db),
+          planes_intervencion: await planesDelCaso(db, id),
+          responsables_accion: await responsablesDeAccion(db),
+          hoy: hoy.rows[0].hoy,
         };
       },
     );

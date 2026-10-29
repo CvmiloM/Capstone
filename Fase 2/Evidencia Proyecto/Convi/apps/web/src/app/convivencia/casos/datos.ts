@@ -1,5 +1,5 @@
 import type { Evidencia } from "@/app/components/evidencias/opciones";
-import { pedir, type RevisionNormativa } from "../datos";
+import { enviar, pedir, type RevisionNormativa } from "../datos";
 
 // PB-053 (HU-046): casos del portal de Convivencia. Mismas formas que devuelve
 // apps/api/src/modules/situaciones/casos.service.ts; las fechas llegan como
@@ -104,6 +104,48 @@ export type DetalleCaso = CasoLista & {
     protocolos: { id: string; nombre: string }[];
     documentos: { id: string; nombre: string }[];
   };
+  /** PB-061 y PB-062 (HU-054): planes de intervención con sus acciones. */
+  planes_intervencion: PlanIntervencion[];
+  /** Personas que pueden ser responsables de una acción del plan. */
+  responsables_accion: { id: string; nombre: string; perfiles: string[] }[];
+  /** AAAA-MM-DD en la zona horaria de la escuela. */
+  hoy: string;
+};
+
+export type AccionPlan = {
+  id: string;
+  descripcion: string;
+  persona_responsable_id: string;
+  responsable: string;
+  /** AAAA-MM-DD en la zona horaria de la escuela. */
+  vence_dia: string;
+  estado: string;
+  /** Sigue abierta y ya pasó su día de vencimiento. */
+  vencida: boolean;
+  notas: string | null;
+  completado_dia: string | null;
+  creado_en: string;
+  motivo_cancelacion: string | null;
+  /** CA4: correcciones registradas y el motivo de la última. */
+  correcciones: number;
+  ultima_correccion: string | null;
+  /** Huella de lo que se ve, para rechazar cambios sobre datos viejos (PB-139). */
+  version: string;
+};
+
+export type PlanIntervencion = {
+  id: string;
+  objetivo: string;
+  estado: string;
+  creado_por: string;
+  creado_en: string;
+  protocolo_caso_id: string | null;
+  protocolo: string | null;
+  /** CA5: fecha y motivo de término, si se completó o canceló. */
+  terminado_en: string | null;
+  motivo_termino: string | null;
+  version: string;
+  acciones: AccionPlan[];
 };
 
 export function obtenerCasos() {
@@ -112,6 +154,48 @@ export function obtenerCasos() {
 
 export function obtenerCaso(id: string) {
   return pedir<DetalleCaso>(`/convivencia/casos/${encodeURIComponent(id)}`);
+}
+
+// PB-061 y PB-062 (HU-054): la API vuelve a validar todo.
+
+export function enviarNuevoPlan(casoId: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/casos/${encodeURIComponent(casoId)}/planes`,
+    cuerpo,
+  );
+}
+
+export function enviarEstadoPlan(planId: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/planes/${encodeURIComponent(planId)}/estado`,
+    cuerpo,
+  );
+}
+
+export function enviarNuevaAccionPlan(planId: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/planes/${encodeURIComponent(planId)}/acciones`,
+    cuerpo,
+  );
+}
+
+export function enviarAvanceAccionPlan(accionId: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/acciones-plan/${encodeURIComponent(accionId)}/estado`,
+    cuerpo,
+  );
+}
+
+export function enviarCorreccionAccionPlan(accionId: string, cuerpo: unknown) {
+  return enviar(
+    "PATCH",
+    `/convivencia/acciones-plan/${encodeURIComponent(accionId)}`,
+    cuerpo,
+  );
 }
 
 /** HU-131: estados del caso con el nombre que usa Convivencia. */

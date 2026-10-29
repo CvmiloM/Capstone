@@ -20,8 +20,8 @@ const LARGO_MAXIMO_FUNDAMENTO_PROTOCOLO = 4000;
 const claseControl =
   "mt-1.5 block w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-ring focus:ring-3 focus:ring-ring/15";
 
-/** Etiqueta, control y mensaje de error o ayuda de un campo. */
-function Campo({
+/** Etiqueta, control y mensaje de error o ayuda de un campo. PB-061 y PB-062: también lo usa el plan de intervención. */
+export function Campo({
   id,
   etiqueta,
   error,
@@ -55,11 +55,19 @@ function Campo({
   );
 }
 
-/** Atributos de accesibilidad y borde de un control según su error. */
-function propsControl(id: string, error?: string, ayuda?: boolean) {
+/**
+ * Atributos de accesibilidad y borde de un control según su error. El nombre
+ * es el id, salvo cuando varios formularios de la página usan el mismo campo.
+ */
+export function propsControl(
+  id: string,
+  error?: string,
+  ayuda?: boolean,
+  name: string = id,
+) {
   return {
     id,
-    name: id,
+    name,
     "aria-invalid": error ? true : undefined,
     "aria-describedby": error ? `${id}-error` : ayuda ? `${id}-ayuda` : undefined,
     className: `${claseControl} ${error ? "border-destructive" : "border-input"}`,

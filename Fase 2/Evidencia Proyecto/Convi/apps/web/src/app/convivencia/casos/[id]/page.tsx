@@ -22,6 +22,7 @@ import {
   FormularioEstado,
 } from "./formularios";
 import { OrientacionCaso } from "./orientacion";
+import { PlanIntervencion } from "./plan-intervencion";
 
 export const metadata: Metadata = { title: "Caso" };
 
@@ -40,6 +41,14 @@ const AVISOS: Record<string, string> = {
     "Aplicaste el protocolo. Sus pasos quedaron en el caso con su vencimiento y su responsable.",
   normativa:
     "Registraste por qué el caso sigue sin protocolo. Quedó con tu nombre y la fecha.",
+  // PB-061 y PB-062 (HU-054): plan de intervención y sus acciones.
+  plan: "Creaste el plan de intervención del caso. Ahora puedes agregarle acciones.",
+  "plan-estado":
+    "Cambiaste el estado del plan. Si lo terminaste, quedó la fecha de término y el motivo en la auditoría.",
+  accion: "Agregaste la acción al plan. Quedó Pendiente con su responsable y su vencimiento.",
+  "accion-estado": "Registraste el avance de la acción.",
+  "accion-corregida":
+    "Corregiste la acción. La auditoría guarda el valor anterior, el nuevo y el motivo.",
 };
 
 /** PB-082: estados del protocolo aplicado y de cada paso en el caso. */
@@ -392,6 +401,11 @@ export default async function PaginaCaso({
           )}
         </Seccion>
 
+        {/* PB-061 y PB-062 (HU-054): plan de intervención con sus acciones. */}
+        <Seccion titulo="Plan de intervención" className="lg:col-span-3" id="plan-intervencion">
+          <PlanIntervencion caso={caso} formatearFecha={formatearFecha} />
+        </Seccion>
+
         {/* PB-152 (HU-131 CA1) y PB-054 (HU-047 CA4): cada cambio queda en el historial. */}
         <Seccion titulo="Historial de estados" className="lg:col-span-2">
           {caso.movimientos.length === 0 ? (
@@ -483,15 +497,19 @@ export default async function PaginaCaso({
 function Seccion({
   titulo,
   className = "",
+  id,
   children,
 }: {
   titulo: string;
   className?: string;
+  /** Ancla para volver a la sección después de guardar. */
+  id?: string;
   children: ReactNode;
 }) {
   return (
     <section
-      className={`rounded-2xl border border-border bg-card p-5 shadow-tarjeta ${className}`}
+      id={id}
+      className={`scroll-mt-4 rounded-2xl border border-border bg-card p-5 shadow-tarjeta ${className}`}
     >
       <h2 className="mb-3 text-base font-semibold">{titulo}</h2>
       {children}
