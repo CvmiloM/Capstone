@@ -21,6 +21,7 @@ import {
   FormularioCierre,
   FormularioEstado,
 } from "./formularios";
+import { SeguimientoCaso } from "./seguimientos";
 import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
 import { PlanIntervencion } from "./plan-intervencion";
@@ -28,6 +29,8 @@ import { PlanIntervencion } from "./plan-intervencion";
 export const metadata: Metadata = { title: "Caso" };
 
 const AVISOS: Record<string, string> = {
+  seguimiento: "Guardaste los cambios del seguimiento",
+  compromiso: "Registraste el compromiso, su cumplimiento se revisará en un seguimiento",
   creado:
     "Abriste el caso. Quedó En análisis con su código, y la situación de origen y sus estudiantes quedaron vinculados.",
   vinculada:
@@ -419,6 +422,10 @@ export default async function PaginaCaso({
         {/* PB-063 y PB-064 (HU-055): entrevistas, reuniones y otros encuentros. */}
         <Seccion titulo="Encuentros" className="lg:col-span-3" id="encuentros">
           <Encuentros caso={caso} formatearFecha={formatearFecha} />
+        </Seccion>
+
+        <Seccion titulo="Compromisos y seguimientos" className="lg:col-span-3" id="seguimientos">
+          <SeguimientoCaso caso={caso} formatearFecha={formatearFecha} />
         </Seccion>
 
         {/* PB-152 (HU-131 CA1) y PB-054 (HU-047 CA4): cada cambio queda en el historial. */}

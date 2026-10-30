@@ -17,6 +17,8 @@ const SECCIONES: SeccionMenu[] = [
         icono: "escudo",
       },
 
+      { href: "/convivencia/seguimientos", texto: "Agenda de seguimientos", icono: "anios" },
+
       // PB-077 (Camilo): situaciones y casos por código, estudiante, estado y período
       {
         href: "/convivencia/expedientes",
