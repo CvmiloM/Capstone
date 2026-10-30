@@ -144,12 +144,6 @@ export default async function PaginaCaso({
 }) {
   const [{ id }, { aviso, seccion: solicitada, antes, nuevo, adjuntar }] =
     await Promise.all([params, searchParams]);
-  const [respuesta, formatearFecha] = await Promise.all([
-    obtenerCaso(id),
-    obtenerFormatoFecha(),
-  ]);
-  if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia/casos" />;
-  const caso = respuesta.datos;
   const secciones = [
     ["resumen", "Resumen"],
     ["participantes", "Participantes"],
@@ -164,9 +158,20 @@ export default async function PaginaCaso({
     ["historial", "Historial"],
     ["estado", "Estado y cierre"],
   ];
-  const seccion = secciones.some(([clave]) => clave === solicitada)
-    ? solicitada
-    : "resumen";
+  const seccion =
+    secciones.find(([clave]) => clave === solicitada)?.[0] ?? "resumen";
+  // Cada pestaña pide solo sus datos, y el historial va en paralelo con el caso.
+  const [respuesta, formatearFecha, historial] = await Promise.all([
+    obtenerCaso(id, seccion),
+    obtenerFormatoFecha(),
+    seccion === "historial"
+      ? pedir<PaginaHistorial>(
+          `/convivencia/casos/${encodeURIComponent(id)}/historial${antes ? `?antes=${encodeURIComponent(typeof antes === "string" ? antes : "invalida")}` : ""}`,
+        )
+      : null,
+  ]);
+  if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia/casos" />;
+  const caso = respuesta.datos;
   const ruta = `/convivencia/casos/${caso.id}`;
   const nombres = [
     ...new Set(
@@ -175,12 +180,6 @@ export default async function PaginaCaso({
         .map((p) => `${p.nombres} ${p.apellidos}`),
     ),
   ];
-  const historial =
-    seccion === "historial"
-      ? await pedir<PaginaHistorial>(
-          `${ruta}/historial${antes ? `?antes=${encodeURIComponent(typeof antes === "string" ? antes : "invalida")}` : ""}`,
-        )
-      : null;
   const textoAviso = aviso ? AVISOS[aviso] : undefined;
 
   return (

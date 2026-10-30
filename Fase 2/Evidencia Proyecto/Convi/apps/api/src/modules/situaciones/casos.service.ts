@@ -68,6 +68,7 @@ import {
   type OpcionesNormativa,
   type RevisionNormativa,
 } from './revision-normativa.js';
+import { cargadorDeSeccion, type SeccionCaso } from './seccion-caso.js';
 import { validarVinculacion } from './vinculacion-caso.js';
 
 // PB-053 (HU-046): casos de convivencia. Solo Convivencia los abre y los ve;
@@ -226,7 +227,14 @@ export class CasosService {
     );
   }
 
-  detalle(sesion: Sesion, id: string): Promise<DetalleCaso> {
+  // Con sección, solo se consulta lo que muestra esa pestaña de la ficha y el
+  // resto va vacío (seccion-caso.ts); sin sección se devuelve todo.
+  detalle(
+    sesion: Sesion,
+    id: string,
+    seccion?: SeccionCaso,
+  ): Promise<DetalleCaso> {
+    const cargar = cargadorDeSeccion(seccion);
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
@@ -278,62 +286,148 @@ export class CasosService {
            ORDER BY p.apellidos, p.nombres`,
           [id],
         );
-        const situaciones = await db.query<
-          DetalleCaso['situaciones_vinculadas'][number]
-        >(
-          `SELECT s.id, s.codigo, cat.nombre AS categoria, s.ocurrido_en,
-                  s.vinculado_a_caso_en,
-                  pv.nombres || ' ' || pv.apellidos AS vinculado_por,
-                  (SELECT r.fundamento FROM convi.revisiones_convivencia r
-                   WHERE r.situacion_id = s.id AND r.resultado = 'VINCULADA_CASO'
-                     AND r.caso_destino_id = s.caso_id
-                   ORDER BY r.revisado_en DESC LIMIT 1) AS fundamento_vinculacion
-           FROM convi.situaciones s
-           LEFT JOIN convi.categorias_convivencia cat ON cat.id = s.categoria_id
-           JOIN convi.membresias_establecimiento mv ON mv.id = s.vinculado_a_caso_por
-           JOIN convi.personas pv ON pv.id = mv.persona_id
-           WHERE s.caso_id = $1
-           ORDER BY s.ocurrido_en, s.codigo`,
-          [id],
+        const situaciones = await cargar(
+          'situaciones_vinculadas',
+          async () =>
+            (
+              await db.query<DetalleCaso['situaciones_vinculadas'][number]>(
+                `SELECT s.id, s.codigo, cat.nombre AS categoria, s.ocurrido_en,
+                        s.vinculado_a_caso_en,
+                        pv.nombres || ' ' || pv.apellidos AS vinculado_por,
+                        (SELECT r.fundamento FROM convi.revisiones_convivencia r
+                         WHERE r.situacion_id = s.id AND r.resultado = 'VINCULADA_CASO'
+                           AND r.caso_destino_id = s.caso_id
+                         ORDER BY r.revisado_en DESC LIMIT 1) AS fundamento_vinculacion
+                 FROM convi.situaciones s
+                 LEFT JOIN convi.categorias_convivencia cat ON cat.id = s.categoria_id
+                 JOIN convi.membresias_establecimiento mv ON mv.id = s.vinculado_a_caso_por
+                 JOIN convi.personas pv ON pv.id = mv.persona_id
+                 WHERE s.caso_id = $1
+                 ORDER BY s.ocurrido_en, s.codigo`,
+                [id],
+              )
+            ).rows,
+          [],
         );
-        const permitidos = await estadosPermitidos(db, caso.estado_actual);
-        const hoy = await db.query<{ hoy: string; ahora: string }>(
-          `SELECT ${HOY_ESCUELA}::text AS hoy,
-                  to_char(now() AT TIME ZONE (SELECT zona_horaria FROM convi.establecimientos
-                    WHERE id = convi.establecimiento_actual()), 'YYYY-MM-DD"T"HH24:MI') AS ahora`,
+        const permitidos = await cargar(
+          'estado',
+          () => estadosPermitidos(db, caso.estado_actual),
+          { intermedios: [], cierre: false },
+        );
+        const fechas = await cargar(
+          'fechas',
+          async () =>
+            (
+              await db.query<{ hoy: string; ahora: string }>(
+                `SELECT ${HOY_ESCUELA}::text AS hoy,
+                        to_char(now() AT TIME ZONE (SELECT zona_horaria FROM convi.establecimientos
+                          WHERE id = convi.establecimiento_actual()), 'YYYY-MM-DD"T"HH24:MI') AS ahora`,
+              )
+            ).rows[0],
+          { hoy: '', ahora: '' },
         );
         return {
           ...caso,
           participantes: participantes.rows,
-          situaciones_vinculadas: situaciones.rows,
-          movimientos: await movimientosDelCaso(db, id),
-          ultimo_movimiento_id: await ultimoMovimiento(db, id),
+          situaciones_vinculadas: situaciones,
+          movimientos: await cargar(
+            'estado',
+            () => movimientosDelCaso(db, id),
+            [],
+          ),
+          ultimo_movimiento_id: await cargar(
+            'estado',
+            () => ultimoMovimiento(db, id),
+            null,
+          ),
           estados_permitidos: permitidos.intermedios,
           puede_cerrar: permitidos.cierre,
-          pendientes: await pendientesDelCaso(db, id),
-          actas_cierre: await actasDelCaso(db, id),
-          evidencias: await evidenciasDelCaso(db, id),
-          protocolos_aplicados: await protocolosDelCaso(db, id),
-          protocolos_aplicables: await protocolosAplicables(db),
-          revisiones_normativas: await revisionesNormativasDelCaso(db, id),
-          opciones_normativa: await opcionesNormativa(db),
-          planes_intervencion: await planesDelCaso(db, id),
-          responsables_accion: await responsablesDeAccion(db),
-          hoy: hoy.rows[0].hoy,
-          ahora: hoy.rows[0].ahora,
-          compromisos: await compromisosDelCaso(db, id),
-          seguimientos: await seguimientosDelCaso(db, id),
-          actuaciones_origen: (
-            await db.query(
-              'SELECT id,objetivo FROM convi.actuaciones WHERE caso_id=$1 ORDER BY creado_en DESC,id',
-              [id],
-            )
-          ).rows,
-          encuentros: await encuentrosDelCaso(db, id),
+          pendientes: await cargar('estado', () => pendientesDelCaso(db, id), {
+            actuaciones: 0,
+            compromisos: 0,
+            acciones_plan: 0,
+            pasos_protocolo: 0,
+          }),
+          actas_cierre: await cargar('estado', () => actasDelCaso(db, id), []),
+          evidencias: await cargar(
+            'evidencias',
+            () => evidenciasDelCaso(db, id),
+            [],
+          ),
+          protocolos_aplicados: await cargar(
+            'protocolos_aplicados',
+            () => protocolosDelCaso(db, id),
+            [],
+          ),
+          protocolos_aplicables: await cargar(
+            'normativa',
+            () => protocolosAplicables(db),
+            [],
+          ),
+          revisiones_normativas: await cargar(
+            'normativa',
+            () => revisionesNormativasDelCaso(db, id),
+            [],
+          ),
+          opciones_normativa: await cargar(
+            'normativa',
+            () => opcionesNormativa(db),
+            { protocolos: [], documentos: [] },
+          ),
+          planes_intervencion: await cargar(
+            'plan',
+            () => planesDelCaso(db, id),
+            [],
+          ),
+          responsables_accion: await cargar(
+            'plan',
+            () => responsablesDeAccion(db),
+            [],
+          ),
+          hoy: fechas.hoy,
+          ahora: fechas.ahora,
+          compromisos: await cargar(
+            'compromisos_seguimientos',
+            () => compromisosDelCaso(db, id),
+            [],
+          ),
+          seguimientos: await cargar(
+            'compromisos_seguimientos',
+            () => seguimientosDelCaso(db, id),
+            [],
+          ),
+          actuaciones_origen: await cargar(
+            'actuaciones_origen',
+            async () =>
+              (
+                await db.query<{ id: string; objetivo: string }>(
+                  'SELECT id,objetivo FROM convi.actuaciones WHERE caso_id=$1 ORDER BY creado_en DESC,id',
+                  [id],
+                )
+              ).rows,
+            [],
+          ),
+          encuentros: await cargar(
+            'encuentros',
+            () => encuentrosDelCaso(db, id),
+            [],
+          ),
           opciones_encuentro: {
-            responsables: await responsablesDeEncuentro(db),
-            asistentes: await asistentesPosibles(db, id),
-            acciones_plan: await accionesParaEncuentro(db, id),
+            responsables: await cargar(
+              'personas_encuentro',
+              () => responsablesDeEncuentro(db),
+              [],
+            ),
+            asistentes: await cargar(
+              'personas_encuentro',
+              () => asistentesPosibles(db, id),
+              [],
+            ),
+            acciones_plan: await cargar(
+              'acciones_encuentro',
+              () => accionesParaEncuentro(db, id),
+              [],
+            ),
           },
         };
       },

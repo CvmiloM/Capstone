@@ -6,11 +6,13 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 import { CasosService } from './casos.service.js';
+import { leerSeccionCaso } from './seccion-caso.js';
 
 // PB-053: casos del portal de Convivencia. El decorador de la clase aplica a
 // todas las rutas: solo entra una cuenta CONVIVENCIA activa con segundo
@@ -25,12 +27,14 @@ export class CasosController {
     return this.casos.listar(peticion.sesion);
   }
 
+  // ?seccion= trae solo lo que muestra esa pestaña de la ficha (seccion-caso.ts).
   @Get('casos/:id')
   detalle(
     @Req() peticion: PeticionConSesion,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query('seccion') seccion: unknown,
   ) {
-    return this.casos.detalle(peticion.sesion, id);
+    return this.casos.detalle(peticion.sesion, id, leerSeccionCaso(seccion));
   }
 
   // PB-152: el cuerpo trae { estado_nuevo, motivo, movimiento_anterior_id };
