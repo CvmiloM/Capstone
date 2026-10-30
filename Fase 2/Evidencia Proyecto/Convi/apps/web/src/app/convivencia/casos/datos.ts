@@ -113,6 +113,9 @@ export type DetalleCaso = CasoLista & {
   /** AAAA-MM-DDTHH:MM en la hora de la escuela, tope de las fechas reales. */
   ahora: string;
   /** PB-063 y PB-064 (HU-055): encuentros del caso con sus asistentes. */
+  compromisos: Compromiso[];
+  seguimientos: Seguimiento[];
+  actuaciones_origen: { id: string; objetivo: string }[];
   encuentros: Encuentro[];
   opciones_encuentro: {
     responsables: { id: string; nombre: string }[];
@@ -290,3 +293,15 @@ export function formatearDia(dia: string) {
   const [anio, mes, diaDelMes] = dia.split("-");
   return `${diaDelMes}-${mes}-${anio}`;
 }
+
+export type Compromiso = {
+ id: string; descripcion: string; responsable: string; estado: string; vence_en: string;
+ vencido: boolean; version: string; origen: string | null; creado_por: string; creado_en: string;
+ revisiones: { id: string; actuacion_id: string; estado: string; observacion: string; registrado_en: string; autor: string }[];
+};
+export type Seguimiento = {
+ id: string; estado: string; objetivo: string; responsable: string; programado_en: string; programado_local: string;
+ realizado_en: string | null; resultado: string | null; proxima_accion: string | null; version: string;
+ siguiente_id: string | null; seguimiento_anterior_id: string | null;
+ reprogramaciones: { fecha_anterior: string; fecha_nueva: string; motivo: string; ocurrido_en: string }[];
+};

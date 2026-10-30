@@ -72,3 +72,5 @@ export const NOMBRE_ROL_ASISTENTE: Record<string, string> = {
   APODERADO: "Apoderado o apoderada",
   EQUIPO: "Equipo de la escuela",
 };
+
+export const ESTADOS_CUMPLIMIENTO: [string,string][] = [["PENDIENTE","Pendiente"],["EN_PROGRESO","En progreso"],["COMPLETADO","Completado"],["VENCIDO","Vencido"],["CANCELADO","Cancelado"]];

@@ -1,3 +1,4 @@
+import { compromisosDelCaso, seguimientosDelCaso } from './seguimientos.js';
 import {
   BadRequestException,
   ConflictException,
@@ -157,6 +158,9 @@ export type DetalleCaso = CasoLista & {
   /** AAAA-MM-DDTHH:MM en la hora de la escuela, tope de las fechas reales. */
   ahora: string;
   /** PB-063 y PB-064 (HU-055): encuentros del caso con sus asistentes. */
+  compromisos: Awaited<ReturnType<typeof compromisosDelCaso>>;
+  seguimientos: Awaited<ReturnType<typeof seguimientosDelCaso>>;
+  actuaciones_origen: { id: string; objetivo: string }[];
   encuentros: Encuentro[];
   opciones_encuentro: {
     responsables: { id: string; nombre: string }[];
@@ -304,6 +308,9 @@ export class CasosService {
           responsables_accion: await responsablesDeAccion(db),
           hoy: hoy.rows[0].hoy,
           ahora: hoy.rows[0].ahora,
+          compromisos: await compromisosDelCaso(db, id),
+          seguimientos: await seguimientosDelCaso(db, id),
+          actuaciones_origen: (await db.query('SELECT id,objetivo FROM convi.actuaciones WHERE caso_id=$1 ORDER BY creado_en DESC,id', [id])).rows,
           encuentros: await encuentrosDelCaso(db, id),
           opciones_encuentro: {
             responsables: await responsablesDeEncuentro(db),
