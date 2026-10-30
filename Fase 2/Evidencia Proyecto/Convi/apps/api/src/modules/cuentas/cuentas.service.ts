@@ -9,10 +9,12 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
 import { comprobarCorreoApoderado } from '../academico/correo-apoderado.js';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { errorDeCampos, validarInvitacion } from './nueva-invitacion.js';
+import { validarReenvio } from './reenvio.js';
 import {
   ejecutarRestablecimiento,
   prepararRestablecimiento,
@@ -206,7 +208,14 @@ export class CuentasService {
   }
 
   // PB-011: el correo sale de la cuenta guardada, nunca de lo que manda el navegador.
-  reenviar(sesion: Sesion, id: string): Promise<InvitacionEnviada> {
+  // PB-146 (HU-125): la clave de la solicitud es el id del evento de auditoría,
+  // así la misma solicitud repetida envía un solo correo y responde lo mismo.
+  reenviar(
+    sesion: Sesion,
+    id: string,
+    cuerpo?: unknown,
+  ): Promise<InvitacionEnviada> {
+    const { solicitud_id } = validarReenvio(cuerpo);
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
@@ -222,9 +231,52 @@ export class CuentasService {
         );
         const cuenta = resultado.rows[0];
         if (!cuenta) throw new NotFoundException('La cuenta no existe.');
+        const respuesta = {
+          id: cuenta.id,
+          correo: cuenta.correo,
+          perfil: cuenta.perfil,
+          estado: cuenta.estado,
+        };
+
+        // Con el bloqueo de la cuenta, una repetición espera a que termine la
+        // primera y aquí ve su evento: responde lo mismo sin enviar otro correo.
+        if (solicitud_id) {
+          const previa = await db.query<{ recurso_id: string }>(
+            `SELECT recurso_id FROM convi.eventos_auditoria
+             WHERE id = $1 AND codigo_accion = 'INVITACION_REENVIADA'`,
+            [solicitud_id],
+          );
+          if (previa.rows[0]) {
+            if (previa.rows[0].recurso_id !== cuenta.id)
+              throw new ConflictException(
+                'Esta solicitud ya corresponde a otro reenvío, actualiza la página.',
+              );
+            return respuesta;
+          }
+        }
         if (cuenta.estado !== 'PENDIENTE' || cuenta.auth_usuario_id)
           throw new ConflictException(
             'Solo puedes reenviar una invitación pendiente.',
+          );
+
+        // El evento va antes del correo: si el envío falla, la transacción lo
+        // deshace y la misma solicitud se puede reintentar.
+        const evento = await db.query(
+          `INSERT INTO convi.eventos_auditoria(id, establecimiento_id, membresia_actor_id,
+             codigo_accion, tipo_recurso, recurso_id, codigo_resultado, solicitud_id, metadatos)
+           VALUES($1, $2, $3, 'INVITACION_REENVIADA', 'membresias_establecimiento',
+                  $4, 'OK', $1, '{}')
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            solicitud_id ?? randomUUID(),
+            sesion.establecimiento_id,
+            sesion.membresia_id,
+            cuenta.id,
+          ],
+        );
+        if (!evento.rowCount)
+          throw new ConflictException(
+            'Esta solicitud ya se usó en otra acción, actualiza la página.',
           );
 
         let { error } = await this.supabase.auth.admin.inviteUserByEmail(
@@ -246,13 +298,10 @@ export class CuentasService {
           );
         }
         // Se conservan persona, escuela, perfil y quién hizo la invitación original.
-        return {
-          id: cuenta.id,
-          correo: cuenta.correo,
-          perfil: cuenta.perfil,
-          estado: cuenta.estado,
-        };
+        return respuesta;
       },
+      // Con READ COMMITTED la repetición ve el evento de la primera en vez de fallar por serialización.
+      'READ COMMITTED',
     );
   }
 

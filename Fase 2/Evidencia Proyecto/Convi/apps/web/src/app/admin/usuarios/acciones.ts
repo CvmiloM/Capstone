@@ -50,8 +50,11 @@ export async function invitarCuenta(
 
 export type EstadoReenvio = { mensaje?: string; reenviado?: boolean };
 
-export async function reenviarCuenta(id: string): Promise<EstadoReenvio> {
-  const resultado = await reenviarInvitacion(id);
+export async function reenviarCuenta(
+  id: string,
+  solicitudId: string,
+): Promise<EstadoReenvio> {
+  const resultado = await reenviarInvitacion(id, solicitudId);
   if (!resultado.ok) return { mensaje: resultado.mensaje };
   revalidatePath("/admin/usuarios");
   return { reenviado: true };

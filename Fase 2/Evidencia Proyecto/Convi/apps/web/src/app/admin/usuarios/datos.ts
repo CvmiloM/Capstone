@@ -68,10 +68,17 @@ export async function enviarInvitacion(cuerpo: {
   return enviar("/admin/cuentas/invitaciones", cuerpo);
 }
 
+/**
+ * PB-146 (HU-125): la clave de la solicitud viene de la página. Si el envío se
+ * repite con la misma clave, la API responde lo mismo sin mandar otro correo.
+ */
 export async function reenviarInvitacion(
   id: string,
+  solicitudId: string,
 ): Promise<ResultadoInvitacion> {
-  return enviar(`/admin/cuentas/${encodeURIComponent(id)}/reenviar-invitacion`);
+  return enviar(`/admin/cuentas/${encodeURIComponent(id)}/reenviar-invitacion`, {
+    solicitud_id: solicitudId,
+  });
 }
 
 export async function invitarApoderado(vinculoId: string): Promise<ResultadoInvitacion> {
