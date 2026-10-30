@@ -4,9 +4,17 @@ import { useActionState } from "react";
 import { AvisoError, claseBotonSecundario } from "@/app/components/formulario";
 import { reenviarCuenta, type EstadoReenvio } from "./acciones";
 
-export function BotonReenvio({ cuentaId }: { cuentaId: string }) {
+// PB-146 (HU-125): la clave cambia solo cuando la página se vuelve a cargar,
+// así un reintento del mismo clic no manda un segundo correo.
+export function BotonReenvio({
+  cuentaId,
+  solicitudId,
+}: {
+  cuentaId: string;
+  solicitudId: string;
+}) {
   const [estado, accion, pendiente] = useActionState<EstadoReenvio>(
-    reenviarCuenta.bind(null, cuentaId),
+    reenviarCuenta.bind(null, cuentaId, solicitudId),
     {},
   );
 

@@ -152,12 +152,15 @@ function FechaCuenta({
 export function ListaCuentas({
   cuentas,
   solicitudes,
+  reenvios,
   zonaHoraria,
   perfilInicial,
   suspendidasInicial,
 }: {
   cuentas: CuentaEscuela[];
   solicitudes: Record<string, string>;
+  /** PB-146: clave de reenvío por cada cuenta pendiente. */
+  reenvios: Record<string, string>;
   zonaHoraria: string;
   perfilInicial: string;
   suspendidasInicial: boolean;
@@ -265,8 +268,11 @@ export function ListaCuentas({
                   {cuenta.es_propia && (
                     <p className="text-xs text-muted-foreground">Tu cuenta</p>
                   )}
-                  {cuenta.estado === "PENDIENTE" && (
-                    <BotonReenvio cuentaId={cuenta.id} />
+                  {cuenta.estado === "PENDIENTE" && reenvios[cuenta.id] && (
+                    <BotonReenvio
+                      cuentaId={cuenta.id}
+                      solicitudId={reenvios[cuenta.id]}
+                    />
                   )}
                   {cuenta.estado === "ACTIVO" && !cuenta.es_propia && (
                     <BotonSuspension

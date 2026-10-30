@@ -51,6 +51,11 @@ export default async function PaginaUsuarios({
         <ListaCuentas
           cuentas={cuentas}
           solicitudes={Object.fromEntries(cuentas.filter((c) => c.estado === "ACTIVO" && !c.es_propia && ["ADMIN", "CONVIVENCIA"].includes(c.perfil)).map((c) => [c.id, randomUUID()]))}
+          reenvios={Object.fromEntries(
+            cuentas
+              .filter((c) => c.estado === "PENDIENTE")
+              .map((c) => [c.id, randomUUID()]),
+          )}
           zonaHoraria={contexto.escuela.zonaHoraria}
           perfilInicial={perfil}
           suspendidasInicial={parametros.suspendidas === "1"}

@@ -65,8 +65,9 @@ export class CuentasController {
   reenviar(
     @Req() peticion: PeticionConSesion,
     @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() cuerpo: unknown,
   ) {
-    return this.cuentas.reenviar(peticion.sesion, id);
+    return this.cuentas.reenviar(peticion.sesion, id, cuerpo);
   }
 
   @Post('apoderados/:vinculoId/invitacion')

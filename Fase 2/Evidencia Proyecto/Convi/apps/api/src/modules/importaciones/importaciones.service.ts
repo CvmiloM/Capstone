@@ -34,6 +34,7 @@ import {
   sesionDelTrabajo,
   type TrabajoConfirmacion,
 } from './cola.js';
+import { confirmacionRepetida } from './confirmacion-repetida.js';
 import { cargarContexto } from './contexto.js';
 import {
   type ArchivoSubido,
@@ -487,8 +488,15 @@ export class ImportacionesService {
     const cola = this.exigirCola('iniciar');
     const incluirAdvertencias = objeto(cuerpo).incluir_advertencias === true;
 
-    const detalle = await this.operar(sesion, async (db) => {
+    const { detalle, repetida } = await this.operar(sesion, async (db) => {
       const proceso = await bloquear(db, id);
+      // PB-146 (HU-125): la misma confirmación repetida (doble clic, la red la
+      // reintenta) no inicia otra: responde la misma importación con su avance.
+      if (confirmacionRepetida(proceso.estado))
+        return {
+          repetida: true,
+          detalle: await buscar(db, id, { estado: null, pagina: 1 }),
+        };
       exigirRevision(proceso.estado, 'confirmar');
       const tipo = proceso.tipo_importacion;
       // Las mismas opciones de la última revisión.
@@ -568,8 +576,12 @@ export class ImportacionesService {
           JSON.stringify(confirmacion),
         ],
       );
-      return buscar(db, id, { estado: null, pagina: 1 });
+      return {
+        repetida: false,
+        detalle: await buscar(db, id, { estado: null, pagina: 1 }),
+      };
     });
+    if (repetida) return this.conEnCurso(id, detalle);
     if (detalle.estado !== 'PROCESANDO') return detalle;
 
     try {
