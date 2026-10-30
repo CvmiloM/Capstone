@@ -212,8 +212,11 @@ export function obtenerCasos() {
   return pedir<{ casos: CasoLista[]; limite: number }>("/convivencia/casos");
 }
 
-export function obtenerCaso(id: string) {
-  return pedir<DetalleCaso>(`/convivencia/casos/${encodeURIComponent(id)}`);
+// La API trae solo lo que muestra la pestaña; lo de las demás llega vacío.
+export function obtenerCaso(id: string, seccion: string) {
+  return pedir<DetalleCaso>(
+    `/convivencia/casos/${encodeURIComponent(id)}?seccion=${encodeURIComponent(seccion)}`,
+  );
 }
 
 // PB-061 y PB-062 (HU-054): la API vuelve a validar todo.
