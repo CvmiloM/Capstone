@@ -2,6 +2,10 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { MarcaCompacta } from "@/app/components/marca";
 import { BotonCerrarSesion } from "@/app/components/boton-cerrar-sesion";
+import {
+  EsqueletoUsuarioPortal,
+  UsuarioPortal,
+} from "@/app/components/usuario-portal";
 import { Navegacion } from "./navegacion";
 
 // Portal del perfil CONVIVENCIA (PB-044). El proxy de PB-009 exige sesión,
@@ -40,6 +44,9 @@ export default function LayoutConvivencia({
           <Navegacion />
         </Suspense>
         <div className="border-t border-border px-4 py-3">
+          <Suspense fallback={<EsqueletoUsuarioPortal />}>
+            <UsuarioPortal />
+          </Suspense>
           <BotonCerrarSesion />
         </div>
       </aside>
