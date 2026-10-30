@@ -25,43 +25,57 @@ import { SeguimientoCaso } from "./seguimientos";
 import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
 import { PlanIntervencion } from "./plan-intervencion";
+import { ResumenCaso } from "./resumen";
+import {
+  claseBotonPrimario,
+  claseBotonSecundario,
+} from "@/app/components/formulario";
+import {
+  ListaHistorial,
+  type PaginaHistorial,
+} from "@/app/components/auditoria/lista-historial";
+import { pedir } from "../../datos";
 
 export const metadata: Metadata = { title: "Caso" };
 
 const AVISOS: Record<string, string> = {
   seguimiento: "Guardaste los cambios del seguimiento",
-  compromiso: "Registraste el compromiso, su cumplimiento se revisará en un seguimiento",
+  compromiso:
+    "Registraste el compromiso, su cumplimiento se revisará en un seguimiento",
   creado:
-    "Abriste el caso. Quedó En análisis con su código, y la situación de origen y sus estudiantes quedaron vinculados.",
+    "Abriste el caso, quedó En análisis con su código, y la situación de origen y sus estudiantes quedaron vinculados.",
   vinculada:
-    "Vinculaste la situación al caso. Quedó en sus situaciones vinculadas con tu nombre, la fecha y el fundamento, y los estudiantes que faltaban se sumaron al caso.",
+    "Vinculaste la situación al caso, quedó en sus situaciones vinculadas con tu nombre, la fecha y el fundamento, y los estudiantes que faltaban se sumaron al caso.",
   estado:
-    "Cambiaste el estado del caso. El cambio quedó en su historial con tu nombre, la fecha y el motivo.",
+    "Cambiaste el estado del caso, el cambio quedó en su historial con tu nombre, la fecha y el motivo.",
   cerrado:
-    "Cerraste el caso. El cierre quedó en su historial con el resumen, y sus antecedentes se conservan.",
+    "Cerraste el caso, el cierre quedó en su historial con el resumen, y sus antecedentes se conservan.",
   evidencia:
-    "Adjuntaste la evidencia al caso. Quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
+    "Adjuntaste la evidencia al caso, quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
   protocolo:
-    "Aplicaste el protocolo. Sus pasos quedaron en el caso con su vencimiento y su responsable.",
+    "Aplicaste el protocolo, sus pasos quedaron en el caso con su vencimiento y su responsable.",
   normativa:
-    "Registraste por qué el caso sigue sin protocolo. Quedó con tu nombre y la fecha.",
+    "Registraste por qué el caso sigue sin protocolo, quedó con tu nombre y la fecha.",
   // PB-061 y PB-062 (HU-054): plan de intervención y sus acciones.
-  plan: "Creaste el plan de intervención del caso. Ahora puedes agregarle acciones.",
+  plan: "Creaste el plan de intervención del caso, ahora puedes agregarle acciones.",
   "plan-estado":
-    "Cambiaste el estado del plan. Si lo terminaste, quedó la fecha de término y el motivo en la auditoría.",
-  accion: "Agregaste la acción al plan. Quedó Pendiente con su responsable y su vencimiento.",
+    "Cambiaste el estado del plan, si lo terminaste, quedó la fecha de término y el motivo en la auditoría.",
+  accion:
+    "Agregaste la acción al plan, quedó Pendiente con su responsable y su vencimiento.",
   "accion-estado": "Registraste el avance de la acción.",
   "accion-corregida":
-    "Corregiste la acción. La auditoría guarda el valor anterior, el nuevo y el motivo.",
+    "Corregiste la acción, la auditoría guarda el valor anterior, el nuevo y el motivo.",
   // PB-063 y PB-064 (HU-055): encuentros del caso.
   encuentro:
-    "Programaste el encuentro. Quedó Planificado con tu nombre como autor y sus asistentes Pendientes.",
-  "encuentro-asistentes": "Agregaste asistentes al encuentro. Quedaron Pendientes.",
+    "Programaste el encuentro, quedó Planificado con tu nombre como autor y sus asistentes Pendientes.",
+  "encuentro-asistentes":
+    "Agregaste asistentes al encuentro, quedaron Pendientes.",
   "encuentro-reprogramado":
-    "Reprogramaste el encuentro. Quedó Pospuesto con la nueva fecha; la anterior y el motivo quedan en la auditoría.",
+    "Reprogramaste el encuentro, quedó Pospuesto con la nueva fecha, la anterior y el motivo quedan en la auditoría.",
   "encuentro-realizado":
     "Registraste el encuentro como realizado, con su resultado y la asistencia de cada participante.",
-  "encuentro-cancelado": "Cancelaste el encuentro. El motivo queda en la auditoría.",
+  "encuentro-cancelado":
+    "Cancelaste el encuentro, el motivo queda en la auditoría.",
 };
 
 /** PB-082: estados del protocolo aplicado y de cada paso en el caso. */
@@ -82,7 +96,8 @@ const NOMBRE_ESTADO_PASO: Record<string, string> = {
 function textosPendientes(pendientes: DetalleCaso["pendientes"]) {
   const textos: string[] = [];
   const agregar = (cantidad: number, uno: string, varios: string) => {
-    if (cantidad > 0) textos.push(`${cantidad} ${cantidad === 1 ? uno : varios}`);
+    if (cantidad > 0)
+      textos.push(`${cantidad} ${cantidad === 1 ? uno : varios}`);
   };
   agregar(
     pendientes.actuaciones,
@@ -119,12 +134,53 @@ export default async function PaginaCaso({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ aviso?: string }>;
+  searchParams: Promise<{
+    aviso?: string;
+    seccion?: string;
+    antes?: string | string[];
+    nuevo?: string;
+    adjuntar?: string;
+  }>;
 }) {
-  const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
-  const [respuesta, formatearFecha] = await Promise.all([obtenerCaso(id), obtenerFormatoFecha()]);
+  const [{ id }, { aviso, seccion: solicitada, antes, nuevo, adjuntar }] =
+    await Promise.all([params, searchParams]);
+  const [respuesta, formatearFecha] = await Promise.all([
+    obtenerCaso(id),
+    obtenerFormatoFecha(),
+  ]);
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia/casos" />;
   const caso = respuesta.datos;
+  const secciones = [
+    ["resumen", "Resumen"],
+    ["participantes", "Participantes"],
+    ["situaciones", "Situaciones"],
+    ["protocolo", "Protocolo"],
+    ["plan", "Plan de intervención"],
+    ["encuentros", "Encuentros"],
+    ["compromisos", "Compromisos"],
+    ["seguimientos", "Seguimientos"],
+    ["evidencias", "Evidencias"],
+    ["ia", "Orientación IA"],
+    ["historial", "Historial"],
+    ["estado", "Estado y cierre"],
+  ];
+  const seccion = secciones.some(([clave]) => clave === solicitada)
+    ? solicitada
+    : "resumen";
+  const ruta = `/convivencia/casos/${caso.id}`;
+  const nombres = [
+    ...new Set(
+      caso.participantes
+        .filter((p) => p.estudiante_id)
+        .map((p) => `${p.nombres} ${p.apellidos}`),
+    ),
+  ];
+  const historial =
+    seccion === "historial"
+      ? await pedir<PaginaHistorial>(
+          `${ruta}/historial${antes ? `?antes=${encodeURIComponent(typeof antes === "string" ? antes : "invalida")}` : ""}`,
+        )
+      : null;
   const textoAviso = aviso ? AVISOS[aviso] : undefined;
 
   return (
@@ -144,10 +200,16 @@ export default async function PaginaCaso({
 
       <div className="mt-4 mb-6">
         <p className="font-mono text-sm text-muted-foreground">{caso.codigo}</p>
-        <h1 className="mt-1 text-2xl font-semibold">{caso.titulo}</h1>
+        <h1 className="mt-1 text-2xl font-semibold">
+          {caso.titulo}
+          {nombres.length > 0 && (
+            <span className="font-normal"> — {nombres.join(", ")}</span>
+          )}
+        </h1>
         <div className="mt-3 flex flex-wrap gap-1.5">
           <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-            Estado: {NOMBRE_ESTADO_CASO[caso.estado_actual] ?? caso.estado_actual}
+            Estado:{" "}
+            {NOMBRE_ESTADO_CASO[caso.estado_actual] ?? caso.estado_actual}
           </span>
           {caso.registro_historico && (
             <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
@@ -157,360 +219,480 @@ export default async function PaginaCaso({
         </div>
       </div>
 
-      <Link href={`/convivencia/casos/${caso.id}/historial`} className={`mb-6 inline-flex text-sm ${claseEnlace}`}>
-        Ver historial del caso y sus cambios →
-      </Link>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Seccion titulo="Resumen" className="lg:col-span-2">
-          <p className="whitespace-pre-line text-sm">{caso.resumen}</p>
-          {caso.justificacion_independiente && (
-            <div className="mt-4 border-t border-border pt-4 text-sm">
-              <p className="text-xs text-muted-foreground">
-                Por qué se abrió aparte de otros casos activos de los mismos estudiantes
-              </p>
-              <p className="mt-1 whitespace-pre-line">{caso.justificacion_independiente}</p>
-            </div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <p className="text-muted-foreground">
+          Responsable:{" "}
+          <span className="text-foreground">{caso.responsable}</span> · Inicio{" "}
+          {formatearDia(caso.fecha_inicio)}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {caso.estado_actual !== "CERRADO" && (
+            <Link
+              href={`${ruta}?seccion=seguimientos&nuevo=1#nuevo-seguimiento`}
+              className={claseBotonSecundario}
+            >
+              Programar seguimiento
+            </Link>
           )}
-        </Seccion>
-
-        <Seccion titulo="Datos del caso">
-          <dl className="space-y-3 text-sm">
-            <Dato nombre="Inicio">{formatearDia(caso.fecha_inicio)}</Dato>
-            <Dato nombre="Responsable">{caso.responsable}</Dato>
-            <Dato nombre="Categoría principal">{caso.categoria ?? "Sin categoría"}</Dato>
-            <Dato nombre="Cierre sugerido">
-              {caso.fecha_limite_cierre
-                ? `${formatearDia(caso.fecha_limite_cierre)} (${caso.plazo_cierre_dias_aplicado} días)`
-                : "La escuela no tiene plazo sugerido"}
-            </Dato>
-            <Dato nombre="Abierto">
-              {formatearFecha(caso.abierto_en)} por {caso.abierto_por}
-            </Dato>
-            {caso.cerrado_en && (
-              <Dato nombre="Cerrado">{formatearFecha(caso.cerrado_en)}</Dato>
-            )}
-          </dl>
-        </Seccion>
-
-        <Seccion titulo="Orientación con IA" className="lg:col-span-3">
-          <OrientacionCaso casoId={caso.id} />
-        </Seccion>
-
-        <Seccion titulo="Estudiantes del caso" className="lg:col-span-3">
-          {caso.participantes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">El caso no tiene estudiantes.</p>
-          ) : (
-            <ul className="divide-y divide-border text-sm">
-              {caso.participantes.map((p) => (
-                <li
-                  key={`${p.codigo_estudiante ?? ""}-${p.apellidos}-${p.nombres}-${p.rol}`}
-                  className="flex flex-wrap items-center justify-between gap-2 py-2.5"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {p.estudiante_id ? (
-                        <Link
-                          href={`/convivencia/estudiantes/${p.estudiante_id}`}
-                          className={claseEnlace}
-                        >
-                          {p.apellidos}, {p.nombres}
-                        </Link>
-                      ) : (
-                        `${p.apellidos}, ${p.nombres}`
-                      )}
-                      {p.codigo_estudiante && (
-                        <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
-                          {p.codigo_estudiante}
-                        </span>
-                      )}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {p.curso_matricula
-                        ? `Curso al ocurrir el hecho: ${p.curso_matricula}`
-                        : "Curso histórico no registrado"}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                    {NOMBRE_ROL_EN_SITUACION[p.rol] ?? p.rol}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          {caso.estado_actual !== "CERRADO" && (
+            <Link
+              href={`${ruta}?seccion=evidencias&adjuntar=1#agregar-evidencia`}
+              className={claseBotonPrimario}
+            >
+              Agregar evidencia
+            </Link>
           )}
-        </Seccion>
-
-        <Seccion titulo="Situaciones vinculadas" className="lg:col-span-3">
-          {caso.situaciones_vinculadas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              El caso no tiene situaciones vinculadas.
+        </div>
+      </div>
+      <nav
+        aria-label="Secciones del caso"
+        className="mb-6 flex gap-1 overflow-x-auto border-b border-border pb-3"
+      >
+        {secciones.map(([clave, texto]) => (
+          <Link
+            key={clave}
+            href={`${ruta}?seccion=${clave}`}
+            scroll={false}
+            aria-current={seccion === clave ? "page" : undefined}
+            className={`min-h-11 shrink-0 rounded-xl px-3 py-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring ${seccion === clave ? "bg-primary font-semibold text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+          >
+            {texto}
+          </Link>
+        ))}
+      </nav>
+      {seccion === "resumen" && (
+        <ResumenCaso caso={caso} fecha={formatearFecha} />
+      )}
+      {seccion === "historial" &&
+        (historial?.ok ? (
+          <Seccion titulo="Historial del caso">
+            <p className="mb-4 text-sm text-muted-foreground">
+              Hechos y cambios registrados, con su fecha y autor
             </p>
-          ) : (
-            <ul className="divide-y divide-border text-sm">
-              {caso.situaciones_vinculadas.map((s) => (
-                <li key={s.id} className="py-2.5">
-                  <Link href={`/convivencia/situaciones/${s.id}`} className={claseEnlace}>
-                    <span className="font-mono">{s.codigo}</span>
-                  </Link>{" "}
-                  · {s.categoria ?? "Sin categoría"}
-                  {/* PB-052 (HU-045 CA2): quién la vinculó, cuándo y por qué. */}
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Ocurrió el {formatearFecha(s.ocurrido_en)} · vinculada el{" "}
-                    {formatearFecha(s.vinculado_a_caso_en)} por {s.vinculado_por}
-                  </p>
-                  {s.fundamento_vinculacion && (
-                    <p className="mt-1 whitespace-pre-line text-muted-foreground">
-                      {s.fundamento_vinculacion}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Seccion>
+            <ListaHistorial
+              pagina={historial.datos}
+              ruta={`${ruta}?seccion=historial`}
+              anteriores={Boolean(antes)}
+              fecha={formatearFecha}
+            />
+          </Seccion>
+        ) : (
+          <AvisoNoDisponible volverA={ruta} />
+        ))}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {seccion === "ia" && (
+          <Seccion titulo="Orientación con IA" className="lg:col-span-3">
+            <OrientacionCaso casoId={caso.id} />
+          </Seccion>
+        )}
 
-        {/* PB-066 (HU-057): evidencias del caso y de sus situaciones vinculadas. */}
-        <Seccion titulo="Evidencias del expediente" className="lg:col-span-3">
-          <ListaEvidencias
-            evidencias={caso.evidencias}
-            rutaDescarga="/convivencia/evidencias"
-            vacio="Todavía no hay evidencias en el caso ni en sus situaciones."
-          />
-          <div className="mt-4 border-t border-border pt-4">
-            {caso.estado_actual === "CERRADO" ? (
+        {seccion === "participantes" && (
+          <Seccion titulo="Participantes del caso" className="lg:col-span-3">
+            {caso.participantes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                El caso está cerrado: conserva sus evidencias, pero no recibe nuevas.
+                El caso no tiene estudiantes.
               </p>
             ) : (
-              <FormularioEvidencia destino="convivencia-caso" registroId={caso.id} />
-            )}
-          </div>
-        </Seccion>
-
-        {/* PB-082 (HU-071): protocolo aplicado al caso, o por qué sigue sin uno. */}
-        <Seccion titulo="Protocolo" className="lg:col-span-3">
-          {caso.protocolos_aplicados.length === 0 &&
-            caso.revisiones_normativas.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Todavía no se aplica un protocolo ni se registra por qué el caso
-                sigue sin uno.
-              </p>
-            )}
-          {caso.protocolos_aplicados.map((aplicado) => (
-            <div key={aplicado.id} className="mb-4 rounded-xl border border-border p-4 text-sm">
-              <p className="font-medium">
-                {aplicado.protocolo} · versión {aplicado.numero_version}
-                <span className="ml-2 rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-                  {NOMBRE_ESTADO_PROTOCOLO[aplicado.estado] ?? aplicado.estado}
-                </span>
-              </p>
-              <p className="mt-1 whitespace-pre-line">{aplicado.fundamento}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Aplicado por {aplicado.aplicado_por} el {formatearFecha(aplicado.aplicado_en)}
-              </p>
-              <ol className="mt-3 divide-y divide-border border-t border-border">
-                {aplicado.pasos.map((paso) => (
+              <ul className="divide-y divide-border text-sm">
+                {caso.participantes.map((p) => (
                   <li
-                    key={paso.id}
-                    className="flex flex-wrap items-start justify-between gap-2 py-2"
+                    key={`${p.codigo_estudiante ?? ""}-${p.apellidos}-${p.nombres}-${p.rol}`}
+                    className="flex flex-wrap items-center justify-between gap-2 py-2.5"
                   >
                     <div>
-                      <p>
-                        {paso.orden_paso}. {paso.nombre}
+                      <p className="font-medium">
+                        {p.estudiante_id ? (
+                          <Link
+                            href={`/convivencia/estudiantes/${p.estudiante_id}`}
+                            className={claseEnlace}
+                          >
+                            {p.nombres} {p.apellidos}
+                          </Link>
+                        ) : (
+                          `${p.nombres} ${p.apellidos}`
+                        )}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {[
-                          paso.vence_en
-                            ? `Vence el ${formatearFecha(paso.vence_en)}`
-                            : "Sin plazo",
-                          paso.responsable
-                            ? `Responsable: ${paso.responsable}`
-                            : "Sin responsable asignado",
-                          paso.es_obligatorio ? null : "Opcional",
-                          paso.requiere_evidencia ? "Exige evidencia" : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
+                        {p.estudiante_id
+                          ? `Curso actual: ${p.curso_actual ?? "Sin matrícula activa"}`
+                          : "Participante del caso"}
+                        {p.rut ? ` · RUT: ${p.rut}` : ""}
                       </p>
+                      {p.curso_matricula && (
+                        <details className="mt-2 text-xs text-muted-foreground">
+                          <summary className="cursor-pointer py-1">
+                            Curso al registrar el caso
+                          </summary>
+                          <p className="mt-1">{p.curso_matricula}</p>
+                        </details>
+                      )}
                     </div>
                     <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                      {NOMBRE_ESTADO_PASO[paso.estado] ?? paso.estado}
+                      {NOMBRE_ROL_EN_SITUACION[p.rol] ?? p.rol}
                     </span>
                   </li>
                 ))}
-              </ol>
+              </ul>
+            )}
+          </Seccion>
+        )}
+
+        {seccion === "situaciones" && (
+          <Seccion titulo="Situaciones vinculadas" className="lg:col-span-3">
+            {caso.situaciones_vinculadas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                El caso no tiene situaciones vinculadas.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border text-sm">
+                {caso.situaciones_vinculadas.map((s) => (
+                  <li key={s.id} className="py-2.5">
+                    <Link
+                      href={`/convivencia/situaciones/${s.id}`}
+                      className={claseEnlace}
+                    >
+                      <span className="font-mono">{s.codigo}</span>
+                    </Link>{" "}
+                    · {s.categoria ?? "Sin categoría"}
+                    {/* PB-052 (HU-045 CA2): quién la vinculó, cuándo y por qué. */}
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Ocurrió el {formatearFecha(s.ocurrido_en)} · vinculada el{" "}
+                      {formatearFecha(s.vinculado_a_caso_en)} por{" "}
+                      {s.vinculado_por}
+                    </p>
+                    {s.fundamento_vinculacion && (
+                      <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                        {s.fundamento_vinculacion}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Seccion>
+        )}
+
+        {/* PB-066 (HU-057): evidencias del caso y de sus situaciones vinculadas. */}
+        {seccion === "evidencias" && (
+          <Seccion titulo="Evidencias del expediente" className="lg:col-span-3">
+            <ListaEvidencias
+              evidencias={caso.evidencias}
+              rutaDescarga="/convivencia/evidencias"
+              vacio="Todavía no hay evidencias en el caso ni en sus situaciones."
+            />
+            <div className="mt-4 border-t border-border pt-4">
+              {caso.estado_actual === "CERRADO" ? (
+                <p className="text-sm text-muted-foreground">
+                  El caso está cerrado: conserva sus evidencias, pero no recibe
+                  nuevas.
+                </p>
+              ) : (
+                <details
+                  open={adjuntar === "1"}
+                  id="agregar-evidencia"
+                  className="group rounded-xl bg-muted/50 p-4 open:bg-card [&:target]:outline-2 [&:target]:outline-ring"
+                >
+                  <summary className="min-h-11 cursor-pointer py-3 font-semibold text-primary">
+                    Agregar evidencia
+                  </summary>
+                  <div className="pt-4">
+                    <FormularioEvidencia
+                      destino="convivencia-caso"
+                      registroId={caso.id}
+                    />
+                  </div>
+                </details>
+              )}
             </div>
-          ))}
-          {caso.revisiones_normativas.map((r) => (
-            <div key={r.id} className="mb-4 rounded-xl border border-border p-4 text-sm">
-              <div className="flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-                  Sin protocolo · {APLICABILIDAD[r.aplicabilidad] ?? r.aplicabilidad}
-                </span>
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                  {MODO_REVISION[r.modo_revision] ?? r.modo_revision}
-                </span>
-              </div>
-              <p className="mt-2 whitespace-pre-line">{r.fundamento}</p>
-              {r.protocolo && (
-                <p className="mt-2 text-muted-foreground">
-                  Protocolo considerado: <span className="text-foreground">{r.protocolo}</span>
+          </Seccion>
+        )}
+
+        {/* PB-082 (HU-071): protocolo aplicado al caso, o por qué sigue sin uno. */}
+        {seccion === "protocolo" && (
+          <Seccion titulo="Protocolo" className="lg:col-span-3">
+            {caso.protocolos_aplicados.length === 0 &&
+              caso.revisiones_normativas.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Todavía no se aplica un protocolo ni se registra por qué el
+                  caso sigue sin uno.
                 </p>
               )}
-              {r.referencias.length > 0 && (
-                <ul className="mt-2 list-inside list-disc text-muted-foreground">
-                  {r.referencias.map((ref, n) => (
-                    <li key={n}>
-                          <Link className={claseEnlace} href={`/convivencia/documentos/versiones/${ref.version_documento_id}?pagina=${ref.pagina_desde ?? 1}`}>
-                            {ref.documento} ({ref.version})
-                          </Link>
-                      {ref.pagina_desde &&
-                        (ref.pagina_hasta && ref.pagina_hasta !== ref.pagina_desde
-                          ? `, páginas ${ref.pagina_desde} a ${ref.pagina_hasta}`
-                          : `, página ${ref.pagina_desde}`)}
-                      {ref.titulo_seccion && `, ${ref.titulo_seccion}`}
+            {caso.protocolos_aplicados.map((aplicado) => (
+              <div
+                key={aplicado.id}
+                className="mb-4 rounded-xl border border-border p-4 text-sm"
+              >
+                <p className="font-medium">
+                  {aplicado.protocolo} · versión {aplicado.numero_version}
+                  <span className="ml-2 rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                    {NOMBRE_ESTADO_PROTOCOLO[aplicado.estado] ??
+                      aplicado.estado}
+                  </span>
+                </p>
+                <p className="mt-1 whitespace-pre-line">
+                  {aplicado.fundamento}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Aplicado por {aplicado.aplicado_por} el{" "}
+                  {formatearFecha(aplicado.aplicado_en)}
+                </p>
+                <ol className="mt-3 divide-y divide-border border-t border-border">
+                  {aplicado.pasos.map((paso) => (
+                    <li
+                      key={paso.id}
+                      className="flex flex-wrap items-start justify-between gap-2 py-2"
+                    >
+                      <div>
+                        <p>
+                          {paso.orden_paso}. {paso.nombre}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {[
+                            paso.vence_en
+                              ? `Vence el ${formatearFecha(paso.vence_en)}`
+                              : "Sin plazo",
+                            paso.responsable
+                              ? `Responsable: ${paso.responsable}`
+                              : "Sin responsable asignado",
+                            paso.es_obligatorio ? null : "Opcional",
+                            paso.requiere_evidencia ? "Exige evidencia" : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                        {NOMBRE_ESTADO_PASO[paso.estado] ?? paso.estado}
+                      </span>
                     </li>
                   ))}
-                </ul>
-              )}
-              <p className="mt-2 text-xs text-muted-foreground">
-                Registrada por {r.revisado_por} el {formatearFecha(r.revisado_en)}
-              </p>
-            </div>
-          ))}
-          {caso.estado_actual !== "CERRADO" && (
-            <div className="mt-4 grid gap-6 border-t border-border pt-4 lg:grid-cols-2">
-              <div>
-                <h3 className="mb-3 text-sm font-semibold">Aplicar un protocolo</h3>
-                {caso.protocolos_aplicables.length > 0 ? (
-                  <FormularioAplicarProtocolo
-                    casoId={caso.id}
-                    protocolos={caso.protocolos_aplicables}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No hay protocolos publicados y vigentes. Se preparan y publican
-                    en{" "}
-                    <Link href="/convivencia/protocolos" className={claseEnlace}>
-                      Protocolos
-                    </Link>
-                    .
+                </ol>
+              </div>
+            ))}
+            {caso.revisiones_normativas.map((r) => (
+              <div
+                key={r.id}
+                className="mb-4 rounded-xl border border-border p-4 text-sm"
+              >
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                    Sin protocolo ·{" "}
+                    {APLICABILIDAD[r.aplicabilidad] ?? r.aplicabilidad}
+                  </span>
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                    {MODO_REVISION[r.modo_revision] ?? r.modo_revision}
+                  </span>
+                </div>
+                <p className="mt-2 whitespace-pre-line">{r.fundamento}</p>
+                {r.protocolo && (
+                  <p className="mt-2 text-muted-foreground">
+                    Protocolo considerado:{" "}
+                    <span className="text-foreground">{r.protocolo}</span>
                   </p>
                 )}
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold">O registrar que sigue sin protocolo</h3>
-                <p className="mt-1 mb-3 text-sm text-muted-foreground">
-                  Indica si la norma es aplicable y por qué no se aplica un
-                  protocolo. No se crea una aplicación ficticia.
+                {r.referencias.length > 0 && (
+                  <ul className="mt-2 list-inside list-disc text-muted-foreground">
+                    {r.referencias.map((ref, n) => (
+                      <li key={n}>
+                        <Link
+                          className={claseEnlace}
+                          href={`/convivencia/documentos/versiones/${ref.version_documento_id}?pagina=${ref.pagina_desde ?? 1}`}
+                        >
+                          {ref.documento} ({ref.version})
+                        </Link>
+                        {ref.pagina_desde &&
+                          (ref.pagina_hasta &&
+                          ref.pagina_hasta !== ref.pagina_desde
+                            ? `, páginas ${ref.pagina_desde} a ${ref.pagina_hasta}`
+                            : `, página ${ref.pagina_desde}`)}
+                        {ref.titulo_seccion && `, ${ref.titulo_seccion}`}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Registrada por {r.revisado_por} el{" "}
+                  {formatearFecha(r.revisado_en)}
                 </p>
-                <FormularioRevisionNormativa
-                  casoId={caso.id}
-                  protocolos={caso.opciones_normativa.protocolos}
-                  documentos={caso.opciones_normativa.documentos}
-                />
               </div>
-            </div>
-          )}
-        </Seccion>
-
-        {/* PB-061 y PB-062 (HU-054): plan de intervención con sus acciones. */}
-        <Seccion titulo="Plan de intervención" className="lg:col-span-3" id="plan-intervencion">
-          <PlanIntervencion caso={caso} formatearFecha={formatearFecha} />
-        </Seccion>
-
-        {/* PB-063 y PB-064 (HU-055): entrevistas, reuniones y otros encuentros. */}
-        <Seccion titulo="Encuentros" className="lg:col-span-3" id="encuentros">
-          <Encuentros caso={caso} formatearFecha={formatearFecha} />
-        </Seccion>
-
-        <Seccion titulo="Compromisos y seguimientos" className="lg:col-span-3" id="seguimientos">
-          <SeguimientoCaso caso={caso} formatearFecha={formatearFecha} />
-        </Seccion>
-
-        {/* PB-152 (HU-131 CA1) y PB-054 (HU-047 CA4): cada cambio queda en el historial. */}
-        <Seccion titulo="Historial de estados" className="lg:col-span-2">
-          {caso.movimientos.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              El caso sigue {nombreEstado(caso.estado_actual)}, el estado con que se
-              abrió.
-            </p>
-          ) : (
-            <ol className="space-y-4">
-              {caso.movimientos.map((m) => (
-                <li key={m.id} className="rounded-xl border border-border p-4 text-sm">
-                  <p className="font-medium">
-                    {nombreEstado(m.estado_anterior)} → {nombreEstado(m.estado_nuevo)}
-                  </p>
-                  <p className="mt-1 whitespace-pre-line">{m.motivo}</p>
-                  {m.resumen_cierre && (
-                    <div className="mt-3 border-l-2 border-verde pl-3">
-                      <p className="text-xs text-muted-foreground">Resumen de cierre</p>
-                      <p className="mt-0.5 whitespace-pre-line">{m.resumen_cierre}</p>
-                    </div>
-                  )}
-                  {m.justificacion_pendientes && (
-                    <div className="mt-3 border-l-2 border-naranjo pl-3">
-                      <p className="text-xs text-muted-foreground">
-                        Cómo se atenderán las tareas que quedaron sin terminar
-                      </p>
-                      <p className="mt-0.5 whitespace-pre-line">
-                        {m.justificacion_pendientes}
-                      </p>
-                    </div>
-                  )}
-                  {m.acta && (
-                    <p className="mt-2 text-muted-foreground">
-                      Acta de cierre: <span className="text-foreground">{m.acta}</span>
+            ))}
+            {caso.estado_actual !== "CERRADO" && (
+              <div className="mt-4 grid gap-6 border-t border-border pt-4 lg:grid-cols-2">
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold">
+                    Aplicar un protocolo
+                  </h3>
+                  {caso.protocolos_aplicables.length > 0 ? (
+                    <FormularioAplicarProtocolo
+                      casoId={caso.id}
+                      protocolos={caso.protocolos_aplicables}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No hay protocolos publicados y vigentes, se preparan y
+                      publican en{" "}
+                      <Link
+                        href="/convivencia/protocolos"
+                        className={claseEnlace}
+                      >
+                        Protocolos
+                      </Link>
+                      .
                     </p>
                   )}
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Por {m.cambiado_por} el {formatearFecha(m.cambiado_en)}
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">
+                    O registrar que sigue sin protocolo
+                  </h3>
+                  <p className="mt-1 mb-3 text-sm text-muted-foreground">
+                    Indica si la norma es aplicable y por qué no se aplica un
+                    protocolo, no se crea una aplicación ficticia.
                   </p>
-                </li>
-              ))}
-            </ol>
-          )}
-        </Seccion>
+                  <FormularioRevisionNormativa
+                    casoId={caso.id}
+                    protocolos={caso.opciones_normativa.protocolos}
+                    documentos={caso.opciones_normativa.documentos}
+                  />
+                </div>
+              </div>
+            )}
+          </Seccion>
+        )}
 
-        <div className="space-y-4">
-          {caso.estado_actual === "CERRADO" ? (
-            <Seccion titulo="Caso cerrado">
+        {/* PB-061 y PB-062 (HU-054): plan de intervención con sus acciones. */}
+        {seccion === "plan" && (
+          <Seccion
+            titulo="Plan de intervención"
+            className="lg:col-span-3"
+            id="plan-intervencion"
+          >
+            <PlanIntervencion caso={caso} formatearFecha={formatearFecha} />
+          </Seccion>
+        )}
+
+        {/* PB-063 y PB-064 (HU-055): entrevistas, reuniones y otros encuentros. */}
+        {seccion === "encuentros" && (
+          <Seccion
+            titulo="Encuentros"
+            className="lg:col-span-3"
+            id="encuentros"
+          >
+            <Encuentros caso={caso} formatearFecha={formatearFecha} />
+          </Seccion>
+        )}
+
+        {["compromisos", "seguimientos"].includes(seccion ?? "") && (
+          <Seccion
+            titulo={seccion === "compromisos" ? "Compromisos" : "Seguimientos"}
+            className="lg:col-span-3"
+            id="seguimientos"
+          >
+            <SeguimientoCaso
+              caso={caso}
+              formatearFecha={formatearFecha}
+              vista={seccion === "compromisos" ? "compromisos" : "seguimientos"}
+              nuevo={nuevo === "1"}
+            />
+          </Seccion>
+        )}
+
+        {/* PB-152 (HU-131 CA1) y PB-054 (HU-047 CA4): cada cambio queda en el historial. */}
+        {seccion === "estado" && (
+          <Seccion titulo="Historial de estados" className="lg:col-span-2">
+            {caso.movimientos.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Sus antecedentes se conservan y ya no cambia de estado. Un caso
-                cerrado solo se puede reabrir.
+                El caso sigue {nombreEstado(caso.estado_actual)}, el estado con
+                que se abrió.
               </p>
-            </Seccion>
-          ) : (
-            <>
-              {caso.estados_permitidos.length > 0 && (
-                <Seccion titulo="Cambiar estado">
-                  <FormularioEstado
-                    casoId={caso.id}
-                    ultimoMovimientoId={caso.ultimo_movimiento_id}
-                    opciones={caso.estados_permitidos.map((valor) => ({
-                      valor,
-                      texto: nombreEstado(valor),
-                    }))}
-                  />
-                </Seccion>
-              )}
-              {caso.puede_cerrar && (
-                <Seccion titulo="Cerrar caso">
-                  <FormularioCierre
-                    casoId={caso.id}
-                    ultimoMovimientoId={caso.ultimo_movimiento_id}
-                    pendientes={textosPendientes(caso.pendientes)}
-                    actas={caso.actas_cierre.map((acta) => ({
-                      id: acta.id,
-                      texto: `${acta.titulo} (${formatearFecha(acta.fecha_documento)})`,
-                    }))}
-                  />
-                </Seccion>
-              )}
-            </>
-          )}
-        </div>
+            ) : (
+              <ol className="space-y-4">
+                {caso.movimientos.map((m) => (
+                  <li
+                    key={m.id}
+                    className="rounded-xl border border-border p-4 text-sm"
+                  >
+                    <p className="font-medium">
+                      {nombreEstado(m.estado_anterior)} →{" "}
+                      {nombreEstado(m.estado_nuevo)}
+                    </p>
+                    <p className="mt-1 whitespace-pre-line">{m.motivo}</p>
+                    {m.resumen_cierre && (
+                      <div className="mt-3 border-l-2 border-verde pl-3">
+                        <p className="text-xs text-muted-foreground">
+                          Resumen de cierre
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-line">
+                          {m.resumen_cierre}
+                        </p>
+                      </div>
+                    )}
+                    {m.justificacion_pendientes && (
+                      <div className="mt-3 border-l-2 border-naranjo pl-3">
+                        <p className="text-xs text-muted-foreground">
+                          Cómo se atenderán las tareas que quedaron sin terminar
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-line">
+                          {m.justificacion_pendientes}
+                        </p>
+                      </div>
+                    )}
+                    {m.acta && (
+                      <p className="mt-2 text-muted-foreground">
+                        Acta de cierre:{" "}
+                        <span className="text-foreground">{m.acta}</span>
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Por {m.cambiado_por} el {formatearFecha(m.cambiado_en)}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Seccion>
+        )}
+
+        {seccion === "estado" && (
+          <div className="space-y-4">
+            {caso.estado_actual === "CERRADO" ? (
+              <Seccion titulo="Caso cerrado">
+                <p className="text-sm text-muted-foreground">
+                  Sus antecedentes se conservan y ya no cambia de estado, un
+                  caso cerrado solo se puede reabrir.
+                </p>
+              </Seccion>
+            ) : (
+              <>
+                {caso.estados_permitidos.length > 0 && (
+                  <Seccion titulo="Cambiar estado">
+                    <FormularioEstado
+                      casoId={caso.id}
+                      ultimoMovimientoId={caso.ultimo_movimiento_id}
+                      opciones={caso.estados_permitidos.map((valor) => ({
+                        valor,
+                        texto: nombreEstado(valor),
+                      }))}
+                    />
+                  </Seccion>
+                )}
+                {caso.puede_cerrar && (
+                  <Seccion titulo="Cerrar caso">
+                    <FormularioCierre
+                      casoId={caso.id}
+                      ultimoMovimientoId={caso.ultimo_movimiento_id}
+                      pendientes={textosPendientes(caso.pendientes)}
+                      actas={caso.actas_cierre.map((acta) => ({
+                        id: acta.id,
+                        texto: `${acta.titulo} (${formatearFecha(acta.fecha_documento)})`,
+                      }))}
+                    />
+                  </Seccion>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
@@ -536,14 +718,5 @@ function Seccion({
       <h2 className="mb-3 text-base font-semibold">{titulo}</h2>
       {children}
     </section>
-  );
-}
-
-function Dato({ nombre, children }: { nombre: string; children: ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{nombre}</dt>
-      <dd className="mt-0.5 font-medium">{children}</dd>
-    </div>
   );
 }

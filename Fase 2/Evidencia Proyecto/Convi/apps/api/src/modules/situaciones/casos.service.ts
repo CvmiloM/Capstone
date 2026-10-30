@@ -100,6 +100,7 @@ export type CasoLista = {
   responsable: string;
   situaciones: number;
   estudiantes: number;
+  nombres_estudiantes: string[];
 };
 
 export type DetalleCaso = CasoLista & {
@@ -117,6 +118,8 @@ export type DetalleCaso = CasoLista & {
     rol: string;
     /** Curso y año de la matrícula guardada al pasar al caso (HU-066). */
     curso_matricula: string | null;
+    curso_actual: string | null;
+    rut: string | null;
   }[];
   situaciones_vinculadas: {
     id: string;
@@ -185,6 +188,10 @@ function esChoque(error: unknown) {
 const COLUMNAS_LISTA = `
   c.id, c.codigo, c.titulo, c.estado_actual, c.fecha_inicio::text AS fecha_inicio,
   c.fecha_limite_cierre::text AS fecha_limite_cierre,
+  ARRAY(SELECT DISTINCT p.nombres || ' ' || p.apellidos
+    FROM convi.participaciones pa JOIN convi.estudiantes e ON e.persona_id = pa.persona_id
+    JOIN convi.personas p ON p.id = pa.persona_id
+    WHERE pa.caso_id = c.id AND pa.activo_hasta IS NULL ORDER BY 1) AS nombres_estudiantes,
   cat.nombre AS categoria, pr.nombres || ' ' || pr.apellidos AS responsable,
   (SELECT count(*) FROM convi.situaciones s WHERE s.caso_id = c.id)::int AS situaciones,
   (SELECT count(*) FROM convi.participaciones pa
@@ -253,7 +260,13 @@ export class CasosService {
           DetalleCaso['participantes'][number]
         >(
           `SELECT e.id AS estudiante_id, p.nombres, p.apellidos,
-                  e.codigo_estudiante, pa.rol_contextual AS rol,
+                  e.codigo_estudiante, p.rut, pa.rol_contextual AS rol,
+                  (SELECT ca.nombre || ' (' || aa.anio || ')' FROM convi.matriculas actual
+                   JOIN convi.cursos ca ON ca.id = actual.curso_id
+                   JOIN convi.anios_academicos aa ON aa.id = actual.anio_academico_id
+                   WHERE actual.estudiante_id = e.id AND actual.estado = 'ACTIVO'
+                     AND actual.matriculado_en <= ${HOY_ESCUELA}
+                   ORDER BY actual.matriculado_en DESC, actual.id LIMIT 1) AS curso_actual,
                   cm.nombre || ' (' || am.anio || ')' AS curso_matricula
            FROM convi.participaciones pa
            JOIN convi.personas p ON p.id = pa.persona_id
@@ -310,7 +323,12 @@ export class CasosService {
           ahora: hoy.rows[0].ahora,
           compromisos: await compromisosDelCaso(db, id),
           seguimientos: await seguimientosDelCaso(db, id),
-          actuaciones_origen: (await db.query('SELECT id,objetivo FROM convi.actuaciones WHERE caso_id=$1 ORDER BY creado_en DESC,id', [id])).rows,
+          actuaciones_origen: (
+            await db.query(
+              'SELECT id,objetivo FROM convi.actuaciones WHERE caso_id=$1 ORDER BY creado_en DESC,id',
+              [id],
+            )
+          ).rows,
           encuentros: await encuentrosDelCaso(db, id),
           opciones_encuentro: {
             responsables: await responsablesDeEncuentro(db),

@@ -14,11 +14,11 @@ const DESTINOS: Record<
 > = {
   "convivencia-situacion": (id) => ({
     api: `/convivencia/situaciones/${id}/evidencias`,
-    volver: `/convivencia/situaciones/${id}?aviso=evidencia`,
+    volver: `/convivencia/situaciones/${id}?seccion=evidencias&aviso=evidencia`,
   }),
   "convivencia-caso": (id) => ({
     api: `/convivencia/casos/${id}/evidencias`,
-    volver: `/convivencia/casos/${id}?aviso=evidencia`,
+    volver: `/convivencia/casos/${id}?seccion=evidencias&aviso=evidencia`,
   }),
   "profesor-situacion": (id) => ({
     api: `/profesor/situaciones/${id}/evidencias`,
@@ -45,11 +45,15 @@ export async function adjuntarEvidencia(
   };
   const nombreDestino = leerTexto(formData, "destino");
   if (!UUID.test(id) || !Object.hasOwn(DESTINOS, nombreDestino))
-    return { mensaje: "No se puede adjuntar aquí. Recarga la página.", valores };
+    return {
+      mensaje: "No se puede adjuntar aquí. Recarga la página.",
+      valores,
+    };
   const destino = DESTINOS[nombreDestino as DestinoEvidencia](id);
 
   const cuerpo = new FormData();
-  for (const [campo, valor] of Object.entries(valores)) cuerpo.set(campo, valor);
+  for (const [campo, valor] of Object.entries(valores))
+    cuerpo.set(campo, valor);
   const archivo = formData.get("archivo");
   if (archivo instanceof File && archivo.size > 0)
     cuerpo.set("archivo", archivo, archivo.name);
