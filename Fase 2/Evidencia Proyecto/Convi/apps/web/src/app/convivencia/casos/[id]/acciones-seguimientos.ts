@@ -84,6 +84,6 @@ export async function guardarSeguimiento(
   if (!respuesta.ok)
     return { mensaje: respuesta.mensaje, errores: respuesta.errores, valores };
   redirect(
-    `/convivencia/casos/${caso_id}?aviso=${modo === "compromiso" ? "compromiso" : "seguimiento"}#seguimientos`,
+    `/convivencia/casos/${caso_id}?seccion=${modo === "compromiso" ? "compromisos" : "seguimientos"}&aviso=${modo === "compromiso" ? "compromiso" : "seguimiento"}#seguimientos`,
   );
 }

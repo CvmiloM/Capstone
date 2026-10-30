@@ -32,7 +32,9 @@ function leerAsistentes(formData: FormData) {
 }
 
 function volver(casoId: string, aviso: string): never {
-  redirect(`/convivencia/casos/${casoId}?aviso=${aviso}#encuentros`);
+  redirect(
+    `/convivencia/casos/${casoId}?seccion=encuentros&aviso=${aviso}#encuentros`,
+  );
 }
 
 // PB-063 (CA1 y CA4): tipo, objetivo, responsable, lugar, fecha y asistentes.

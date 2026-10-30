@@ -222,7 +222,7 @@ export async function registrarRevisionNormativa(
   }
   redirect(
     casoId
-      ? `/convivencia/casos/${id}?aviso=normativa`
+      ? `/convivencia/casos/${id}?seccion=protocolo&aviso=normativa`
       : `/convivencia/situaciones/${id}?aviso=normativa`,
   );
 }

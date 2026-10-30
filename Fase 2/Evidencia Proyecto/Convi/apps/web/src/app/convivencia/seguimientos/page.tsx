@@ -69,7 +69,7 @@ export default async function AgendaSeguimientos({
         {a.filas.map((s) => (
           <Link
             key={s.id}
-            href={`/convivencia/casos/${s.caso_id}#seguimiento-${s.id}`}
+            href={`/convivencia/casos/${s.caso_id}?seccion=seguimientos#seguimiento-${s.id}`}
             className="block rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring"
           >
             <div className="flex flex-wrap justify-between gap-2">

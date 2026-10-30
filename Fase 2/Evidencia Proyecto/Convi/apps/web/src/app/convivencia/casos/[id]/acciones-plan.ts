@@ -24,7 +24,9 @@ function leerTexto(formData: FormData, campo: string) {
 }
 
 function volver(casoId: string, aviso: string): never {
-  redirect(`/convivencia/casos/${casoId}?aviso=${aviso}#plan-intervencion`);
+  redirect(
+    `/convivencia/casos/${casoId}?seccion=plan&aviso=${aviso}#plan-intervencion`,
+  );
 }
 
 // CA1: objetivo, estado inicial y protocolo aplicado opcional.

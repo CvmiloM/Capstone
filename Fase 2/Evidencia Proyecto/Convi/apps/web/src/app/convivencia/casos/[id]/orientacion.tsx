@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   AvisoError,
   BotonEnviar,
@@ -101,6 +101,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
     estadoInicial,
   );
   const [paso, setPaso] = useState(0);
+  const pregunta = useRef<HTMLTextAreaElement>(null);
   const resultado = estado.resultado;
 
   useEffect(() => {
@@ -139,6 +140,31 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
       <MascotaIA fase={fase} mensajes={mensajes} />
 
       <form action={accion} onSubmit={() => setPaso(0)} className="space-y-3">
+        <fieldset disabled={pendiente} className="grid gap-2 sm:grid-cols-2">
+          <legend className="mb-2 text-sm font-medium">
+            Puedes comenzar con una de estas preguntas
+          </legend>
+          {[
+            "¿Qué hechos están documentados en este caso?",
+            "¿Qué compromisos siguen pendientes?",
+            "¿Qué indica el reglamento para este caso?",
+            "¿Qué antecedentes conviene revisar antes del próximo seguimiento?",
+          ].map((texto) => (
+            <button
+              key={texto}
+              type="button"
+              onClick={() => {
+                if (pregunta.current) {
+                  pregunta.current.value = texto;
+                  pregunta.current.focus();
+                }
+              }}
+              className="min-h-11 rounded-xl border border-border px-4 py-3 text-left text-sm text-primary transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+            >
+              {texto}
+            </button>
+          ))}
+        </fieldset>
         <div>
           <label
             htmlFor="pregunta-orientacion"
@@ -147,6 +173,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
             ¿Algo puntual que quieras saber? (opcional)
           </label>
           <textarea
+            ref={pregunta}
             id="pregunta-orientacion"
             name="pregunta"
             key={estado.pregunta ?? ""}

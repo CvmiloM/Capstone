@@ -44,7 +44,7 @@ export async function cambiarEstadoCaso(
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  redirect(`/convivencia/casos/${id}?aviso=estado`);
+  redirect(`/convivencia/casos/${id}?seccion=estado&aviso=estado`);
 }
 
 // PB-054 (HU-047): cierra el caso con motivo y resumen; si quedan tareas sin
@@ -68,7 +68,7 @@ export async function cerrarCaso(
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  redirect(`/convivencia/casos/${id}?aviso=cerrado`);
+  redirect(`/convivencia/casos/${id}?seccion=estado&aviso=cerrado`);
 }
 
 // PB-082 (HU-071 CA1): aplica al caso una versión publicada del protocolo
@@ -87,5 +87,5 @@ export async function aplicarProtocolo(
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  redirect(`/convivencia/casos/${id}?aviso=protocolo`);
+  redirect(`/convivencia/casos/${id}?seccion=protocolo&aviso=protocolo`);
 }
