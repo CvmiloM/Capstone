@@ -2,7 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 import logo from "@/assets/convi-logo-trim.png";
+import { AvatarUsuario } from "@/app/components/avatar-usuario";
 import { BotonCerrarSesion } from "@/app/components/boton-cerrar-sesion";
+import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { obtenerContextoAdmin } from "./datos";
 import { Navegacion } from "./navegacion";
 
@@ -80,16 +82,26 @@ async function FichaEscuela() {
 
 async function UsuarioSesion() {
     const { usuario } = await obtenerContextoAdmin();
+    // El blob sale del correo de la sesión; si no se pudiera leer, quedan las iniciales.
+    const supabase = await crearClienteServidor();
+    // getClaims valida la firma del token antes de usar el correo.
+    const { data } = await supabase.auth.getClaims();
+    const correo =
+      typeof data?.claims?.email === "string" ? data.claims.email : undefined;
     const iniciales = `${usuario.nombres.charAt(0)}${usuario.apellidos.charAt(0)}`;
 
     return (
         <div className="flex items-center gap-2.5">
-            <span
-                aria-hidden="true"
-                className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
-            >
-                {iniciales}
-            </span>
+            {correo ? (
+                <AvatarUsuario correo={correo} tamano={36} siempre />
+            ) : (
+                <span
+                    aria-hidden="true"
+                    className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+                >
+                    {iniciales}
+                </span>
+            )}
             <div className="leading-tight">
                 <p className="text-sm font-medium">
                     {usuario.nombres} {usuario.apellidos}

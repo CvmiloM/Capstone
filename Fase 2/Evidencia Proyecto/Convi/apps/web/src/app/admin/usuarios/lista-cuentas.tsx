@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { AvatarUsuario } from "@/app/components/avatar-usuario";
 import type { CuentaEscuela } from "./datos";
 import { NOMBRE_ESTADO, NOMBRE_PERFIL } from "./opciones";
 import { BotonReenvio } from "./boton-reenvio";
@@ -207,6 +208,7 @@ export function ListaCuentas({
             <li key={cuenta.id}>
               <details className="group rounded-2xl border border-border bg-card p-5 shadow-tarjeta">
                 <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                  <AvatarUsuario correo={cuenta.correo} tamano={40} />
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold">{nombre}</span>
                     <span className="block truncate text-sm text-muted-foreground">
