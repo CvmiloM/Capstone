@@ -1,5 +1,6 @@
 import { claseEnlace } from "@/app/components/formulario";
 import type { DetalleCaso } from "../datos";
+import { Correos } from "./correos";
 import { FormularioComunicacion } from "./formulario-comunicacion";
 import { NOMBRE_ROL_ASISTENTE, NOMBRE_TIPO_COMUNICACION } from "./opciones";
 
@@ -85,6 +86,9 @@ export function Comunicaciones({
           </p>
         )
       )}
+
+      {/* PB-151 y PB-086 (HU-130 y HU-075): correos al apoderado. */}
+      <Correos caso={caso} formatearFecha={formatearFecha} />
     </>
   );
 }

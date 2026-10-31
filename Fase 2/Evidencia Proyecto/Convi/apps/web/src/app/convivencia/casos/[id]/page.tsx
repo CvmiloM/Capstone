@@ -97,6 +97,14 @@ const AVISOS: Record<string, string> = {
   // PB-067 (HU-058): comunicaciones del caso.
   comunicacion:
     "Registraste la comunicación con tu nombre y la fecha de registro, no se puede editar ni trasladar a otro caso. Si el apoderado no podía ser contactado, la advertencia quedó en la auditoría.",
+  // PB-151 y PB-086 (HU-130 y HU-075): borradores de correo al apoderado.
+  correo:
+    "Guardaste el borrador del correo, no se envió: puedes editarlo o descartarlo mientras nadie lo confirme.",
+  "correo-ia":
+    "La IA preparó el borrador del correo y quedó marcado como generado con IA, no se envió: revísalo y corrígelo antes de confirmarlo.",
+  "correo-editado": "Guardaste los cambios del borrador, el correo no se envió.",
+  "correo-descartado":
+    "Descartaste el borrador, el descarte quedó en la auditoría.",
 };
 
 /** HU-047 CA2: las tareas sin terminar, en palabras. */
