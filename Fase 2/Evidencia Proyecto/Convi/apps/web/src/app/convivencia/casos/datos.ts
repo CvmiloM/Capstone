@@ -110,6 +110,27 @@ export type DetalleCaso = CasoLista & {
     asistentes: AsistentePosible[];
     acciones_plan: { id: string; descripcion: string }[];
   };
+  /** PB-067 (HU-058): comunicaciones del caso, de la más reciente a la más antigua. */
+  comunicaciones: Comunicacion[];
+  /** CA5: personas del caso que pueden recibirla, con la advertencia del vínculo. */
+  destinatarios_comunicacion: (AsistentePosible & { no_contactable: boolean })[];
+};
+
+/** PB-067 (HU-058): llamada, conversación u otro contacto registrado en el caso. */
+export type Comunicacion = {
+  id: string;
+  tipo: string;
+  destinatario: string;
+  /** ESTUDIANTE, APODERADO o EQUIPO; null si el destinatario es externo. */
+  rol: string | null;
+  resumen: string;
+  ocurrido_en: string;
+  creado_en: string;
+  creado_por: string;
+  /** Nombre del archivo de respaldo, si tiene. */
+  respaldo: string | null;
+  /** CA5: se registró a un apoderado que no puede ser contactado. */
+  advertencia: boolean;
 };
 
 /** PB-082 (HU-071), PB-055 (HU-048) y PB-056 (HU-049): protocolo aplicado al caso. */

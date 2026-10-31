@@ -24,6 +24,7 @@ const GRUPOS: DatosCaso[] = [
   'personas_encuentro',
   'acciones_encuentro',
   'responsables_paso',
+  'comunicaciones',
 ];
 
 // Grupos que llegan a consultar la base con la sección indicada.
@@ -117,5 +118,13 @@ describe('cargadorDeSeccion', () => {
 
   it('estado consulta solo su grupo', async () => {
     expect(await consultados('estado')).toEqual(['estado']);
+  });
+
+  it('comunicaciones consulta las del caso, sus destinatarios y la hora actual', async () => {
+    expect(leerSeccionCaso('comunicaciones')).toBe('comunicaciones');
+    expect(await consultados('comunicaciones')).toEqual([
+      'fechas',
+      'comunicaciones',
+    ]);
   });
 });

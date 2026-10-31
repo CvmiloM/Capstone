@@ -22,6 +22,7 @@ import {
   FormularioEstado,
 } from "./formularios";
 import { SeguimientoCaso } from "./seguimientos";
+import { Comunicaciones } from "./comunicaciones";
 import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
 import { PlanIntervencion } from "./plan-intervencion";
@@ -93,6 +94,9 @@ const AVISOS: Record<string, string> = {
     "Cambiaste el estado del protocolo, el motivo y la fecha quedaron en la auditoría.",
   // PB-072 (HU-062): acta firmada de una entrevista o reunión.
   acta: "Adjuntaste el acta firmada al encuentro, quedó como evidencia de tipo Acta con tu nombre y la fecha, y no se puede editar ni borrar.",
+  // PB-067 (HU-058): comunicaciones del caso.
+  comunicacion:
+    "Registraste la comunicación con tu nombre y la fecha de registro, no se puede editar ni trasladar a otro caso. Si el apoderado no podía ser contactado, la advertencia quedó en la auditoría.",
 };
 
 /** HU-047 CA2: las tareas sin terminar, en palabras. */
@@ -156,6 +160,7 @@ export default async function PaginaCaso({
     ["encuentros", "Encuentros"],
     ["compromisos", "Compromisos"],
     ["seguimientos", "Seguimientos"],
+    ["comunicaciones", "Comunicaciones"],
     ["evidencias", "Evidencias"],
     ["ia", "Orientación IA"],
     ["historial", "Historial"],
@@ -559,6 +564,17 @@ export default async function PaginaCaso({
               vista={seccion === "compromisos" ? "compromisos" : "seguimientos"}
               nuevo={nuevo === "1"}
             />
+          </Seccion>
+        )}
+
+        {/* PB-067 (HU-058): llamadas, conversaciones y otros contactos del caso. */}
+        {seccion === "comunicaciones" && (
+          <Seccion
+            titulo="Comunicaciones"
+            className="lg:col-span-3"
+            id="comunicaciones"
+          >
+            <Comunicaciones caso={caso} formatearFecha={formatearFecha} />
           </Seccion>
         )}
 

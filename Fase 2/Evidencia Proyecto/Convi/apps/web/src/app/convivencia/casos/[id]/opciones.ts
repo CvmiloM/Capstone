@@ -93,4 +93,23 @@ export const NOMBRE_ROL_ASISTENTE: Record<string, string> = {
   EQUIPO: "Equipo de la escuela",
 };
 
+// PB-067 (HU-058): comunicaciones del caso. Mismos valores y límites que valida
+// la API (apps/api/src/modules/situaciones/comunicaciones.ts). El correo se
+// prepara y envía con HU-076.
+export const TIPOS_COMUNICACION = [
+  { valor: "LLAMADA", texto: "Llamada" },
+  { valor: "PRESENCIAL", texto: "Presencial" },
+  { valor: "INSTITUCIONAL", texto: "Institucional" },
+  { valor: "OTRO", texto: "Otro" },
+] as const;
+
+export const NOMBRE_TIPO_COMUNICACION: Record<string, string> = Object.fromEntries(
+  TIPOS_COMUNICACION.map((t) => [t.valor, t.texto]),
+);
+
+export const LARGO_MAXIMO_RESUMEN_COMUNICACION = 4000;
+export const LARGO_MAXIMO_DESTINATARIO_EXTERNO = 220;
+/** Valor de la lista de destinatarios que pide escribir uno fuera del caso. */
+export const DESTINATARIO_EXTERNO = "externo";
+
 export const ESTADOS_CUMPLIMIENTO: [string,string][] = [["PENDIENTE","Pendiente"],["EN_PROGRESO","En progreso"],["COMPLETADO","Completado"],["VENCIDO","Vencido"],["CANCELADO","Cancelado"]];

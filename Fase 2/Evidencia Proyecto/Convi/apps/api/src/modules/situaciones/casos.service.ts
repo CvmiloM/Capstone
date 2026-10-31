@@ -68,6 +68,12 @@ import {
   type OpcionesNormativa,
   type RevisionNormativa,
 } from './revision-normativa.js';
+import {
+  comunicacionesDelCaso,
+  destinatariosDeComunicacion,
+  type Comunicacion,
+  type DestinatarioComunicacion,
+} from './comunicaciones.js';
 import { cargadorDeSeccion, type SeccionCaso } from './seccion-caso.js';
 import { validarVinculacion } from './vinculacion-caso.js';
 import { validarReapertura, validarReasignacion } from './continuidad-caso.js';
@@ -187,6 +193,10 @@ export type DetalleCaso = CasoLista & {
     asistentes: AsistentePosible[];
     acciones_plan: { id: string; descripcion: string }[];
   };
+  /** PB-067 (HU-058): comunicaciones del caso, de la más reciente a la más antigua. */
+  comunicaciones: Comunicacion[];
+  /** CA5: personas del caso que pueden recibirla, con la advertencia del vínculo. */
+  destinatarios_comunicacion: DestinatarioComunicacion[];
 };
 
 // 40001: otra transacción cambió la fila bloqueada; 23505 en el código: otro
@@ -487,6 +497,16 @@ export class CasosService {
               [],
             ),
           },
+          comunicaciones: await cargar(
+            'comunicaciones',
+            () => comunicacionesDelCaso(db, id),
+            [],
+          ),
+          destinatarios_comunicacion: await cargar(
+            'comunicaciones',
+            () => destinatariosDeComunicacion(db, id),
+            [],
+          ),
         };
       },
     );

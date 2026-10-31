@@ -24,12 +24,13 @@ import { EvidenciasService } from './evidencias.service.js';
 
 // PB-066 y PB-130: formulario multipart con los campos titulo, tipo,
 // descripcion y archivo. El archivo queda en memoria hasta 1 MB más que el
-// límite, para responder con un mensaje en vez de cortar la conexión.
-const CARGA = FileInterceptor('archivo', {
+// límite, para responder con un mensaje en vez de cortar la conexión. PB-067:
+// las comunicaciones también lo usan para su respaldo.
+export const CARGA = FileInterceptor('archivo', {
   limits: { fileSize: TAMANO_MAXIMO + 1024 * 1024, files: 1, fields: 10 },
 });
 
-async function enviarArchivo(
+export async function enviarArchivo(
   descarga: Promise<{ nombre: string; mime: string; contenido: Buffer }>,
 ) {
   const { nombre, mime, contenido } = await descarga;
