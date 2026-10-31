@@ -1,5 +1,8 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
-import type { DetalleCaso, Encuentro } from "../datos";
+import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evidencia";
+import { claseEnlace } from "@/app/components/formulario";
+import { formatearDia, type DetalleCaso, type Encuentro } from "../datos";
 import {
   FormularioAgregarAsistentes,
   FormularioCancelacionEncuentro,
@@ -18,15 +21,24 @@ import { Desplegable } from "./plan-intervencion";
 // PB-063 y PB-064 (HU-055): encuentros del caso, distinguiendo lo programado
 // de lo realizado. Los seguimientos son otro ítem (PB-068).
 const ABIERTO = ["PLANIFICADA", "POSPUESTA"];
+// PB-072 (HU-062): decisión del PO (por defecto), el acta firmada se adjunta
+// a una entrevista o reunión ya realizada.
+const CON_ACTA = ["ENTREVISTA", "REUNION"];
 
 export function Encuentros({
   caso,
   formatearFecha,
+  adjuntar,
 }: {
   caso: DetalleCaso;
   formatearFecha: (iso: string) => string;
+  /** Encuentro cuyo formulario de acta se muestra (?adjuntar=). */
+  adjuntar?: string;
 }) {
   const abierto = caso.estado_actual !== "CERRADO";
+  const ruta = `/convivencia/casos/${caso.id}`;
+  const conActa = (encuentro: Encuentro) =>
+    abierto && CON_ACTA.includes(encuentro.tipo) && encuentro.estado === "REALIZADA";
   const rango = (inicio: string | null, fin: string | null) =>
     inicio ? `${formatearFecha(inicio)}${fin ? ` hasta ${formatearFecha(fin)}` : ""}` : "Sin fecha";
 
@@ -39,7 +51,11 @@ export function Encuentros({
       )}
 
       {caso.encuentros.map((encuentro) => (
-        <div key={encuentro.id} className="mb-4 rounded-xl border border-border p-4 text-sm">
+        <div
+          key={encuentro.id}
+          id={`encuentro-${encuentro.id}`}
+          className="mb-4 rounded-xl border border-border p-4 text-sm"
+        >
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
               {NOMBRE_TIPO_ENCUENTRO[encuentro.tipo] ?? encuentro.tipo}
@@ -112,6 +128,74 @@ export function Encuentros({
               </li>
             ))}
           </ul>
+
+          {(encuentro.actas.length > 0 || conActa(encuentro)) && (
+            <>
+              <h3 className="mt-4 text-sm font-semibold">Actas firmadas</h3>
+              {encuentro.actas.length === 0 ? (
+                <p className="mt-1 text-muted-foreground">
+                  Todavía no se adjunta el acta firmada.
+                </p>
+              ) : (
+                <ul className="mt-1 divide-y divide-border border-t border-border">
+                  {encuentro.actas.map((acta) => (
+                    <li
+                      key={acta.id}
+                      className="flex flex-wrap items-start justify-between gap-2 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium">{acta.titulo}</p>
+                        {acta.descripcion && (
+                          <p className="mt-0.5 whitespace-pre-line text-muted-foreground">
+                            {acta.descripcion}
+                          </p>
+                        )}
+                        <p className="mt-0.5 break-all text-xs text-muted-foreground">
+                          {[
+                            `Fecha del acta: ${formatearDia(acta.fecha_documento)}`,
+                            acta.archivo,
+                            `${acta.creado_por}, ${formatearFecha(acta.creado_en)}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                      {acta.archivo && (
+                        <a
+                          href={`/convivencia/evidencias/${acta.id}`}
+                          className={`shrink-0 ${claseEnlace}`}
+                        >
+                          Descargar
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {conActa(encuentro) &&
+                (adjuntar === encuentro.id ? (
+                  <div className="mt-3 rounded-xl border border-border bg-card p-4">
+                    <h3 className="mb-3 text-sm font-semibold">
+                      Adjuntar el acta firmada
+                    </h3>
+                    <FormularioEvidencia
+                      destino="convivencia-acta"
+                      registroId={caso.id}
+                      encuentroId={encuentro.id}
+                      hoy={caso.hoy}
+                    />
+                  </div>
+                ) : (
+                  <Link
+                    href={`${ruta}?seccion=encuentros&adjuntar=${encuentro.id}#encuentro-${encuentro.id}`}
+                    scroll={false}
+                    className={`mt-2 inline-block text-sm font-medium ${claseEnlace}`}
+                  >
+                    Adjuntar acta firmada
+                  </Link>
+                ))}
+            </>
+          )}
 
           {abierto && ABIERTO.includes(encuentro.estado) && (
             <AccionesEncuentro caso={caso} encuentro={encuentro} />

@@ -27,16 +27,24 @@ export function FormularioEvidencia({
   destino,
   registroId,
   pasoId,
+  encuentroId,
+  hoy,
 }: {
   destino: DestinoEvidencia;
   registroId: string;
   /** PB-055: paso del protocolo del caso al que respalda (destino convivencia-paso). */
   pasoId?: string;
+  /** PB-072: entrevista o reunión del acta (destino convivencia-acta). */
+  encuentroId?: string;
+  /** AAAA-MM-DD de la escuela: el acta no puede tener fecha futura. */
+  hoy?: string;
 }) {
   const [estado, accion, pendiente] = useActionState(
     adjuntarEvidencia,
     estadoInicial,
   );
+  // PB-072 (HU-062 CA1): el acta es siempre de tipo Acta y lleva su fecha.
+  const acta = destino === "convivencia-acta";
   const valores = estado.valores ?? {};
   // Un archivo demasiado grande se avisa antes de enviar, junto a la
   // respuesta que se veía al elegirlo.
@@ -80,6 +88,9 @@ export function FormularioEvidencia({
       <input type="hidden" name="destino" value={destino} />
       <input type="hidden" name="registro_id" value={registroId} />
       {pasoId && <input type="hidden" name="paso_caso_id" value={pasoId} />}
+      {encuentroId && (
+        <input type="hidden" name="encuentro_id" value={encuentroId} />
+      )}
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
       )}
@@ -94,7 +105,11 @@ export function FormularioEvidencia({
             name="titulo"
             type="text"
             maxLength={LARGO_MAXIMO_TITULO}
-            placeholder="Por ejemplo: captura del chat del curso"
+            placeholder={
+              acta
+                ? "Por ejemplo: acta firmada de la entrevista"
+                : "Por ejemplo: captura del chat del curso"
+            }
             defaultValue={valores.titulo}
             aria-invalid={errores.titulo ? true : undefined}
             aria-describedby={describir("titulo")}
@@ -102,29 +117,51 @@ export function FormularioEvidencia({
           />
           {mensajeError("titulo")}
         </div>
-        <div>
-          <label htmlFor="tipo_evidencia" className="block text-sm font-medium">
-            Tipo
-          </label>
-          <select
-            id="tipo_evidencia"
-            name="tipo"
-            defaultValue={valores.tipo ?? ""}
-            aria-invalid={errores.tipo ? true : undefined}
-            aria-describedby={describir("tipo")}
-            className={`${claseControl} ${borde("tipo")}`}
-          >
-            <option value="" disabled>
-              Elige un tipo
-            </option>
-            {TIPOS_EVIDENCIA.map((tipo) => (
-              <option key={tipo.valor} value={tipo.valor}>
-                {tipo.texto}
+        {acta ? (
+          <div>
+            <label
+              htmlFor="fecha_documento_evidencia"
+              className="block text-sm font-medium"
+            >
+              Fecha del acta
+            </label>
+            <input
+              id="fecha_documento_evidencia"
+              name="fecha_documento"
+              type="date"
+              max={hoy}
+              defaultValue={valores.fecha_documento}
+              aria-invalid={errores.fecha_documento ? true : undefined}
+              aria-describedby={describir("fecha_documento")}
+              className={`${claseControl} ${borde("fecha_documento")}`}
+            />
+            {mensajeError("fecha_documento")}
+          </div>
+        ) : (
+          <div>
+            <label htmlFor="tipo_evidencia" className="block text-sm font-medium">
+              Tipo
+            </label>
+            <select
+              id="tipo_evidencia"
+              name="tipo"
+              defaultValue={valores.tipo ?? ""}
+              aria-invalid={errores.tipo ? true : undefined}
+              aria-describedby={describir("tipo")}
+              className={`${claseControl} ${borde("tipo")}`}
+            >
+              <option value="" disabled>
+                Elige un tipo
               </option>
-            ))}
-          </select>
-          {mensajeError("tipo")}
-        </div>
+              {TIPOS_EVIDENCIA.map((tipo) => (
+                <option key={tipo.valor} value={tipo.valor}>
+                  {tipo.texto}
+                </option>
+              ))}
+            </select>
+            {mensajeError("tipo")}
+          </div>
+        )}
       </div>
 
       <div>
@@ -172,12 +209,13 @@ export function FormularioEvidencia({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Queda guardada en forma privada con tu nombre y la fecha. Una evidencia
-        no se edita ni se borra.
+        {acta
+          ? "Sube el acta firmada y escaneada; no se pide firma electrónica. Queda guardada en forma privada con tu nombre y la fecha, y no se edita ni se borra."
+          : "Queda guardada en forma privada con tu nombre y la fecha. Una evidencia no se edita ni se borra."}
       </p>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Adjuntando…" : "Adjuntar evidencia"}
+        {pendiente ? "Adjuntando…" : acta ? "Adjuntar acta" : "Adjuntar evidencia"}
       </button>
     </form>
   );

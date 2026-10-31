@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -14,10 +15,13 @@ import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { comprobarCasoHijo } from './portal-apoderado.js';
 import {
+  validarActa,
   validarEvidencia,
   type ArchivoSubido,
+  type NuevaActa,
   type NuevaEvidencia,
 } from './archivo-evidencia.js';
+import { INICIO_DEL_DIA } from './plan-intervencion.js';
 
 // PB-066 (HU-057): evidencias de situaciones y casos. El profesor adjunta a
 // las situaciones que registró y Convivencia a cualquier situación o caso de
@@ -89,6 +93,8 @@ export async function evidenciasDelCaso(
                  WHEN ev.caso_id IS NOT NULL THEN 'Caso'
                  WHEN ev.situacion_id IS NOT NULL THEN 'Situación ' || s.codigo
                  WHEN ev.aclaracion_id IS NOT NULL THEN 'Aclaración de ' || sa.codigo
+                 WHEN ev.actuacion_id IS NOT NULL AND ev.tipo_evidencia = 'ACTA'
+                   THEN 'Acta del encuentro'
                  WHEN ev.actuacion_id IS NOT NULL THEN 'Actuación'
                  WHEN ev.compromiso_id IS NOT NULL THEN 'Compromiso'
                  ELSE 'Caso' END AS origen
@@ -104,7 +110,7 @@ export async function evidenciasDelCaso(
 }
 
 type Origen = {
-  columna: 'situacion_id' | 'caso_id';
+  columna: 'situacion_id' | 'caso_id' | 'actuacion_id';
   id: string;
   /** PB-055 (HU-048 CA3): paso del protocolo del caso al que respalda. */
   paso_caso_id?: string;
@@ -239,6 +245,79 @@ export class EvidenciasService {
     );
   }
 
+  // PB-072 (HU-062): acta firmada y escaneada de una entrevista o reunión
+  // del caso, de tipo Acta y con la fecha del documento (CA1). Decisión del
+  // PO (por defecto): solo de un encuentro Realizado (CA2), con una fecha que
+  // no es futura ni anterior al día del encuentro; un caso cerrado no recibe
+  // actas. El borrador de IA vive en otra tabla y no reemplaza el acta (CA3).
+  adjuntarActa(
+    sesion: Sesion,
+    encuentroId: string,
+    cuerpo: unknown,
+    archivo: ArchivoSubido | undefined,
+  ) {
+    const datos = validarActa(cuerpo, archivo);
+    return this.guardar(
+      sesion,
+      ['CONVIVENCIA'],
+      datos,
+      archivo!,
+      async (db) => {
+        // FOR SHARE: el caso no se cierra ni el encuentro cambia mientras se adjunta.
+        const encuentro = await db
+          .query<{
+            tipo: string;
+            estado: string;
+            caso: string;
+            antes_del_encuentro: boolean;
+            futura: boolean;
+          }>(
+            `SELECT a.tipo_actuacion AS tipo, a.estado, c.estado_actual AS caso,
+                    $2::date < (a.realizado_en AT TIME ZONE e.zona_horaria)::date
+                      AS antes_del_encuentro,
+                    $2::date > (now() AT TIME ZONE e.zona_horaria)::date AS futura
+             FROM convi.actuaciones a
+             JOIN convi.casos c ON c.id = a.caso_id
+             JOIN convi.establecimientos e ON e.id = a.establecimiento_id
+             WHERE a.id = $1 AND a.tipo_actuacion <> 'SEGUIMIENTO'
+             FOR SHARE OF a, c`,
+            [encuentroId, datos.fecha_documento],
+          )
+          .catch((error: unknown) => {
+            if ((error as { code?: string }).code === '40001')
+              throw new ConflictException(
+                'El encuentro cambió mientras adjuntabas. Recarga la página e inténtalo nuevamente.',
+              );
+            throw error;
+          });
+        const fila = encuentro.rows[0];
+        if (!fila) throw new NotFoundException('El encuentro no existe.');
+        if (fila.caso === 'CERRADO')
+          throw new ConflictException(
+            'El caso está cerrado: conserva sus actas, pero no recibe nuevas.',
+          );
+        if (!['ENTREVISTA', 'REUNION'].includes(fila.tipo))
+          throw new ConflictException(
+            'El acta firmada se adjunta a una entrevista o una reunión.',
+          );
+        if (fila.estado !== 'REALIZADA')
+          throw new ConflictException(
+            'El acta se adjunta cuando el encuentro ya se realizó.',
+          );
+        if (fila.antes_del_encuentro || fila.futura)
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. No se adjuntó el acta.',
+            errores: {
+              fecha_documento: fila.futura
+                ? 'La fecha del acta no puede ser futura.'
+                : 'La fecha del acta no puede ser anterior al día del encuentro.',
+            },
+          });
+        return { columna: 'actuacion_id', id: encuentroId };
+      },
+    );
+  }
+
   /**
    * CA3: cada descarga pasa por el servidor, que vuelve a comprobar la
    * sesión, la cuenta activa, la escuela y el perfil (CuentaService.operar).
@@ -351,7 +430,7 @@ export class EvidenciasService {
   private async guardar(
     sesion: Sesion,
     perfiles: Perfil[],
-    datos: NuevaEvidencia,
+    datos: NuevaEvidencia | NuevaActa,
     archivo: ArchivoSubido,
     comprobarOrigen: (db: PoolClient) => Promise<Origen>,
   ): Promise<{ id: string }> {
@@ -381,9 +460,10 @@ export class EvidenciasService {
           const evidencia = await db.query<{ id: string }>(
             `INSERT INTO convi.evidencias
                (establecimiento_id, archivo_id, tipo_evidencia, titulo,
-                descripcion, ${origen.columna}, paso_caso_id, creado_por)
+                descripcion, ${origen.columna}, paso_caso_id, fecha_documento,
+                creado_por)
              VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5, $6,
-                     convi.membresia_actual())
+                     ${INICIO_DEL_DIA('$7')}, convi.membresia_actual())
              RETURNING id`,
             [
               guardado.rows[0].id,
@@ -392,6 +472,8 @@ export class EvidenciasService {
               datos.descripcion,
               origen.id,
               origen.paso_caso_id ?? null,
+              // PB-072: la fecha del acta es un día de la escuela.
+              'fecha_documento' in datos ? datos.fecha_documento : null,
             ],
           );
           const { error } = await this.supabase.storage

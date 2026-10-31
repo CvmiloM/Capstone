@@ -91,6 +91,8 @@ const AVISOS: Record<string, string> = {
     "Adjuntaste el respaldo al paso, también quedó en las evidencias del caso y no se puede editar ni borrar.",
   "protocolo-estado":
     "Cambiaste el estado del protocolo, el motivo y la fecha quedaron en la auditoría.",
+  // PB-072 (HU-062): acta firmada de una entrevista o reunión.
+  acta: "Adjuntaste el acta firmada al encuentro, quedó como evidencia de tipo Acta con tu nombre y la fecha, y no se puede editar ni borrar.",
 };
 
 /** HU-047 CA2: las tareas sin terminar, en palabras. */
@@ -537,7 +539,11 @@ export default async function PaginaCaso({
             className="lg:col-span-3"
             id="encuentros"
           >
-            <Encuentros caso={caso} formatearFecha={formatearFecha} />
+            <Encuentros
+              caso={caso}
+              formatearFecha={formatearFecha}
+              adjuntar={adjuntar}
+            />
           </Seccion>
         )}
 

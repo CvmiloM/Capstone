@@ -76,6 +76,19 @@ export class EvidenciasConvivenciaController {
     return this.evidencias.adjuntarACaso(peticion.sesion, id, cuerpo, archivo);
   }
 
+  // PB-072 (HU-062): acta firmada de una entrevista o reunión realizada, con
+  // los campos titulo, fecha_documento, descripcion y archivo.
+  @Post('encuentros/:id/actas')
+  @UseInterceptors(CARGA)
+  adjuntarActa(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+    @UploadedFile() archivo: ArchivoSubido | undefined,
+  ) {
+    return this.evidencias.adjuntarActa(peticion.sesion, id, cuerpo, archivo);
+  }
+
   // CA3: la descarga vuelve a comprobar el permiso en cada petición.
   @Get('evidencias/:id/archivo')
   @Header('Cache-Control', 'private, no-store')
