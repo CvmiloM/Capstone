@@ -11,9 +11,13 @@ export const NOMBRE_ROL: Record<Rol, string> = {
 // Planificados o Activos. La API lo exige igual; aquí solo oculta los formularios.
 export const ANIOS_EDITABLES = ["PLANIFICADO", "ACTIVO"];
 
+// PB-023 (HU-018 CA1): largo del motivo de una corrección en un año Cerrado,
+// el mismo que valida la API.
+export const LARGO_MOTIVO = { minimo: 10, maximo: 500 } as const;
+
 // Mismos largos que valida la API.
 export const LARGO_MAXIMO_CURSO = {
   codigo: 40,
   nombre: 120,
   seccion: 20,
-} as const;
+} as const;

@@ -3,17 +3,20 @@
 import { useActionState } from "react";
 import { claseBotonSecundario } from "@/app/components/formulario";
 import { type EstadoFormulario, terminarAsignacion } from "./acciones";
+import { CampoMotivo } from "./campo-motivo";
 
 const estadoInicial: EstadoFormulario = {};
 
 // HU-013 CA4: registra el último día de una asignación. Como no se puede
-// reabrir, pide confirmación antes de enviar.
+// reabrir, pide confirmación antes de enviar. PB-023 (HU-018 CA1): en un año
+// Cerrado corrige el término, hacia antes o hacia después, con un motivo.
 export function BotonTerminar({
   asignacionId,
   profesor,
   desde,
   hasta,
   hoy,
+  anioCerrado,
 }: {
   asignacionId: string;
   profesor: string;
@@ -22,14 +25,23 @@ export function BotonTerminar({
   /** Término ya registrado: el último día no puede ser posterior. */
   hasta: string | null;
   hoy: string;
+  /** PB-023: año Cerrado del curso, el cambio es una corrección con motivo. */
+  anioCerrado?: number;
 }) {
   const [estado, accion, pendiente] = useActionState(
     terminarAsignacion,
     estadoInicial,
   );
-  // Por defecto, hoy, dentro de los límites de la asignación.
-  const sugerida =
-    hasta && hasta < hoy ? hasta : desde && desde > hoy ? desde : hoy;
+  const correccion = anioCerrado !== undefined;
+  // Por defecto, hoy, dentro de los límites de la asignación. Al corregir,
+  // el término que ya tiene.
+  const sugerida = correccion
+    ? (hasta ?? hoy)
+    : hasta && hasta < hoy
+      ? hasta
+      : desde && desde > hoy
+        ? desde
+        : hoy;
   const porDefecto = estado.valores?.fecha_fin ?? sugerida;
 
   return (
@@ -37,17 +49,22 @@ export function BotonTerminar({
       action={accion}
       onSubmit={(evento) => {
         const fecha = new FormData(evento.currentTarget).get("fecha_fin");
-        if (
-          !window.confirm(
-            `¿Terminar la asignación de ${profesor} con último día ${fecha}? Después de ese día no podrá registrar situaciones de este curso, y no se puede reabrir.`,
-          )
-        )
-          evento.preventDefault();
+        const pregunta = correccion
+          ? `¿Corregir el último día de ${profesor} a ${fecha}? La corrección y su motivo quedan en la auditoría.`
+          : `¿Terminar la asignación de ${profesor} con último día ${fecha}? Después de ese día no podrá registrar situaciones de este curso, y no se puede reabrir.`;
+        if (!window.confirm(pregunta)) evento.preventDefault();
       }}
-      className="flex flex-wrap items-center justify-end gap-2"
+      className={
+        correccion
+          ? "space-y-3"
+          : "flex flex-wrap items-center justify-end gap-2"
+      }
     >
       <input type="hidden" name="asignacion_id" value={asignacionId} />
-      <label className="sr-only" htmlFor={`fin-${asignacionId}`}>
+      <label
+        className={correccion ? "block text-sm font-medium" : "sr-only"}
+        htmlFor={`fin-${asignacionId}`}
+      >
         Último día de {profesor}
       </label>
       <input
@@ -56,18 +73,34 @@ export function BotonTerminar({
         type="date"
         defaultValue={porDefecto}
         min={desde ?? undefined}
-        max={hasta ?? undefined}
+        max={correccion ? undefined : (hasta ?? undefined)}
         className="rounded-lg border border-input bg-card px-2 py-1.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/15"
       />
+      {correccion && (
+        <CampoMotivo
+          id={`motivo-fin-${asignacionId}`}
+          anio={anioCerrado}
+          defaultValue={estado.valores?.motivo}
+        />
+      )}
       <button
         type="submit"
         disabled={pendiente}
         className={claseBotonSecundario}
       >
-        {pendiente ? "Terminando…" : "Terminar"}
+        {pendiente
+          ? correccion
+            ? "Corrigiendo…"
+            : "Terminando…"
+          : correccion
+            ? "Corregir término"
+            : "Terminar"}
       </button>
       {estado.mensaje && (
-        <p role="alert" className="w-full text-right text-sm text-destructive">
+        <p
+          role="alert"
+          className={`w-full text-sm text-destructive ${correccion ? "" : "text-right"}`}
+        >
           {estado.mensaje}
         </p>
       )}

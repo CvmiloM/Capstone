@@ -33,8 +33,9 @@ function formatearFecha(fecha: string | null) {
   return fecha ? formatoFecha.format(new Date(`${fecha}T00:00:00Z`)) : "—";
 }
 
-// PB-015 (HU-013): un curso con sus datos y sus profesores. En un año cerrado
-// todo queda de solo lectura (decisión del PO).
+// PB-015 (HU-013): un curso con sus datos y sus profesores. PB-023 (HU-018):
+// en un año cerrado se consulta igual (CA2) y solo cambia como corrección con
+// motivo, que queda en la auditoría (CA1, decisión del PO).
 export default async function PaginaCurso({
   params,
 }: {
@@ -104,8 +105,9 @@ export default async function PaginaCurso({
           role="note"
           className="mb-6 rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground"
         >
-          El año {curso.anio} está cerrado: este curso y sus profesores son de
-          solo lectura.
+          El año {curso.anio} está cerrado: este curso y sus profesores quedan
+          como registro del año, y si hay un error puedes corregirlo indicando
+          el motivo, que queda en la auditoría.
         </p>
       )}
 
@@ -184,6 +186,23 @@ export default async function PaginaCurso({
                                   hoy={hoy}
                                 />
                               )}
+                            {!editable && (
+                              <details className="text-sm">
+                                <summary className="cursor-pointer whitespace-nowrap text-primary">
+                                  Corregir término
+                                </summary>
+                                <div className="mt-3 min-w-64">
+                                  <BotonTerminar
+                                    asignacionId={asignacion.id}
+                                    profesor={nombre}
+                                    desde={asignacion.fecha_inicio}
+                                    hasta={asignacion.fecha_fin}
+                                    hoy={hoy}
+                                    anioCerrado={curso.anio}
+                                  />
+                                </div>
+                              </details>
+                            )}
                           </td>
                         </tr>
                       );
@@ -194,7 +213,7 @@ export default async function PaginaCurso({
             )}
           </section>
 
-          {editable && (
+          {editable ? (
             <section
               aria-labelledby="titulo-asignar"
               className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta"
@@ -217,6 +236,22 @@ export default async function PaginaCurso({
                 />
               )}
             </section>
+          ) : (
+            profesores.length > 0 && (
+              <details className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta">
+                <summary className="cursor-pointer text-lg font-semibold">
+                  Agregar un profesor que faltó
+                </summary>
+                <div className="mt-4">
+                  <FormularioAsignacion
+                    cursoId={curso.id}
+                    profesores={profesores}
+                    hoy={hoy}
+                    anioCerrado={curso.anio}
+                  />
+                </div>
+              </details>
+            )
           )}
         </div>
 
@@ -230,19 +265,33 @@ export default async function PaginaCurso({
           {editable ? (
             <FormularioCurso curso={curso} niveles={opcionesNivel} />
           ) : (
-            <dl className="space-y-2 text-sm">
-              <div>
-                <dt className="text-muted-foreground">Código</dt>
-                <dd className="font-mono">{curso.codigo}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Nivel</dt>
-                <dd>{curso.nivel_nombre}</dd>
-              </div>
-            </dl>
+            <>
+              <dl className="space-y-2 text-sm">
+                <div>
+                  <dt className="text-muted-foreground">Código</dt>
+                  <dd className="font-mono">{curso.codigo}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Nivel</dt>
+                  <dd>{curso.nivel_nombre}</dd>
+                </div>
+              </dl>
+              <details className="mt-4 text-sm">
+                <summary className="cursor-pointer text-primary">
+                  Corregir datos del curso
+                </summary>
+                <div className="mt-4">
+                  <FormularioCurso
+                    curso={curso}
+                    niveles={opcionesNivel}
+                    correccion
+                  />
+                </div>
+              </details>
+            </>
           )}
         </section>
       </div>
     </>
   );
-}
+}
