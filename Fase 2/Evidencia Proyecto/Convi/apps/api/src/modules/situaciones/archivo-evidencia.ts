@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { esDia } from './plan-intervencion.js';
 
 // PB-130 (HU-111) y PB-066 (HU-057): archivo y datos de una evidencia. El
 // servidor revisa el contenido real del archivo, no solo su nombre ni el tipo
@@ -11,7 +12,8 @@ export const TAMANO_MAXIMO = 25 * 1024 * 1024;
 export const LARGO_MAXIMO_TITULO_EVIDENCIA = 220;
 export const LARGO_MAXIMO_DESCRIPCION_EVIDENCIA = 2000;
 
-// HU-057 CA1. El acta (ACTA) llega con PB-072, con su fecha del documento.
+// HU-057 CA1. El acta (ACTA) se adjunta aparte, con su fecha del documento
+// (PB-072, validarActa).
 export const TIPOS_EVIDENCIA = [
   'DOCUMENTO',
   'IMAGEN',
@@ -55,6 +57,13 @@ export type NuevaEvidencia = {
   tipo: (typeof TIPOS_EVIDENCIA)[number];
   descripcion: string | null;
   archivo: ArchivoValido;
+};
+
+/** PB-072 (HU-062 CA1): el acta firmada, siempre de tipo Acta y con la fecha del documento. */
+export type NuevaActa = Omit<NuevaEvidencia, 'tipo'> & {
+  tipo: 'ACTA';
+  /** AAAA-MM-DD. */
+  fecha_documento: string;
 };
 
 const MENSAJE = 'Revisa los datos marcados. No se adjuntó la evidencia.';
@@ -248,6 +257,55 @@ export function validarEvidencia(
     tipo,
     descripcion: descripcion || null,
     archivo: revisado,
+  };
+}
+
+/**
+ * PB-072 (HU-062 CA1): título, fecha del documento y archivo obligatorios;
+ * descripción opcional. El servicio revisa que la fecha no sea futura ni
+ * anterior al día del encuentro.
+ */
+export function validarActa(
+  cuerpo: unknown,
+  archivo: ArchivoSubido | undefined,
+): NuevaActa {
+  const datos = (
+    typeof cuerpo === 'object' && cuerpo !== null ? cuerpo : {}
+  ) as Record<string, unknown>;
+  const errores: Record<string, string> = {};
+
+  const titulo = typeof datos.titulo === 'string' ? datos.titulo.trim() : '';
+  if (!titulo) errores.titulo = 'Escribe un título para el acta.';
+  else if (titulo.length > LARGO_MAXIMO_TITULO_EVIDENCIA)
+    errores.titulo = `El título admite hasta ${LARGO_MAXIMO_TITULO_EVIDENCIA} caracteres.`;
+
+  const fecha = datos.fecha_documento;
+  if (!esDia(fecha))
+    errores.fecha_documento = 'Indica la fecha que lleva el acta.';
+
+  const descripcion =
+    typeof datos.descripcion === 'string' ? datos.descripcion.trim() : '';
+  if (descripcion.length > LARGO_MAXIMO_DESCRIPCION_EVIDENCIA)
+    errores.descripcion = `La descripción admite hasta ${LARGO_MAXIMO_DESCRIPCION_EVIDENCIA} caracteres.`;
+
+  const revisado = validarArchivo(archivo);
+  if ('error' in revisado)
+    errores.archivo =
+      !archivo || archivo.size === 0
+        ? 'Elige el archivo escaneado del acta.'
+        : revisado.error;
+
+  if (!esDia(fecha) || 'error' in revisado || Object.keys(errores).length > 0)
+    throw new BadRequestException({
+      mensaje: 'Revisa los datos marcados. No se adjuntó el acta.',
+      errores,
+    });
+  return {
+    titulo,
+    tipo: 'ACTA',
+    descripcion: descripcion || null,
+    archivo: revisado,
+    fecha_documento: fecha,
   };
 }
 

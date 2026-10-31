@@ -189,6 +189,17 @@ export type Encuentro = {
   motivo_cancelacion: string | null;
   /** Huella de lo que se ve, para rechazar cambios sobre datos viejos (PB-139). */
   version: string;
+  /** PB-072 (HU-062): actas firmadas de la entrevista o reunión. */
+  actas: {
+    id: string;
+    titulo: string;
+    descripcion: string | null;
+    archivo: string | null;
+    /** AAAA-MM-DD en la zona horaria de la escuela. */
+    fecha_documento: string;
+    creado_por: string;
+    creado_en: string;
+  }[];
   asistentes: {
     participacion_id: string;
     persona_id: string;

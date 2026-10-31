@@ -5,6 +5,7 @@ import {
   formatoReal,
   nombresEnZip,
   TAMANO_MAXIMO,
+  validarActa,
   validarArchivo,
   validarEvidencia,
 } from './archivo-evidencia.js';
@@ -193,7 +194,7 @@ describe('Datos de la evidencia (PB-066, HU-057)', () => {
     });
   });
 
-  it('no acepta el tipo Acta, que llega con PB-072', () => {
+  it('no acepta el tipo Acta, que se adjunta aparte (PB-072)', () => {
     expect(
       camposConError(() =>
         validarEvidencia(
@@ -202,6 +203,43 @@ describe('Datos de la evidencia (PB-066, HU-057)', () => {
         ),
       ),
     ).toEqual(['tipo']);
+  });
+
+  // PB-072 (HU-062 CA1): el acta firmada lleva archivo, título y fecha del documento.
+  it('el acta exige título, fecha del documento y archivo', () => {
+    expect(camposConError(() => validarActa({}, undefined))).toEqual([
+      'archivo',
+      'fecha_documento',
+      'titulo',
+    ]);
+    expect(
+      camposConError(() =>
+        validarActa(
+          { titulo: 'Acta', fecha_documento: '2026-02-30' },
+          archivo('acta.pdf', PDF),
+        ),
+      ),
+    ).toEqual(['fecha_documento']);
+  });
+
+  it('el acta queda de tipo Acta aunque el cuerpo diga otro tipo', () => {
+    expect(
+      validarActa(
+        {
+          titulo: ' Acta de la entrevista ',
+          tipo: 'IMAGEN',
+          fecha_documento: '2026-10-30',
+          descripcion: ' Firmada por el apoderado ',
+        },
+        archivo('acta.pdf', PDF),
+      ),
+    ).toMatchObject({
+      titulo: 'Acta de la entrevista',
+      tipo: 'ACTA',
+      fecha_documento: '2026-10-30',
+      descripcion: 'Firmada por el apoderado',
+      archivo: { formato: 'pdf' },
+    });
   });
 });
 

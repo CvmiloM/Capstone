@@ -49,6 +49,8 @@ export type DestinoEvidencia =
   | "convivencia-caso"
   // PB-055 (HU-048 CA3): evidencia del caso que respalda un paso del protocolo.
   | "convivencia-paso"
+  // PB-072 (HU-062): acta firmada de una entrevista o reunión.
+  | "convivencia-acta"
   | "profesor-situacion";
 
 export function formatearTamano(bytes: number) {

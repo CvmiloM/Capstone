@@ -445,6 +445,18 @@ export type Encuentro = {
   motivo_reprogramacion: string | null;
   motivo_cancelacion: string | null;
   version: string;
+  /** PB-072 (HU-062): actas firmadas de la entrevista o reunión. */
+  actas: {
+    id: string;
+    titulo: string;
+    descripcion: string | null;
+    archivo: string | null;
+    /** AAAA-MM-DD en la zona horaria de la escuela. */
+    fecha_documento: string;
+    creado_por: string;
+    /** Texto ISO: llega dentro del JSON del encuentro. */
+    creado_en: string;
+  }[];
   asistentes: {
     participacion_id: string;
     persona_id: string;
@@ -473,7 +485,8 @@ export async function encuentrosDelCaso(
                AND e.metadatos->'despues'->>'estado' = 'CANCELADA'
                AND e.metadatos->'antes'->>'estado' <> 'CANCELADA'
              ORDER BY e.ocurrido_en DESC LIMIT 1) AS motivo_cancelacion,
-            md5(to_jsonb(a)::text) AS version
+            md5(to_jsonb(a)::text) AS version,
+            coalesce(ac.actas, '[]'::json) AS actas
      FROM convi.actuaciones a
      JOIN convi.membresias_establecimiento mr ON mr.id = a.membresia_responsable_id
      JOIN convi.personas pr ON pr.id = mr.persona_id
@@ -491,6 +504,21 @@ export async function encuentrosDelCaso(
          AND e.metadatos->'antes'->>'programado_en'
              IS DISTINCT FROM e.metadatos->'despues'->>'programado_en'
      ) r
+     -- PB-072: las actas van en la misma consulta, sin otro viaje a la base.
+     LEFT JOIN LATERAL (
+       SELECT json_agg(json_build_object(
+                'id', ev.id, 'titulo', ev.titulo, 'descripcion', ev.descripcion,
+                'archivo', ar.nombre_original,
+                'fecha_documento', to_char(ev.fecha_documento AT TIME ZONE ${ZONA_ESCUELA}, 'YYYY-MM-DD'),
+                'creado_por', pe.nombres || ' ' || pe.apellidos,
+                'creado_en', ev.creado_en)
+              ORDER BY ev.fecha_documento, ev.creado_en, ev.id) AS actas
+       FROM convi.evidencias ev
+       LEFT JOIN convi.archivos ar ON ar.id = ev.archivo_id
+       JOIN convi.membresias_establecimiento me ON me.id = ev.creado_por
+       JOIN convi.personas pe ON pe.id = me.persona_id
+       WHERE ev.actuacion_id = a.id AND ev.tipo_evidencia = 'ACTA'
+     ) ac ON true
      WHERE a.caso_id = $1 AND a.tipo_actuacion <> 'SEGUIMIENTO'
      ORDER BY a.estado IN ('PLANIFICADA', 'POSPUESTA') DESC,
               CASE WHEN a.estado IN ('PLANIFICADA', 'POSPUESTA') THEN a.programado_en END,
