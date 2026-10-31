@@ -13,6 +13,17 @@ export const TIPOS_DOCUMENTO = [
   'OTRO',
 ] as const;
 
+/**
+ * PB-079, decisión del PO (2026-10-30): todo documento se prepara para la
+ * búsqueda con IA salvo las plantillas, que la base no admite como fuente.
+ */
+export function usaBusquedaIa(tipo: string) {
+  return (
+    (TIPOS_DOCUMENTO as readonly string[]).includes(tipo) &&
+    tipo !== 'PLANTILLA'
+  );
+}
+
 function cuerpo(valor: unknown): Record<string, unknown> {
   return typeof valor === 'object' && valor !== null
     ? (valor as Record<string, unknown>)

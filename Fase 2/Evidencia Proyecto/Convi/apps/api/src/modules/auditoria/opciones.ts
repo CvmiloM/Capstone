@@ -3,6 +3,7 @@ export const ACCIONES: Record<string, string> = {
   MFA_RESTABLECIDO: 'Segundo factor restablecido',
   INVITACION_REENVIADA: 'Invitación reenviada',
   REPUBLICACION_DOCUMENTO: 'Documento publicado nuevamente',
+  HABILITACION_BUSQUEDA_IA: 'Documento habilitado para búsqueda con IA',
   REGISTRO_ESTABLECIMIENTO: 'Establecimiento registrado',
   MODIFICACION: 'Registro actualizado',
   CREACION: 'Registro creado',

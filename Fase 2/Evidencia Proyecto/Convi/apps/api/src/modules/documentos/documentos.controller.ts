@@ -59,6 +59,14 @@ export class DocumentosController {
   ) {
     return this.preparacion.solicitar(r.sesion, id);
   }
+  // PB-079: habilita para la búsqueda con IA una versión que no lo estaba.
+  @Post('versiones/:id/busqueda-ia')
+  habilitarBusqueda(
+    @Req() r: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.documentos.habilitarBusqueda(r.sesion, id);
+  }
   @Get('versiones/:id/preparacion')
   @Header('Cache-Control', 'private, no-store')
   estadoPreparacion(

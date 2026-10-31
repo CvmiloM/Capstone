@@ -171,6 +171,11 @@ export async function DetalleDocumento({
                 key={`${v.id}-${v.estado_procesamiento}-${v.intentos_procesamiento}`}
                 version={v}
                 portal={portal}
+                habilitable={
+                  d.tipo_documento !== "PLANTILLA" &&
+                  d.estado === "ACTIVO" &&
+                  ["BORRADOR", "PUBLICADO"].includes(v.estado)
+                }
               />
             }
             acciones={

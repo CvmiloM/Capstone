@@ -32,6 +32,7 @@ export async function cambiarDocumento(
       archivar: "archivo",
       republicar: "republicacion",
       preparar: "preparacion",
+      habilitar: "busqueda-ia",
     };
     if (!rutas[accion]) return { mensaje: "Acción no válida" };
     ruta = `/versiones/${encodeURIComponent(version)}/${rutas[accion]}`;

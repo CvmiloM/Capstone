@@ -16,7 +16,7 @@ import {
   type AccesoRegistro,
 } from '../../database/cuenta.service.js';
 import type { ArchivoSubido } from '../situaciones/archivo-evidencia.js';
-import { validarCarga, validarVigencia } from './documento.js';
+import { usaBusquedaIa, validarCarga, validarVigencia } from './documento.js';
 import {
   COLA_DOCUMENTOS,
   encolarDocumento,
@@ -227,8 +227,8 @@ export class DocumentosService {
               doc.id,
               datos.etiqueta,
               ar.id,
-              doc.tipo_documento === 'RICE',
-              doc.tipo_documento === 'RICE' ? 'PENDIENTE' : 'NO_APLICA',
+              usaBusquedaIa(doc.tipo_documento),
+              usaBusquedaIa(doc.tipo_documento) ? 'PENDIENTE' : 'NO_APLICA',
             ],
           )
           .catch((e: unknown) => {
@@ -367,9 +367,10 @@ export class DocumentosService {
         etiqueta_version: string;
         archivo_id: string;
         incluir_en_busqueda_ia: boolean;
+        tipo_documento: string;
       }>(
         `SELECT v.id, v.documento_id, v.estado, v.vigente_desde::text, v.vigente_hasta::text,
-           d.titulo, v.etiqueta_version, v.archivo_id, v.incluir_en_busqueda_ia
+           d.titulo, v.etiqueta_version, v.archivo_id, v.incluir_en_busqueda_ia, d.tipo_documento
          FROM convi.versiones_documento v JOIN convi.documentos_institucionales d ON d.id = v.documento_id WHERE v.id = $1 FOR UPDATE OF v`,
         [id],
       )
@@ -465,62 +466,148 @@ export class DocumentosService {
         throw new ConflictException(
           'Recarga la página para publicar desde la fecha actual de tu escuela',
         );
-      const etiquetas = (
-        await db.query<{ etiqueta_version: string }>(
-          `SELECT v.etiqueta_version FROM convi.versiones_documento v
-        JOIN convi.documentos_institucionales d ON d.id = v.documento_id
-        WHERE lower(regexp_replace(trim(d.titulo), '[[:space:]]+', ' ', 'g')) = lower(regexp_replace(trim($1::text), '[[:space:]]+', ' ', 'g'))`,
-          [v.titulo],
-        )
-      ).rows;
-      const usadas = new Set(
-        etiquetas.map((x) =>
-          x.etiqueta_version
-            .trim()
-            .replace(/\s+/g, ' ')
-            .toLocaleLowerCase('es'),
-        ),
-      );
-      let numero = 1,
-        etiqueta: string;
-      do {
-        const sufijo = ` · republicación ${numero++}`;
-        etiqueta = v.etiqueta_version.slice(0, 60 - sufijo.length) + sufijo;
-      } while (usadas.has(etiqueta.toLocaleLowerCase('es')));
-      await db.query(
-        "UPDATE convi.versiones_documento SET estado = 'ARCHIVADO' WHERE documento_id = $1 AND estado = 'PUBLICADO'",
-        [v.documento_id],
-      );
-      const nueva = (
-        await db.query<{ id: string }>(
-          `INSERT INTO convi.versiones_documento
-        (establecimiento_id, documento_id, etiqueta_version, archivo_id, subido_por, estado, publicado_en,
-         vigente_desde, vigente_hasta, incluir_en_busqueda_ia, estado_procesamiento)
-        VALUES (convi.establecimiento_actual(), $1, $2, $3, convi.membresia_actual(), 'PUBLICADO', now(), $4, $5, $6, $7) RETURNING id`,
-          [
-            v.documento_id,
-            etiqueta,
-            v.archivo_id,
-            hoy,
-            datos.hasta,
-            v.incluir_en_busqueda_ia,
-            v.incluir_en_busqueda_ia ? 'PENDIENTE' : 'NO_APLICA',
-          ],
-        )
-      ).rows[0];
-      await db.query(
-        `INSERT INTO convi.eventos_auditoria
-        (establecimiento_id, membresia_actor_id, codigo_accion, tipo_recurso, recurso_id, codigo_resultado, metadatos)
-        VALUES (convi.establecimiento_actual(), convi.membresia_actual(), 'REPUBLICACION_DOCUMENTO', 'versiones_documento', $1, 'OK', jsonb_build_object('version_origen_id', $2::text))`,
-        [nueva.id, id],
-      );
-      return { id: nueva.id, documento_id: v.documento_id };
+      return this.publicarCopia(db, v, {
+        sufijo: (n) => ` · republicación ${n}`,
+        desde: hoy,
+        hasta: datos.hasta,
+        archivar: 'documento',
+        accion: 'REPUBLICACION_DOCUMENTO',
+      });
     });
     const preparacion_solicitada = await this.programarPreparacion(
       sesion,
       guardado.id,
     );
     return { ...guardado, preparacion_solicitada };
+  }
+
+  /**
+   * PB-079, decisión del PO (2026-10-30): una versión que no está habilitada para la
+   * búsqueda con IA se habilita sin volver a subir el archivo. En borrador se marca y
+   * listo, pero una versión publicada no cambia (proteger_version), así que se publica
+   * de nuevo el mismo archivo con las mismas fechas, ya habilitado, y la anterior queda
+   * archivada. Las plantillas no se habilitan.
+   */
+  async habilitarBusqueda(sesion: Sesion, id: string) {
+    const guardado = await this.operarCatalogo(sesion, async (db) => {
+      const v = await this.bloquearVersion(db, id);
+      if (v.incluir_en_busqueda_ia)
+        return { id: v.id, documento_id: v.documento_id };
+      if (!usaBusquedaIa(v.tipo_documento))
+        throw new ConflictException(
+          'Las plantillas se conservan para descarga, no se usan en la búsqueda con IA',
+        );
+      if (!v.documento_activo)
+        throw new ConflictException('El documento está inactivo');
+      if (v.estado === 'BORRADOR') {
+        await db.query(
+          `UPDATE convi.versiones_documento
+           SET incluir_en_busqueda_ia = true, estado_procesamiento = 'PENDIENTE'
+           WHERE id = $1`,
+          [id],
+        );
+        return { id: v.id, documento_id: v.documento_id };
+      }
+      if (v.estado !== 'PUBLICADO') {
+        // Un segundo clic llega cuando esta ya quedó archivada: responde la versión
+        // que creó el primero, sin publicar otra.
+        const creada = (
+          await db.query<{ recurso_id: string }>(
+            `SELECT recurso_id FROM convi.eventos_auditoria
+             WHERE codigo_accion = 'HABILITACION_BUSQUEDA_IA'
+               AND metadatos->>'version_origen_id' = $1::text
+             ORDER BY ocurrido_en DESC LIMIT 1`,
+            [v.id],
+          )
+        ).rows[0];
+        if (creada)
+          return { id: creada.recurso_id, documento_id: v.documento_id };
+        throw new ConflictException(
+          'Esta versión está archivada, publícala nuevamente y quedará habilitada para la búsqueda con IA',
+        );
+      }
+      return this.publicarCopia(db, v, {
+        sufijo: (n) => (n === 1 ? ' · con IA' : ` · con IA ${n}`),
+        desde: v.vigente_desde,
+        hasta: v.vigente_hasta,
+        archivar: 'version',
+        accion: 'HABILITACION_BUSQUEDA_IA',
+      });
+    });
+    const preparacion_solicitada = await this.programarPreparacion(
+      sesion,
+      guardado.id,
+    );
+    return { ...guardado, preparacion_solicitada };
+  }
+
+  /**
+   * Publica otra versión con el mismo archivo y una etiqueta libre, archiva la
+   * anterior y deja el evento de auditoría. Queda habilitada para la búsqueda con IA
+   * si el documento no es una plantilla.
+   */
+  private async publicarCopia(
+    db: PoolClient,
+    v: Awaited<ReturnType<DocumentosService['bloquearVersion']>>,
+    opciones: {
+      sufijo: (numero: number) => string;
+      desde: string | null;
+      hasta: string | null;
+      archivar: 'documento' | 'version';
+      accion: 'REPUBLICACION_DOCUMENTO' | 'HABILITACION_BUSQUEDA_IA';
+    },
+  ) {
+    const etiquetas = (
+      await db.query<{ etiqueta_version: string }>(
+        `SELECT v.etiqueta_version FROM convi.versiones_documento v
+        JOIN convi.documentos_institucionales d ON d.id = v.documento_id
+        WHERE lower(regexp_replace(trim(d.titulo), '[[:space:]]+', ' ', 'g')) = lower(regexp_replace(trim($1::text), '[[:space:]]+', ' ', 'g'))`,
+        [v.titulo],
+      )
+    ).rows;
+    const usadas = new Set(
+      etiquetas.map((x) =>
+        x.etiqueta_version.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es'),
+      ),
+    );
+    let numero = 1,
+      etiqueta: string;
+    do {
+      const sufijo = opciones.sufijo(numero++);
+      etiqueta = v.etiqueta_version.slice(0, 60 - sufijo.length) + sufijo;
+    } while (usadas.has(etiqueta.toLocaleLowerCase('es')));
+    // Al republicar se archiva la publicada del documento, al habilitar solo esta versión.
+    await db.query(
+      opciones.archivar === 'documento'
+        ? "UPDATE convi.versiones_documento SET estado = 'ARCHIVADO' WHERE documento_id = $1 AND estado = 'PUBLICADO'"
+        : "UPDATE convi.versiones_documento SET estado = 'ARCHIVADO' WHERE id = $1 AND estado = 'PUBLICADO'",
+      [opciones.archivar === 'documento' ? v.documento_id : v.id],
+    );
+    const incluir = v.incluir_en_busqueda_ia || usaBusquedaIa(v.tipo_documento);
+    const nueva = (
+      await db.query<{ id: string }>(
+        `INSERT INTO convi.versiones_documento
+        (establecimiento_id, documento_id, etiqueta_version, archivo_id, subido_por, estado, publicado_en,
+         vigente_desde, vigente_hasta, incluir_en_busqueda_ia, estado_procesamiento)
+        VALUES (convi.establecimiento_actual(), $1, $2, $3, convi.membresia_actual(), 'PUBLICADO', now(), $4, $5, $6, $7) RETURNING id`,
+        [
+          v.documento_id,
+          etiqueta,
+          v.archivo_id,
+          opciones.desde,
+          opciones.hasta,
+          incluir,
+          incluir ? 'PENDIENTE' : 'NO_APLICA',
+        ],
+      )
+    ).rows[0];
+    await db.query(
+      `INSERT INTO convi.eventos_auditoria
+        (establecimiento_id, membresia_actor_id, codigo_accion, tipo_recurso, recurso_id, codigo_resultado, metadatos)
+        VALUES (convi.establecimiento_actual(), convi.membresia_actual(), $3, 'versiones_documento', $1, 'OK', jsonb_build_object('version_origen_id', $2::text))`,
+      [nueva.id, v.id, opciones.accion],
+    );
+    return { id: nueva.id, documento_id: v.documento_id };
   }
 
   async descargar(sesion: Sesion, id: string) {
