@@ -47,6 +47,8 @@ export const TAMANO_MAXIMO = 25 * 1024 * 1024;
 export type DestinoEvidencia =
   | "convivencia-situacion"
   | "convivencia-caso"
+  // PB-055 (HU-048 CA3): evidencia del caso que respalda un paso del protocolo.
+  | "convivencia-paso"
   | "profesor-situacion";
 
 export function formatearTamano(bytes: number) {

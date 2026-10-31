@@ -162,6 +162,8 @@ export type DetalleCaso = CasoLista & {
   evidencias: EvidenciaRegistrada[];
   /** PB-082 (HU-071 CA1): protocolos aplicados con sus pasos. */
   protocolos_aplicados: ProtocoloAplicado[];
+  /** PB-055 (HU-048 CA2): cuentas activas de Convivencia para los pasos. */
+  responsables_paso: { id: string; nombre: string }[];
   /** Versiones publicadas y vigentes que se pueden aplicar hoy. */
   protocolos_aplicables: { id: string; nombre: string; pasos: number }[];
   /** HU-071 CA2 y CA3: revisiones del caso sin protocolo. */
@@ -407,6 +409,12 @@ export class CasosService {
           protocolos_aplicados: await cargar(
             'protocolos_aplicados',
             () => protocolosDelCaso(db, id),
+            [],
+          ),
+          // Las mismas cuentas que pueden ser responsables de un encuentro.
+          responsables_paso: await cargar(
+            'responsables_paso',
+            () => responsablesDeEncuentro(db),
             [],
           ),
           protocolos_aplicables: await cargar(

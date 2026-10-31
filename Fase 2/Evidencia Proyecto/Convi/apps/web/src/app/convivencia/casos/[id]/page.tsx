@@ -25,6 +25,7 @@ import { SeguimientoCaso } from "./seguimientos";
 import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
 import { PlanIntervencion } from "./plan-intervencion";
+import { ProtocolosAplicados } from "./protocolo-aplicado";
 import { ResumenCaso } from "./resumen";
 import { FormularioContinuidad } from "./formulario-continuidad";
 import {
@@ -81,20 +82,15 @@ const AVISOS: Record<string, string> = {
     "Registraste el encuentro como realizado, con su resultado y la asistencia de cada participante.",
   "encuentro-cancelado":
     "Cancelaste el encuentro, el motivo queda en la auditoría.",
-};
-
-/** PB-082: estados del protocolo aplicado y de cada paso en el caso. */
-const NOMBRE_ESTADO_PROTOCOLO: Record<string, string> = {
-  ACTIVO: "Activo",
-  COMPLETADO: "Completado",
-  CANCELADO: "Cancelado",
-};
-const NOMBRE_ESTADO_PASO: Record<string, string> = {
-  PENDIENTE: "Pendiente",
-  EN_PROGRESO: "En progreso",
-  COMPLETADO: "Completado",
-  OMITIDO: "Omitido",
-  VENCIDO: "Vencido",
+  // PB-055 y PB-056 (HU-048 y HU-049): pasos del protocolo y su término.
+  "paso-avance":
+    "Registraste el avance del paso, quedó con tu nombre y la fecha en la auditoría.",
+  "paso-asignado":
+    "Guardaste el responsable y el plazo del paso, la auditoría guarda el valor anterior y el nuevo.",
+  "paso-evidencia":
+    "Adjuntaste el respaldo al paso, también quedó en las evidencias del caso y no se puede editar ni borrar.",
+  "protocolo-estado":
+    "Cambiaste el estado del protocolo, el motivo y la fecha quedaron en la auditoría.",
 };
 
 /** HU-047 CA2: las tareas sin terminar, en palabras. */
@@ -426,58 +422,12 @@ export default async function PaginaCaso({
                   caso sigue sin uno.
                 </p>
               )}
-            {caso.protocolos_aplicados.map((aplicado) => (
-              <div
-                key={aplicado.id}
-                className="mb-4 rounded-xl border border-border p-4 text-sm"
-              >
-                <p className="font-medium">
-                  {aplicado.protocolo} · versión {aplicado.numero_version}
-                  <span className="ml-2 rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-                    {NOMBRE_ESTADO_PROTOCOLO[aplicado.estado] ??
-                      aplicado.estado}
-                  </span>
-                </p>
-                <p className="mt-1 whitespace-pre-line">
-                  {aplicado.fundamento}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Aplicado por {aplicado.aplicado_por} el{" "}
-                  {formatearFecha(aplicado.aplicado_en)}
-                </p>
-                <ol className="mt-3 divide-y divide-border border-t border-border">
-                  {aplicado.pasos.map((paso) => (
-                    <li
-                      key={paso.id}
-                      className="flex flex-wrap items-start justify-between gap-2 py-2"
-                    >
-                      <div>
-                        <p>
-                          {paso.orden_paso}. {paso.nombre}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {[
-                            paso.vence_en
-                              ? `Vence el ${formatearFecha(paso.vence_en)}`
-                              : "Sin plazo",
-                            paso.responsable
-                              ? `Responsable: ${paso.responsable}`
-                              : "Sin responsable asignado",
-                            paso.es_obligatorio ? null : "Opcional",
-                            paso.requiere_evidencia ? "Exige evidencia" : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                        {NOMBRE_ESTADO_PASO[paso.estado] ?? paso.estado}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ))}
+            {/* PB-055 y PB-056: pasos, su avance y el término del protocolo. */}
+            <ProtocolosAplicados
+              caso={caso}
+              formatearFecha={formatearFecha}
+              adjuntar={adjuntar}
+            />
             {caso.revisiones_normativas.map((r) => (
               <div
                 key={r.id}

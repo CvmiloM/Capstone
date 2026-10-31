@@ -81,27 +81,9 @@ export type DetalleCaso = CasoLista & {
   /** PB-066: evidencias del caso y de sus situaciones vinculadas. */
   evidencias: Evidencia[];
   /** PB-082 (HU-071 CA1): protocolos aplicados con sus pasos. */
-  protocolos_aplicados: {
-    id: string;
-    protocolo: string;
-    codigo: string;
-    numero_version: number;
-    estado: string;
-    fundamento: string;
-    aplicado_por: string;
-    aplicado_en: string;
-    pasos: {
-      id: string;
-      orden_paso: number;
-      nombre: string;
-      descripcion: string | null;
-      estado: string;
-      vence_en: string | null;
-      requiere_evidencia: boolean;
-      es_obligatorio: boolean;
-      responsable: string | null;
-    }[];
-  }[];
+  protocolos_aplicados: ProtocoloAplicado[];
+  /** PB-055 (HU-048 CA2): cuentas activas de Convivencia para los pasos. */
+  responsables_paso: { id: string; nombre: string }[];
   /** Versiones publicadas y vigentes que se pueden aplicar hoy. */
   protocolos_aplicables: { id: string; nombre: string; pasos: number }[];
   /** HU-071 CA2 y CA3: revisiones del caso sin protocolo. */
@@ -128,6 +110,47 @@ export type DetalleCaso = CasoLista & {
     asistentes: AsistentePosible[];
     acciones_plan: { id: string; descripcion: string }[];
   };
+};
+
+/** PB-082 (HU-071), PB-055 (HU-048) y PB-056 (HU-049): protocolo aplicado al caso. */
+export type ProtocoloAplicado = {
+  id: string;
+  protocolo: string;
+  codigo: string;
+  numero_version: number;
+  estado: string;
+  fundamento: string;
+  aplicado_por: string;
+  aplicado_en: string;
+  /** Fecha y motivo del término, si se completó o canceló. */
+  terminado_en: string | null;
+  motivo_termino: string | null;
+  /** Huella de lo que se ve, para rechazar cambios sobre datos viejos (PB-139). */
+  version: string;
+  pasos: PasoProtocolo[];
+};
+
+export type PasoProtocolo = {
+  id: string;
+  orden_paso: number;
+  nombre: string;
+  descripcion: string | null;
+  estado: string;
+  vence_en: string | null;
+  /** AAAA-MM-DD en la zona horaria de la escuela. */
+  vence_dia: string | null;
+  /** Sigue Pendiente o En progreso y ya pasó su plazo. */
+  vencido: boolean;
+  requiere_evidencia: boolean;
+  es_obligatorio: boolean;
+  responsable: string | null;
+  responsable_id: string | null;
+  notas: string | null;
+  completado_en: string | null;
+  completado_por: string | null;
+  /** CA3: archivos adjuntos al paso, que también son evidencias del caso. */
+  respaldos: Evidencia[];
+  version: string;
 };
 
 /** Persona que puede asistir a un encuentro del caso, con su rol. */
@@ -291,6 +314,35 @@ export function enviarCambioEncuentro(
   return enviar(
     "POST",
     `/convivencia/encuentros/${encodeURIComponent(encuentroId)}/${operacion}`,
+    cuerpo,
+  );
+}
+
+// PB-055 y PB-056 (HU-048 y HU-049): la API vuelve a validar todo.
+
+/** Avance del paso: En progreso, Completado u Omitido con sus notas. */
+export function enviarAvancePaso(pasoId: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/pasos-caso/${encodeURIComponent(pasoId)}/avance`,
+    cuerpo,
+  );
+}
+
+/** Responsable y plazo del paso. */
+export function enviarAsignacionPaso(pasoId: string, cuerpo: unknown) {
+  return enviar(
+    "PATCH",
+    `/convivencia/pasos-caso/${encodeURIComponent(pasoId)}`,
+    cuerpo,
+  );
+}
+
+/** Completar, cancelar o reabrir el protocolo con un motivo. */
+export function enviarEstadoProtocolo(protocoloId: string, cuerpo: unknown) {
+  return enviar(
+    "POST",
+    `/convivencia/protocolos-caso/${encodeURIComponent(protocoloId)}/estado`,
     cuerpo,
   );
 }

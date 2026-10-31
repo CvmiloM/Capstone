@@ -19,6 +19,8 @@ import { ExpedientesController } from './expedientes.controller.js';
 import { ExpedientesService } from './expedientes.service.js';
 import { HistorialController } from './historial.controller.js';
 import { HistorialService } from './historial.service.js';
+import { PasosProtocoloController } from './pasos-protocolo.controller.js';
+import { PasosProtocoloService } from './pasos-protocolo.service.js';
 import { PlanesController } from './planes.controller.js';
 import { PlanesService } from './planes.service.js';
 import { ApoderadoController } from './apoderado.controller.js';
@@ -37,6 +39,7 @@ import { ProfesorService } from './profesor.service.js';
 // registrar una situación.
 // PB-061 y PB-062: el plan de intervención del caso y sus acciones.
 // PB-063 y PB-064: los encuentros del caso (entrevistas, reuniones y otros).
+// PB-055 y PB-056: los pasos del protocolo aplicado y su término.
 @Module({
   imports: [AuthModule, AlertasModule],
   controllers: [
@@ -49,6 +52,7 @@ import { ProfesorService } from './profesor.service.js';
     CasosController,
     PlanesController,
     EncuentrosController,
+    PasosProtocoloController,
     EvidenciasConvivenciaController,
     EvidenciasProfesorController,
   ],
@@ -62,6 +66,7 @@ import { ProfesorService } from './profesor.service.js';
     CasosService,
     PlanesService,
     EncuentrosService,
+    PasosProtocoloService,
     EvidenciasService,
     {
       provide: ALMACENAMIENTO,

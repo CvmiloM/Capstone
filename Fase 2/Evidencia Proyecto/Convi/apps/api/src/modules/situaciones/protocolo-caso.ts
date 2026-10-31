@@ -72,6 +72,17 @@ export async function protocolosAplicables(
   return versiones.rows;
 }
 
+/** PB-055 (HU-048 CA3): archivo adjunto a un paso, que también es evidencia del caso. */
+export type RespaldoPaso = {
+  id: string;
+  titulo: string;
+  tipo: string;
+  archivo: string | null;
+  creado_por: string;
+  /** Texto ISO: llega dentro del JSON del paso. */
+  creado_en: string;
+};
+
 export type ProtocoloAplicado = {
   id: string;
   protocolo: string;
@@ -81,6 +92,11 @@ export type ProtocoloAplicado = {
   fundamento: string;
   aplicado_por: string;
   aplicado_en: Date;
+  /** PB-056 (HU-049): fecha y motivo del término, si se completó o canceló. */
+  terminado_en: Date | null;
+  motivo_termino: string | null;
+  /** Huella de lo que se ve, para rechazar cambios sobre datos viejos (PB-139). */
+  version: string;
   pasos: {
     id: string;
     orden_paso: number;
@@ -88,12 +104,24 @@ export type ProtocoloAplicado = {
     descripcion: string | null;
     estado: string;
     vence_en: Date | null;
+    /** AAAA-MM-DD en la zona horaria de la escuela, para cambiar el plazo. */
+    vence_dia: string | null;
+    /** Sigue Pendiente o En progreso y ya pasó su plazo. */
+    vencido: boolean;
     requiere_evidencia: boolean;
     es_obligatorio: boolean;
     responsable: string | null;
+    responsable_id: string | null;
+    notas: string | null;
+    completado_en: Date | null;
+    completado_por: string | null;
+    respaldos: RespaldoPaso[];
+    version: string;
   }[];
 };
 
+// Los motivos del término viven en la auditoría (eventos_auditoria), como en
+// el plan de intervención (PB-061).
 export async function protocolosDelCaso(
   db: PoolClient,
   casoId: string,
@@ -101,27 +129,60 @@ export async function protocolosDelCaso(
   const aplicados = await db.query<Omit<ProtocoloAplicado, 'pasos'>>(
     `SELECT pc.id, pr.nombre AS protocolo, pr.codigo, vp.numero_version,
             pc.estado, pc.fundamento, pc.aplicado_en,
-            p.nombres || ' ' || p.apellidos AS aplicado_por
+            p.nombres || ' ' || p.apellidos AS aplicado_por,
+            coalesce(pc.completado_en, t.ocurrido_en) AS terminado_en,
+            t.motivo AS motivo_termino, md5(to_jsonb(pc)::text) AS version
      FROM convi.protocolos_caso pc
      JOIN convi.versiones_protocolo vp ON vp.id = pc.version_protocolo_id
      JOIN convi.protocolos pr ON pr.id = vp.protocolo_id
      JOIN convi.membresias_establecimiento m ON m.id = pc.aplicado_por
      JOIN convi.personas p ON p.id = m.persona_id
+     LEFT JOIN LATERAL (
+       SELECT e.ocurrido_en, e.metadatos->>'motivo' AS motivo
+       FROM convi.eventos_auditoria e
+       WHERE e.tipo_recurso = 'protocolos_caso' AND e.recurso_id = pc.id
+         AND e.metadatos->'despues'->>'estado' = pc.estado
+         AND e.metadatos->'antes'->>'estado' <> pc.estado
+       ORDER BY e.ocurrido_en DESC LIMIT 1
+     ) t ON pc.estado IN ('COMPLETADO', 'CANCELADO')
      WHERE pc.caso_id = $1
      ORDER BY pc.aplicado_en, pc.id`,
     [casoId],
   );
   if (aplicados.rows.length === 0) return [];
+  // Los respaldos de cada paso van en la misma consulta, sin otro viaje a la base.
   const pasos = await db.query<
     ProtocoloAplicado['pasos'][number] & { protocolo_caso_id: string }
   >(
     `SELECT ep.protocolo_caso_id, ep.id, pp.orden_paso, pp.nombre,
-            pp.descripcion, ep.estado, ep.vence_en, pp.requiere_evidencia,
-            pp.es_obligatorio, pr.nombres || ' ' || pr.apellidos AS responsable
+            pp.descripcion, ep.estado, ep.vence_en,
+            to_char(ep.vence_en AT TIME ZONE e.zona_horaria, 'YYYY-MM-DD') AS vence_dia,
+            ep.estado IN ('PENDIENTE', 'EN_PROGRESO') AND ep.vence_en < now() AS vencido,
+            pp.requiere_evidencia, pp.es_obligatorio,
+            pr.nombres || ' ' || pr.apellidos AS responsable, ep.responsable_id,
+            ep.notas, ep.completado_en,
+            pcp.nombres || ' ' || pcp.apellidos AS completado_por,
+            coalesce(r.respaldos, '[]'::json) AS respaldos,
+            md5(to_jsonb(ep)::text) AS version
      FROM convi.estados_pasos_protocolo_caso ep
      JOIN convi.pasos_protocolo pp ON pp.id = ep.paso_protocolo_id
+     JOIN convi.establecimientos e ON e.id = ep.establecimiento_id
      LEFT JOIN convi.membresias_establecimiento mr ON mr.id = ep.responsable_id
      LEFT JOIN convi.personas pr ON pr.id = mr.persona_id
+     LEFT JOIN convi.membresias_establecimiento mc ON mc.id = ep.completado_por
+     LEFT JOIN convi.personas pcp ON pcp.id = mc.persona_id
+     LEFT JOIN LATERAL (
+       SELECT json_agg(json_build_object(
+                'id', ev.id, 'titulo', ev.titulo, 'tipo', ev.tipo_evidencia,
+                'archivo', ar.nombre_original,
+                'creado_por', pe.nombres || ' ' || pe.apellidos,
+                'creado_en', ev.creado_en) ORDER BY ev.creado_en, ev.id) AS respaldos
+       FROM convi.evidencias ev
+       LEFT JOIN convi.archivos ar ON ar.id = ev.archivo_id
+       JOIN convi.membresias_establecimiento me ON me.id = ev.creado_por
+       JOIN convi.personas pe ON pe.id = me.persona_id
+       WHERE ev.paso_caso_id = ep.id
+     ) r ON true
      WHERE ep.protocolo_caso_id = ANY($1::uuid[])
      ORDER BY pp.orden_paso`,
     [aplicados.rows.map((a) => a.id)],
