@@ -70,15 +70,18 @@ import {
 } from './revision-normativa.js';
 import { cargadorDeSeccion, type SeccionCaso } from './seccion-caso.js';
 import { validarVinculacion } from './vinculacion-caso.js';
+import { validarReapertura, validarReasignacion } from './continuidad-caso.js';
+import {
+  CONDICIONES_CASOS,
+  leerFiltrosCasos,
+  valoresFiltrosCasos,
+} from './lista-casos.js';
 
 // PB-053 (HU-046): casos de convivencia. Solo Convivencia los abre y los ve;
 // la seguridad por fila separa por escuela y CuentaService.operar exige el
 // segundo factor. PB-052 (HU-045): una situación también se suma a un caso
 // existente. PB-152 (HU-131) y PB-054 (HU-047): cambio de estado y cierre.
 const PERFILES: Perfil[] = ['CONVIVENCIA'];
-
-/** Tope de filas de la lista de casos. */
-export const MAXIMO_CASOS = 200;
 
 const NO_EXISTE = 'El caso no existe.';
 const NO_EXISTE_SITUACION = 'La situación no existe.';
@@ -104,7 +107,18 @@ export type CasoLista = {
   nombres_estudiantes: string[];
 };
 
+type PaginaCasos = {
+  casos: (CasoLista & { ultima_actividad: string })[];
+  total: number;
+  pagina: number;
+  limite: number;
+  opciones: { anios: string[]; responsables: { id: string; nombre: string }[] };
+};
+
 export type DetalleCaso = CasoLista & {
+  responsable_id: string;
+  version_responsable: string;
+  responsables_disponibles: { id: string; nombre: string }[];
   resumen: string;
   abierto_por: string;
   abierto_en: Date;
@@ -209,20 +223,48 @@ const DESDE_LISTA = `
 export class CasosService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
-  // Los casos abiertos primero (no cerrados), luego por fecha de inicio.
-  listar(sesion: Sesion): Promise<{ casos: CasoLista[]; limite: number }> {
+  listar(
+    sesion: Sesion,
+    consulta: Record<string, unknown> = {},
+  ): Promise<PaginaCasos> {
+    const filtros = leerFiltrosCasos(consulta);
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
-        const casos = await db.query<CasoLista>(
-          `SELECT ${COLUMNAS_LISTA}
-           ${DESDE_LISTA}
-           ORDER BY c.estado_actual = 'CERRADO', c.fecha_inicio DESC, c.codigo DESC
-           LIMIT $1`,
-          [MAXIMO_CASOS],
+        const resultado = await db.query<PaginaCasos>(
+          `WITH filtrados AS MATERIALIZED (
+             SELECT c.id, c.registrado_en FROM convi.casos c WHERE ${CONDICIONES_CASOS}
+           ), cuenta AS (
+             SELECT count(*)::int AS total,
+               least($8::int, greatest(1, ceil(count(*)::numeric / $9)::int)) AS pagina FROM filtrados
+           ), elegidos AS MATERIALIZED (
+             SELECT f.id, coalesce(u.fecha, f.registrado_en) AS ultima_actividad
+             FROM filtrados f
+             LEFT JOIN LATERAL (
+               SELECT max(v.fecha_registro) AS fecha FROM convi.vw_cronologia_caso v
+               WHERE v.caso_id = f.id AND v.establecimiento_id = $10::uuid
+             ) u ON true
+             ORDER BY ultima_actividad DESC, f.id DESC
+             LIMIT $9 OFFSET (SELECT (pagina - 1) * $9 FROM cuenta)
+           )
+           SELECT cuenta.total, cuenta.pagina, $9::int AS limite,
+             (SELECT coalesce(jsonb_agg(fila ORDER BY fila.ultima_actividad DESC, fila.id DESC), '[]'::jsonb)
+              FROM (SELECT ${COLUMNAS_LISTA}, u.ultima_actividad
+                ${DESDE_LISTA} JOIN elegidos u ON u.id = c.id) fila) AS casos,
+             jsonb_build_object(
+               'anios', (SELECT coalesce(jsonb_agg(anio ORDER BY anio DESC), '[]'::jsonb)
+                 FROM (SELECT DISTINCT extract(year FROM fecha_inicio)::text AS anio
+                   FROM convi.casos WHERE establecimiento_id = $10::uuid) a),
+               'responsables', (SELECT coalesce(jsonb_agg(r ORDER BY r.nombre, r.id), '[]'::jsonb)
+                 FROM (SELECT DISTINCT m.id, p.nombres || ' ' || p.apellidos AS nombre
+                   FROM convi.casos c JOIN convi.membresias_establecimiento m ON m.id = c.asignado_a_membresia_id
+                   JOIN convi.personas p ON p.id = m.persona_id WHERE c.establecimiento_id = $10::uuid) r)
+             ) AS opciones
+           FROM cuenta`,
+          [...valoresFiltrosCasos(filtros), sesion.establecimiento_id],
         );
-        return { casos: casos.rows, limite: MAXIMO_CASOS };
+        return resultado.rows[0];
       },
     );
   }
@@ -243,6 +285,8 @@ export class CasosService {
           Pick<DetalleCaso, keyof CasoLista> &
             Pick<
               DetalleCaso,
+              | 'responsable_id'
+              | 'version_responsable'
               | 'resumen'
               | 'abierto_por'
               | 'abierto_en'
@@ -252,7 +296,8 @@ export class CasosService {
               | 'cerrado_en'
             >
         >(
-          `SELECT ${COLUMNAS_LISTA}, c.resumen, c.abierto_en,
+          `SELECT ${COLUMNAS_LISTA}, c.asignado_a_membresia_id AS responsable_id,
+                  md5(to_jsonb(c)::text || c.xmin::text) AS version_responsable, c.resumen, c.abierto_en,
                   pa.nombres || ' ' || pa.apellidos AS abierto_por,
                   c.plazo_cierre_dias_aplicado, c.justificacion_independiente,
                   c.registro_historico, c.cerrado_en
@@ -328,6 +373,11 @@ export class CasosService {
         );
         return {
           ...caso,
+          responsables_disponibles: await cargar(
+            'estado',
+            () => responsablesDeEncuentro(db),
+            [],
+          ),
           participantes: participantes.rows,
           situaciones_vinculadas: situaciones,
           movimientos: await cargar(
@@ -555,6 +605,96 @@ export class CasosService {
         );
         return { id: casoId, estado: datos.estado_nuevo };
       },
+    );
+  }
+
+  // PB-058: la reapertura agrega un movimiento, el cierre y sus respaldos permanecen intactos.
+  reabrir(sesion: Sesion, casoId: string, cuerpo: unknown) {
+    const datos = validarReapertura(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const caso = (
+          await db.query<{ estado_actual: string; responsable_id: string }>(
+            'SELECT estado_actual, asignado_a_membresia_id AS responsable_id FROM convi.casos WHERE id=$1 FOR UPDATE',
+            [casoId],
+          )
+        ).rows[0];
+        if (!caso) throw new NotFoundException(NO_EXISTE);
+        if (caso.estado_actual !== 'CERRADO')
+          throw new ConflictException(
+            'Solo se puede reabrir un caso cerrado, recarga para ver su estado actual',
+          );
+        if (
+          (await ultimoMovimiento(db, casoId)) !== datos.movimiento_anterior_id
+        )
+          throw new ConflictException(CASO_DESACTUALIZADO);
+        const responsable = await db.query(
+          "SELECT id FROM convi.membresias_establecimiento WHERE id=$1 AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO' FOR SHARE",
+          [caso.responsable_id],
+        );
+        if (!responsable.rowCount)
+          throw new ConflictException(
+            'El responsable del caso ya no está activo en Convivencia, reasigna el caso antes de reabrirlo',
+          );
+        await db.query(
+          `INSERT INTO convi.historial_estados_caso
+        (establecimiento_id,caso_id,estado_anterior,estado_nuevo,cambiado_por,motivo)
+        VALUES(convi.establecimiento_actual(),$1,'CERRADO','REABIERTO',convi.membresia_actual(),$2)`,
+          [casoId, datos.motivo],
+        );
+        return { id: casoId, estado: 'REABIERTO' };
+      },
+      'READ COMMITTED',
+    );
+  }
+
+  // PB-059: bloquear el caso y la cuenta destino conserva la decisión y la auditoría juntas.
+  reasignar(sesion: Sesion, casoId: string, cuerpo: unknown) {
+    const datos = validarReasignacion(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const caso = (
+          await db.query<{ responsable_id: string; version: string }>(
+            'SELECT asignado_a_membresia_id AS responsable_id, md5(to_jsonb(c)::text || c.xmin::text) AS version FROM convi.casos c WHERE id=$1 FOR UPDATE',
+            [casoId],
+          )
+        ).rows[0];
+        if (!caso) throw new NotFoundException(NO_EXISTE);
+        if (caso.version !== datos.version_responsable)
+          throw new ConflictException(
+            'El caso cambió mientras lo revisabas, recarga antes de reasignarlo',
+          );
+        if (caso.responsable_id === datos.responsable_id)
+          throw new BadRequestException({
+            mensaje: 'El responsable no cambió',
+            errores: { responsable_id: 'Elige a otra persona de Convivencia' },
+          });
+        const destino = await db.query(
+          "SELECT id FROM convi.membresias_establecimiento WHERE id=$1 AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO' FOR SHARE",
+          [datos.responsable_id],
+        );
+        if (!destino.rowCount)
+          throw new BadRequestException({
+            mensaje: 'El responsable no cambió',
+            errores: {
+              responsable_id:
+                'Elige una cuenta activa de Convivencia de esta escuela',
+            },
+          });
+        await db.query("SELECT set_config('app.motivo_cambio',$1,true)", [
+          datos.motivo,
+        ]);
+        await db.query(
+          'UPDATE convi.casos SET asignado_a_membresia_id=$2 WHERE id=$1',
+          [casoId, datos.responsable_id],
+        );
+        return { id: casoId, responsable_id: datos.responsable_id };
+      },
+      'READ COMMITTED',
     );
   }
 

@@ -26,6 +26,7 @@ import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
 import { PlanIntervencion } from "./plan-intervencion";
 import { ResumenCaso } from "./resumen";
+import { FormularioContinuidad } from "./formulario-continuidad";
 import {
   claseBotonPrimario,
   claseBotonSecundario,
@@ -39,6 +40,10 @@ import { pedir } from "../../datos";
 export const metadata: Metadata = { title: "Caso" };
 
 const AVISOS: Record<string, string> = {
+  reabierto:
+    "Reabriste el caso, el cierre anterior y sus respaldos se conservan en el historial",
+  reasignado:
+    "Cambiaste la persona responsable, la reasignación quedó registrada con tu nombre, fecha y motivo",
   seguimiento: "Guardaste los cambios del seguimiento",
   compromiso:
     "Registraste el compromiso, su cumplimiento se revisará en un seguimiento",
@@ -128,7 +133,7 @@ function nombreEstado(estado: string | null) {
 
 // PB-053 (HU-046): detalle de un caso con sus estudiantes y las situaciones
 // vinculadas. PB-152 (HU-131) y PB-054 (HU-047): historial de estados, cambio
-// de estado y cierre. La reapertura de un caso cerrado es otro ítem (HU-051).
+// de estado y cierre. PB-058 y PB-059 permiten reabrirlo y reasignar su responsable.
 export default async function PaginaCaso({
   params,
   searchParams,
@@ -287,6 +292,11 @@ export default async function PaginaCaso({
 
         {seccion === "participantes" && (
           <Seccion titulo="Participantes del caso" className="lg:col-span-3">
+            <p className="mb-4 text-sm text-muted-foreground">
+              El curso actual se actualiza con la matrícula, el curso registrado
+              al incorporar al estudiante se conserva como antecedente del mismo
+              caso
+            </p>
             {caso.participantes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 El caso no tiene estudiantes.
@@ -657,9 +667,16 @@ export default async function PaginaCaso({
             {caso.estado_actual === "CERRADO" ? (
               <Seccion titulo="Caso cerrado">
                 <p className="text-sm text-muted-foreground">
-                  Sus antecedentes se conservan y ya no cambia de estado, un
-                  caso cerrado solo se puede reabrir.
+                  El cierre y sus respaldos se conservan, puedes reabrir el caso
+                  para continuar el acompañamiento
                 </p>
+                <div className="mt-4">
+                  <FormularioContinuidad
+                    casoId={caso.id}
+                    modo="reapertura"
+                    ultimoMovimientoId={caso.ultimo_movimiento_id}
+                  />
+                </div>
               </Seccion>
             ) : (
               <>
@@ -690,6 +707,30 @@ export default async function PaginaCaso({
                 )}
               </>
             )}
+            <Seccion titulo="Responsable del caso">
+              <p className="text-sm">
+                Responsable actual:{" "}
+                <span className="font-medium">{caso.responsable}</span>
+              </p>
+              <details className="mt-3 rounded-xl border border-border p-4">
+                <summary className="min-h-11 cursor-pointer py-2 font-medium text-primary">
+                  Reasignar responsable
+                </summary>
+                <p className="mt-2 mb-4 text-sm text-muted-foreground">
+                  Puedes elegir a otra persona activa de Convivencia de esta
+                  escuela, el cambio conserva los registros y queda en el
+                  historial con su motivo
+                </p>
+                <FormularioContinuidad
+                  casoId={caso.id}
+                  modo="responsable"
+                  version={caso.version_responsable}
+                  opciones={caso.responsables_disponibles.filter(
+                    (p) => p.id !== caso.responsable_id,
+                  )}
+                />
+              </details>
+            </Seccion>
           </div>
         )}
       </div>
