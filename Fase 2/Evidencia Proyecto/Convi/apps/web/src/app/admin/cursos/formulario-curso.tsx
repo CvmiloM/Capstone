@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import type { NivelEducativo } from "../niveles/datos";
 import { crearCurso, editarCurso, type EstadoFormulario } from "./acciones";
+import { CampoMotivo } from "./campo-motivo";
 import type { Curso } from "./datos";
 import { LARGO_MAXIMO_CURSO as LARGO_MAXIMO } from "./opciones";
 import { Selector } from "./selector";
@@ -16,12 +17,15 @@ export function FormularioCurso({
   curso,
   anioId,
   niveles,
+  correccion = false,
 }: {
   curso?: Curso;
   /** Año del curso nuevo; al editar no se envía porque el año no cambia. */
   anioId?: string;
   /** Niveles que se pueden elegir: los activos y, al editar, el actual. */
   niveles: NivelEducativo[];
+  /** PB-023: el año está Cerrado y el cambio es una corrección con motivo. */
+  correccion?: boolean;
 }) {
   const [estado, accion, pendiente] = useActionState(
     curso ? editarCurso : crearCurso,
@@ -112,12 +116,21 @@ export function FormularioCurso({
         ))}
       </Selector>
 
+      {correccion && curso && (
+        <CampoMotivo
+          id={`motivo-curso-${curso.id}`}
+          anio={curso.anio}
+          defaultValue={estado.valores?.motivo}
+          error={errores.motivo}
+        />
+      )}
+
       <BotonEnviar
         pendiente={pendiente}
         textoPendiente={curso ? "Guardando…" : "Creando curso…"}
       >
-        {curso ? "Guardar cambios" : "Crear curso"}
+        {correccion ? "Guardar corrección" : curso ? "Guardar cambios" : "Crear curso"}
       </BotonEnviar>
     </form>
   );
-}
+}

@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { asignarProfesor, type EstadoFormulario } from "./acciones";
+import { CampoMotivo } from "./campo-motivo";
 import type { ProfesorDisponible } from "./datos";
 import { NOMBRE_ROL, type Rol } from "./opciones";
 import { Selector } from "./selector";
@@ -15,11 +16,14 @@ export function FormularioAsignacion({
   cursoId,
   profesores,
   hoy,
+  anioCerrado,
 }: {
   cursoId: string;
   profesores: ProfesorDisponible[];
   /** AAAA-MM-DD en la zona horaria de la escuela: inicio por defecto. */
   hoy: string;
+  /** PB-023: año Cerrado del curso, la asignación es una corrección con motivo. */
+  anioCerrado?: number;
 }) {
   const [estado, accion, pendiente] = useActionState(
     asignarProfesor,
@@ -89,9 +93,18 @@ export function FormularioAsignacion({
         />
       </div>
 
+      {anioCerrado !== undefined && (
+        <CampoMotivo
+          id={`motivo-asignacion-${cursoId}`}
+          anio={anioCerrado}
+          defaultValue={valores.motivo}
+          error={errores.motivo}
+        />
+      )}
+
       <BotonEnviar pendiente={pendiente} textoPendiente="Asignando…">
-        Asignar profesor
+        {anioCerrado !== undefined ? "Agregar como corrección" : "Asignar profesor"}
       </BotonEnviar>
     </form>
   );
-}
+}

@@ -144,7 +144,9 @@ export default async function PaginaCursos({
           </h2>
           {!editable ? (
             <p className="text-sm text-muted-foreground">
-              El año {anio.anio} está cerrado: sus cursos son de solo lectura.
+              El año {anio.anio} está cerrado: ya no se le agregan cursos, y si
+              uno tiene un error puedes abrirlo y corregirlo indicando el
+              motivo.
             </p>
           ) : nivelesActivos.length === 0 ? (
             <p className="text-sm text-muted-foreground">

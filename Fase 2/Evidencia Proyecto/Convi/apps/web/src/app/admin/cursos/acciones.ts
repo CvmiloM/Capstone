@@ -54,17 +54,28 @@ export async function editarCurso(
   formData: FormData,
 ): Promise<EstadoFormulario> {
   const id = leerTexto(formData, "id");
+  const motivo = leerTexto(formData, "motivo");
   const valores = leerCurso(formData);
+  // PB-023: en un año Cerrado se envía el motivo de la corrección.
   const resultado = await enviarCambio(
     "PATCH",
     `/admin/cursos/${encodeURIComponent(id)}`,
-    valores,
+    motivo ? { ...valores, motivo } : valores,
   );
   if (!resultado.ok) {
-    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+    return {
+      mensaje: resultado.mensaje,
+      errores: resultado.errores,
+      valores: { ...valores, motivo },
+    };
   }
   revalidatePath("/admin/cursos", "layout");
-  return { listo: "Guardaste los cambios del curso.", valores };
+  return {
+    listo: motivo
+      ? "Corregiste el curso, la corrección y su motivo quedaron en la auditoría."
+      : "Guardaste los cambios del curso.",
+    valores,
+  };
 }
 
 // HU-013 CA2 y CA3: la API revisa que sea un profesor de la escuela y que no
@@ -79,17 +90,26 @@ export async function asignarProfesor(
     rol: leerTexto(formData, "rol"),
     fecha_inicio: leerTexto(formData, "fecha_inicio"),
     fecha_fin: leerTexto(formData, "fecha_fin"),
+    motivo: leerTexto(formData, "motivo"),
   };
   const resultado = await enviarCambio(
     "POST",
     `/admin/cursos/${encodeURIComponent(cursoId)}/asignaciones`,
-    { ...valores, fecha_fin: valores.fecha_fin || null },
+    {
+      ...valores,
+      fecha_fin: valores.fecha_fin || null,
+      motivo: valores.motivo || undefined,
+    },
   );
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
   revalidatePath("/admin/cursos", "layout");
-  return { listo: "Asignaste al profesor al curso." };
+  return {
+    listo: valores.motivo
+      ? "Agregaste al profesor como corrección, el motivo quedó en la auditoría."
+      : "Asignaste al profesor al curso.",
+  };
 }
 
 // HU-013 CA4: registra el último día de la asignación. No se puede deshacer.
@@ -99,17 +119,22 @@ export async function terminarAsignacion(
 ): Promise<EstadoFormulario> {
   const id = leerTexto(formData, "asignacion_id");
   const fechaFin = leerTexto(formData, "fecha_fin");
+  // PB-023: en un año Cerrado es una corrección del término, con motivo.
+  const motivo = leerTexto(formData, "motivo");
   const resultado = await enviarCambio(
     "PATCH",
     `/admin/asignaciones/${encodeURIComponent(id)}/termino`,
-    { fecha_fin: fechaFin },
+    motivo ? { fecha_fin: fechaFin, motivo } : { fecha_fin: fechaFin },
   );
   if (!resultado.ok) {
     return {
-      mensaje: resultado.errores?.fecha_fin ?? resultado.mensaje,
-      valores: { fecha_fin: fechaFin },
+      mensaje:
+        resultado.errores?.fecha_fin ??
+        resultado.errores?.motivo ??
+        resultado.mensaje,
+      valores: { fecha_fin: fechaFin, motivo },
     };
   }
   revalidatePath("/admin/cursos", "layout");
   return {};
-}
+}

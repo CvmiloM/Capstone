@@ -18,6 +18,7 @@ import {
   ANIOS_EDITABLES,
   errorDeCampos,
   esUuid,
+  motivoDeCorreccion,
   validarCurso,
   validarNuevoCurso,
 } from './curso.js';
@@ -194,10 +195,17 @@ export class CursosService {
       if (actual.rows.length === 0)
         throw new NotFoundException('No encontramos ese curso.');
       const curso = actual.rows[0];
-      if (!ANIOS_EDITABLES.includes(curso.anio_estado))
-        throw new ConflictException(
-          `El año ${curso.anio} está cerrado: sus cursos ya no se modifican.`,
-        );
+      // PB-023 (HU-018 CA1): en un año Cerrado solo como corrección con motivo.
+      const motivo = motivoDeCorreccion(
+        cuerpo,
+        curso.anio,
+        curso.anio_estado,
+        'Revisa los datos marcados. No se guardó el curso.',
+      );
+      if (motivo)
+        await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
+          motivo,
+        ]);
       if (datos.nivel_id !== curso.nivel_id) {
         if (curso.matriculas > 0)
           throw errorDeCampos({

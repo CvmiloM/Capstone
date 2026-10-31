@@ -151,6 +151,37 @@ export function validarNuevaAsignacion(cuerpo: unknown): NuevaAsignacion {
   };
 }
 
+// PB-023 (HU-018 CA1), decisión del PO (2026-10-31): en un año Cerrado los
+// cursos y sus asignaciones no cambian de forma ordinaria. Con un motivo se
+// puede corregir un curso, agregar un profesor que faltó o corregir el término
+// de una asignación; la base exige ese motivo y lo deja en la auditoría.
+export const LARGO_MOTIVO = { minimo: 10, maximo: 500 } as const;
+
+/**
+ * Devuelve null si el año sigue abierto. Si está Cerrado, exige el motivo de
+ * la corrección y lo devuelve para guardarlo en app.motivo_cambio.
+ */
+export function motivoDeCorreccion(
+  cuerpo: unknown,
+  anio: number,
+  anioEstado: string,
+  mensaje: string,
+): string | null {
+  if (ANIOS_EDITABLES.includes(anioEstado)) return null;
+  const motivo = texto(objeto(cuerpo).motivo);
+  if (
+    motivo.length < LARGO_MOTIVO.minimo ||
+    motivo.length > LARGO_MOTIVO.maximo
+  )
+    throw errorDeCampos(
+      {
+        motivo: `El año ${anio} está cerrado: explica en ${LARGO_MOTIVO.minimo} a ${LARGO_MOTIVO.maximo} caracteres por qué corriges este dato, quedará en la auditoría.`,
+      },
+      mensaje,
+    );
+  return motivo;
+}
+
 /** CA4: terminar una asignación registra su último día. */
 export function validarTermino(cuerpo: unknown): string {
   const fechaFin = texto(objeto(cuerpo).fecha_fin);

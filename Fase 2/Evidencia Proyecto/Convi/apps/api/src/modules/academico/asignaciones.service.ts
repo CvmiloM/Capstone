@@ -8,8 +8,8 @@ import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import {
-  ANIOS_EDITABLES,
   errorDeCampos,
+  motivoDeCorreccion,
   type Rol,
   validarNuevaAsignacion,
   validarTermino,
@@ -102,10 +102,18 @@ export class AsignacionesService {
       if (curso.rows.length === 0)
         throw new NotFoundException('No encontramos ese curso.');
       const { anio, anio_estado } = curso.rows[0];
-      if (!ANIOS_EDITABLES.includes(anio_estado))
-        throw new ConflictException(
-          `El año ${anio} está cerrado: sus cursos ya no reciben asignaciones.`,
-        );
+      // PB-023 (HU-018 CA1): en un año Cerrado solo para agregar, con motivo,
+      // un profesor que faltó. La base deja la corrección en la auditoría.
+      const motivo = motivoDeCorreccion(
+        cuerpo,
+        anio,
+        anio_estado,
+        'Revisa los datos marcados. No se guardó la asignación.',
+      );
+      if (motivo)
+        await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
+          motivo,
+        ]);
 
       // Como en matrículas, tocar la fila evita una lectura anterior al bloqueo
       // en REPEATABLE READ: una asignación concurrente recibe 40001 y reintenta.
@@ -197,11 +205,15 @@ export class AsignacionesService {
         terminada: boolean;
         anio: number;
         anio_estado: string;
+        curso_id: string;
+        membresia_id: string;
+        rol: Rol;
       }>(
         `SELECT a.fecha_inicio::text AS fecha_inicio,
                 a.fecha_fin::text AS fecha_fin,
                 coalesce(a.fecha_fin < current_date, false) AS terminada,
-                an.anio, an.estado AS anio_estado
+                an.anio, an.estado AS anio_estado,
+                a.curso_id, a.membresia_id, a.rol_asignacion AS rol
          FROM convi.asignaciones_docentes a
          JOIN convi.cursos c ON c.id = a.curso_id
          JOIN convi.anios_academicos an ON an.id = c.anio_academico_id
@@ -212,10 +224,53 @@ export class AsignacionesService {
       if (actual.rows.length === 0)
         throw new NotFoundException('No encontramos esa asignación.');
       const asignacion = actual.rows[0];
-      if (!ANIOS_EDITABLES.includes(asignacion.anio_estado))
-        throw new ConflictException(
-          `El año ${asignacion.anio} está cerrado: sus asignaciones ya no se modifican.`,
+      // PB-023 (HU-018 CA1): en un año Cerrado se corrige el término con un
+      // motivo, hacia antes o hacia después, sin cruzarse con otra asignación.
+      const motivo = motivoDeCorreccion(
+        cuerpo,
+        asignacion.anio,
+        asignacion.anio_estado,
+        'Revisa los datos marcados. No se corrigió el término.',
+      );
+      if (motivo) {
+        if (asignacion.fecha_inicio && fechaFin < asignacion.fecha_inicio)
+          throw errorDeCampos(
+            {
+              fecha_fin: `El último día no puede ser anterior al inicio (${asignacion.fecha_inicio}).`,
+            },
+            'Revisa los datos marcados. No se corrigió el término.',
+          );
+        const cruce = await db.query<{ nombre: string }>(
+          `SELECT p.nombres || ' ' || p.apellidos AS nombre
+           ${DESDE_ASIGNACIONES}
+           WHERE a.curso_id = $1 AND a.id <> $2
+             AND ((a.membresia_id = $3 AND a.rol_asignacion = $4)
+                  OR (a.rol_asignacion = 'PROFESOR_JEFE' AND $4 = 'PROFESOR_JEFE'))
+             AND daterange(a.fecha_inicio, a.fecha_fin, '[]')
+                 && daterange($5::date, $6::date, '[]')
+           LIMIT 1`,
+          [
+            asignacion.curso_id,
+            asignacionId,
+            asignacion.membresia_id,
+            asignacion.rol,
+            asignacion.fecha_inicio,
+            fechaFin,
+          ],
         );
+        if (cruce.rows.length > 0)
+          throw new ConflictException(
+            `Con ese término la asignación se cruza con la de ${cruce.rows[0].nombre} en el mismo rol. Revisa las fechas.`,
+          );
+        await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
+          motivo,
+        ]);
+        await db.query(
+          `UPDATE convi.asignaciones_docentes SET fecha_fin = $2 WHERE id = $1`,
+          [asignacionId, fechaFin],
+        );
+        return buscar(db, asignacionId);
+      }
       // Una asignación terminada no se reabre: para volver a asignar al
       // profesor se crea una nueva.
       if (asignacion.terminada)
