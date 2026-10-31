@@ -22,6 +22,9 @@ export type CasoLista = {
 };
 
 export type DetalleCaso = CasoLista & {
+  responsable_id: string;
+  version_responsable: string;
+  responsables_disponibles: { id: string; nombre: string }[];
   resumen: string;
   abierto_por: string;
   abierto_en: string;
@@ -208,8 +211,16 @@ export type PlanIntervencion = {
   acciones: AccionPlan[];
 };
 
-export function obtenerCasos() {
-  return pedir<{ casos: CasoLista[]; limite: number }>("/convivencia/casos");
+export type PaginaCasos = {
+  casos: (CasoLista & { ultima_actividad: string })[];
+  limite: number;
+  total: number;
+  pagina: number;
+  opciones: { anios: string[]; responsables: { id: string; nombre: string }[] };
+};
+
+export function obtenerCasos(filtros: URLSearchParams) {
+  return pedir<PaginaCasos>(`/convivencia/casos?${filtros.toString()}`);
 }
 
 // La API trae solo lo que muestra la pestaña; lo de las demás llega vacío.

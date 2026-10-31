@@ -23,8 +23,11 @@ export class CasosController {
   constructor(@Inject(CasosService) private readonly casos: CasosService) {}
 
   @Get('casos')
-  listar(@Req() peticion: PeticionConSesion) {
-    return this.casos.listar(peticion.sesion);
+  listar(
+    @Req() peticion: PeticionConSesion,
+    @Query() consulta: Record<string, unknown>,
+  ) {
+    return this.casos.listar(peticion.sesion, consulta);
   }
 
   // ?seccion= trae solo lo que muestra esa pestaña de la ficha (seccion-caso.ts).
@@ -57,6 +60,24 @@ export class CasosController {
     @Body() cuerpo: unknown,
   ) {
     return this.casos.cerrar(peticion.sesion, id, cuerpo);
+  }
+
+  @Post('casos/:id/reapertura')
+  reabrir(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.casos.reabrir(peticion.sesion, id, cuerpo);
+  }
+
+  @Post('casos/:id/responsable')
+  reasignar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.casos.reasignar(peticion.sesion, id, cuerpo);
   }
 
   // PB-082: el cuerpo trae { version_protocolo_id, fundamento }.

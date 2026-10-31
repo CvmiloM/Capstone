@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import {
+  enviar,
   enviarAplicacionProtocolo,
   enviarCambioEstadoCaso,
   enviarCierreCaso,
@@ -88,4 +89,38 @@ export async function aplicarProtocolo(
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
   redirect(`/convivencia/casos/${id}?seccion=protocolo&aviso=protocolo`);
+}
+
+export async function guardarContinuidadCaso(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const id = leerTexto(formData, "caso_id");
+  const modo = leerTexto(formData, "modo_continuidad");
+  const valores = {
+    motivo: leerTexto(formData, "motivo_continuidad"),
+    responsable_id: leerTexto(formData, "responsable_id"),
+  };
+  if (!UUID.test(id) || !["reapertura", "responsable"].includes(modo))
+    return { mensaje: NO_VALIDO, valores };
+  const cuerpo =
+    modo === "reapertura"
+      ? {
+          motivo: valores.motivo,
+          movimiento_anterior_id: leerTexto(formData, "movimiento_anterior_id"),
+        }
+      : {
+          ...valores,
+          version_responsable: leerTexto(formData, "version_responsable"),
+        };
+  const respuesta = await enviar(
+    "POST",
+    `/convivencia/casos/${encodeURIComponent(id)}/${modo}`,
+    cuerpo,
+  );
+  if (!respuesta.ok)
+    return { mensaje: respuesta.mensaje, errores: respuesta.errores, valores };
+  redirect(
+    `/convivencia/casos/${id}?seccion=estado&aviso=${modo === "reapertura" ? "reabierto" : "reasignado"}`,
+  );
 }

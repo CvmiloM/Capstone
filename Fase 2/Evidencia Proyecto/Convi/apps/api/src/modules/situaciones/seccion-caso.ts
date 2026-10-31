@@ -28,7 +28,7 @@ const PESTANAS = {
   protocolos_aplicados: ['resumen', 'protocolo', 'plan'],
   // Protocolos aplicables, revisiones normativas y sus opciones.
   normativa: ['protocolo'],
-  // Movimientos, último movimiento, estados permitidos, pendientes y actas.
+  // Movimientos, estados, pendientes, actas y responsables para reasignación.
   estado: ['estado'],
   // Planes de intervención y responsables de sus acciones.
   plan: ['plan'],
