@@ -243,13 +243,28 @@ export class CuentaService implements OnModuleDestroy {
    * la escuela de cada transacción, así que la lista la entrega una función
    * de la base que devuelve solo identificadores.
    */
-  async escuelasConReglasDiarias(): Promise<string[]> {
+  escuelasConReglasDiarias(): Promise<string[]> {
+    return this.escuelasDelMotor('motor_escuelas_con_reglas_diarias');
+  }
+
+  /**
+   * PB-094 (HU-081, Fernando): todas las escuelas activas, para los avisos de
+   * lo que vence cada día, tengan o no reglas.
+   */
+  escuelasActivas(): Promise<string[]> {
+    return this.escuelasDelMotor('motor_escuelas_activas');
+  }
+
+  private async escuelasDelMotor(
+    funcion: 'motor_escuelas_con_reglas_diarias' | 'motor_escuelas_activas',
+  ): Promise<string[]> {
     const cliente = await this.pool.connect();
     let descartarConexion = false;
     try {
       await cliente.query('BEGIN READ ONLY; SET LOCAL ROLE convi_motor_reglas');
+      // El nombre de la función es fijo, no viene de la petición.
       const filas = await cliente.query<{ id: string }>(
-        'SELECT id FROM convi.motor_escuelas_con_reglas_diarias() AS id',
+        `SELECT id FROM convi.${funcion}() AS id`,
       );
       await cliente.query('COMMIT');
       return filas.rows.map((f) => f.id);

@@ -9,6 +9,7 @@ import {
 import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import { crearAvisos, TEXTO_AVISO } from '../alertas/crear-avisos.js';
 import {
   casosRelacionados,
   HOY_ESCUELA,
@@ -716,10 +717,21 @@ export class CasosService {
         await db.query("SELECT set_config('app.motivo_cambio',$1,true)", [
           datos.motivo,
         ]);
-        await db.query(
-          'UPDATE convi.casos SET asignado_a_membresia_id=$2 WHERE id=$1',
-          [casoId, datos.responsable_id],
-        );
+        const { codigo } = (
+          await db.query<{ codigo: string }>(
+            'UPDATE convi.casos SET asignado_a_membresia_id=$2 WHERE id=$1 RETURNING codigo',
+            [casoId, datos.responsable_id],
+          )
+        ).rows[0];
+        // PB-094 (HU-081 CA1, Fernando): avisa al nuevo responsable.
+        await crearAvisos(db, {
+          tipo: 'CASO_ASIGNADO',
+          ...TEXTO_AVISO.casoAsignado(codigo, false),
+          tipoRecurso: 'casos',
+          recursoId: casoId,
+          destinatario: datos.responsable_id,
+          evento: `${casoId}:${datos.responsable_id}:${Date.now()}`,
+        });
         return { id: casoId, responsable_id: datos.responsable_id };
       },
       'READ COMMITTED',
@@ -899,6 +911,16 @@ export class CasosService {
             throw error;
           });
         const nuevo = caso.rows[0];
+        // PB-094 (HU-081 CA1): avisa al responsable, salvo que sea quien abre
+        // el caso.
+        await crearAvisos(db, {
+          tipo: 'CASO_ASIGNADO',
+          ...TEXTO_AVISO.casoAsignado(nuevo.codigo, true),
+          tipoRecurso: 'casos',
+          recursoId: nuevo.id,
+          destinatario: datos.responsable_id,
+          evento: `${nuevo.id}:${datos.responsable_id}`,
+        });
 
         // CA2: los participantes de la situación pasan al caso, con la
         // matrícula que tenían al ocurrir el hecho (HU-066).

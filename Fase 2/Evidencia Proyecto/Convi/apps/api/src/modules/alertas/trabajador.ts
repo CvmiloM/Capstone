@@ -18,11 +18,13 @@ import {
 } from './cola.js';
 import { MotorDiarioService } from './motor-diario.service.js';
 import { MotorReglasService } from './motor.service.js';
+import { VencimientosService } from './vencimientos.service.js';
 
 // PB-090 (HU-079 CA8): el trabajador corre dentro de la API y evalúa una
 // situación a la vez. Si la API se apaga a medias, el trabajo vuelve a la
 // cola cuando enciende de nuevo; la clave única de cada alerta evita repetirla.
 // PB-091 y PB-092: en la misma cola corre la evaluación de cada mañana.
+// PB-094 (Fernando): después de esa evaluación se avisa lo que vence hoy.
 @Injectable()
 export class TrabajadorReglas implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TrabajadorReglas.name);
@@ -31,6 +33,8 @@ export class TrabajadorReglas implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(MotorReglasService) private readonly motor: MotorReglasService,
     @Inject(MotorDiarioService) private readonly diario: MotorDiarioService,
+    @Inject(VencimientosService)
+    private readonly vencimientos: VencimientosService,
     @Inject(COLA_REGLAS) private readonly cola: ColaReglas | null,
   ) {}
 
@@ -51,7 +55,7 @@ export class TrabajadorReglas implements OnModuleInit, OnModuleDestroy {
               trabajo.data.establecimiento_id,
               trabajo.data.situacion_id,
             )
-          : this.diario.evaluarTodas(),
+          : this.evaluarCadaManana(),
       {
         connection: conexionRedis(url, true),
         // Una evaluación a la vez: son cortas y así no compiten por la escuela.
@@ -75,6 +79,20 @@ export class TrabajadorReglas implements OnModuleInit, OnModuleDestroy {
           'No se pudo programar la evaluación diaria de reglas.',
         ),
       );
+  }
+
+  /**
+   * PB-094: los avisos de lo que vence hoy se crean aunque falle la
+   * evaluación de alguna escuela; si algo falló, la cola reintenta todo y las
+   * claves de alertas y avisos evitan repetirlos.
+   */
+  private async evaluarCadaManana() {
+    const reglas = await this.diario.evaluarTodas().then(
+      () => null,
+      (error: unknown) => error,
+    );
+    await this.vencimientos.avisarTodas();
+    if (reglas) throw reglas;
   }
 
   async onModuleDestroy() {
