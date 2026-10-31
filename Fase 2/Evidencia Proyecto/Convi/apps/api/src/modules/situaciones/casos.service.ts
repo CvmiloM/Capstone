@@ -75,6 +75,12 @@ import {
   type Comunicacion,
   type DestinatarioComunicacion,
 } from './comunicaciones.js';
+import {
+  correosDelCaso,
+  destinatariosDeCorreo,
+  type CorreoCaso,
+  type DestinatarioCorreo,
+} from './correos.js';
 import { cargadorDeSeccion, type SeccionCaso } from './seccion-caso.js';
 import { validarVinculacion } from './vinculacion-caso.js';
 import { validarReapertura, validarReasignacion } from './continuidad-caso.js';
@@ -198,6 +204,10 @@ export type DetalleCaso = CasoLista & {
   comunicaciones: Comunicacion[];
   /** CA5: personas del caso que pueden recibirla, con la advertencia del vínculo. */
   destinatarios_comunicacion: DestinatarioComunicacion[];
+  /** PB-151 y PB-086 (HU-130 y HU-075): correos al apoderado del caso. */
+  correos: CorreoCaso[];
+  /** Personas del caso que pueden recibir un correo, con su dirección guardada. */
+  destinatarios_correo: DestinatarioCorreo[];
 };
 
 // 40001: otra transacción cambió la fila bloqueada; 23505 en el código: otro
@@ -506,6 +516,16 @@ export class CasosService {
           destinatarios_comunicacion: await cargar(
             'comunicaciones',
             () => destinatariosDeComunicacion(db, id),
+            [],
+          ),
+          correos: await cargar(
+            'comunicaciones',
+            () => correosDelCaso(db, id),
+            [],
+          ),
+          destinatarios_correo: await cargar(
+            'comunicaciones',
+            () => destinatariosDeCorreo(db, id),
             [],
           ),
         };

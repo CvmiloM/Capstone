@@ -112,4 +112,19 @@ export const LARGO_MAXIMO_DESTINATARIO_EXTERNO = 220;
 /** Valor de la lista de destinatarios que pide escribir uno fuera del caso. */
 export const DESTINATARIO_EXTERNO = "externo";
 
+// PB-151 y PB-086 (HU-130 y HU-075): correos al apoderado. Mismos límites que
+// valida la API (apps/api/src/modules/situaciones/correos.ts).
+export const LARGO_MAXIMO_ASUNTO = 220;
+export const LARGO_MAXIMO_CONTENIDO = 10000;
+export const LARGO_MAXIMO_DIRECCION = 220;
+export const LARGO_MAXIMO_INDICACION = 500;
+export const NOMBRE_ESTADO_CORREO: Record<string, string> = {
+  BORRADOR: "Borrador",
+  PENDIENTE: "Pendiente de envío",
+  ENVIADO: "Enviado",
+  ENTREGADO: "Entregado",
+  FALLIDO: "Fallido",
+  REBOTADO: "Rebotado",
+};
+
 export const ESTADOS_CUMPLIMIENTO: [string,string][] = [["PENDIENTE","Pendiente"],["EN_PROGRESO","En progreso"],["COMPLETADO","Completado"],["VENCIDO","Vencido"],["CANCELADO","Cancelado"]];

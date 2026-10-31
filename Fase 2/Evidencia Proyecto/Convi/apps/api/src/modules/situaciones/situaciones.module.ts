@@ -8,6 +8,8 @@ import { CasosController } from './casos.controller.js';
 import { CasosService } from './casos.service.js';
 import { ComunicacionesController } from './comunicaciones.controller.js';
 import { ComunicacionesService } from './comunicaciones.service.js';
+import { CorreosController } from './correos.controller.js';
+import { CorreosService } from './correos.service.js';
 import { ConvivenciaController } from './convivencia.controller.js';
 import { ConvivenciaService } from './convivencia.service.js';
 import { EncuentrosController } from './encuentros.controller.js';
@@ -43,6 +45,7 @@ import { ProfesorService } from './profesor.service.js';
 // PB-063 y PB-064: los encuentros del caso (entrevistas, reuniones y otros).
 // PB-055 y PB-056: los pasos del protocolo aplicado y su término.
 // PB-067: las comunicaciones del caso, con su respaldo opcional.
+// PB-151 y PB-086 (Camilo): borradores de correo al apoderado, a mano o con IA.
 @Module({
   imports: [AuthModule, AlertasModule],
   controllers: [
@@ -57,6 +60,7 @@ import { ProfesorService } from './profesor.service.js';
     EncuentrosController,
     PasosProtocoloController,
     ComunicacionesController,
+    CorreosController,
     EvidenciasConvivenciaController,
     EvidenciasProfesorController,
   ],
@@ -72,6 +76,7 @@ import { ProfesorService } from './profesor.service.js';
     EncuentrosService,
     PasosProtocoloService,
     ComunicacionesService,
+    CorreosService,
     EvidenciasService,
     {
       provide: ALMACENAMIENTO,

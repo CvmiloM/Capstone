@@ -114,6 +114,37 @@ export type DetalleCaso = CasoLista & {
   comunicaciones: Comunicacion[];
   /** CA5: personas del caso que pueden recibirla, con la advertencia del vínculo. */
   destinatarios_comunicacion: (AsistentePosible & { no_contactable: boolean })[];
+  /** PB-151 y PB-086 (HU-130 y HU-075): correos al apoderado del caso. */
+  correos: CorreoCaso[];
+  /** Personas del caso que pueden recibir un correo, con su dirección guardada. */
+  destinatarios_correo: DestinatarioCorreo[];
+};
+
+/** PB-151 y PB-086: correo al apoderado, en borrador hasta que se confirme (PB-087). */
+export type CorreoCaso = {
+  id: string;
+  persona_destinataria_id: string | null;
+  destinatario: string | null;
+  direccion: string | null;
+  asunto: string | null;
+  contenido: string | null;
+  estado: string;
+  generado_por_ia: boolean;
+  creado_por: string;
+  creado_en: string;
+  confirmado_en: string | null;
+  enviado_en: string | null;
+  /** Borrador que nadie confirmó: se puede editar o descartar. */
+  editable: boolean;
+};
+
+export type DestinatarioCorreo = {
+  persona_id: string;
+  rol: string;
+  nombre: string;
+  detalle: string | null;
+  correo: string | null;
+  no_contactable: boolean;
 };
 
 /** PB-067 (HU-058): llamada, conversación u otro contacto registrado en el caso. */
