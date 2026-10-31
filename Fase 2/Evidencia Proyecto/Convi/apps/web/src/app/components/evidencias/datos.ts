@@ -29,10 +29,15 @@ async function tokenDeSesion() {
   return token;
 }
 
-/** Envía el formulario multipart (titulo, tipo, descripcion y archivo) a la API. */
+/**
+ * Envía el formulario multipart (titulo, tipo, descripcion y archivo) a la
+ * API. PB-067: las comunicaciones con respaldo también lo usan, con su propio
+ * mensaje si falla la conexión.
+ */
 export async function enviarEvidencia(
   ruta: string,
   cuerpo: FormData,
+  sinConexion = SIN_CONEXION,
 ): Promise<ResultadoEvidencia> {
   const token = await tokenDeSesion();
   let respuesta: Response;
@@ -45,7 +50,7 @@ export async function enviarEvidencia(
       signal: AbortSignal.timeout(60000),
     });
   } catch {
-    return { ok: false, mensaje: SIN_CONEXION };
+    return { ok: false, mensaje: sinConexion };
   }
   if (respuesta.status === 401) redirect("/login");
 
@@ -78,7 +83,7 @@ export async function enviarEvidencia(
   if ([404, 409, 503].includes(respuesta.status) && datos?.message) {
     return { ok: false, mensaje: datos.message };
   }
-  return { ok: false, mensaje: SIN_CONEXION };
+  return { ok: false, mensaje: sinConexion };
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   validarActa,
   validarEvidencia,
   type ArchivoSubido,
+  type ArchivoValido,
   type NuevaActa,
   type NuevaEvidencia,
 } from './archivo-evidencia.js';
@@ -424,62 +425,122 @@ export class EvidenciasService {
     };
   }
 
-  // Guarda el archivo y la evidencia en una sola transacción (PB-138); al
-  // final sube el archivo al espacio privado, de modo que si Storage falla la
-  // base deshace todo y no queda una evidencia sin archivo.
-  private async guardar(
+  /**
+   * PB-067 (HU-058 CA2): el respaldo de una comunicación, con los mismos
+   * controles de descarga que una evidencia (CA3 de HU-057 y PB-143).
+   */
+  async descargarRespaldo(
+    sesion: Sesion,
+    comunicacionId: string,
+  ): Promise<{ nombre: string; mime: string; contenido: Buffer }> {
+    const archivo = await this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: ['CONVIVENCIA'] },
+      async (db) => {
+        const fila = await db.query<{
+          nombre: string;
+          mime: string;
+          clave: string;
+          espacio: string;
+        }>(
+          `SELECT ar.nombre_original AS nombre, ar.tipo_mime AS mime,
+                  ar.clave_almacenamiento AS clave, ar.bucket_id AS espacio
+           FROM convi.comunicaciones co
+           JOIN convi.archivos ar ON ar.id = co.archivo_respaldo_id
+           WHERE co.id = $1`,
+          [comunicacionId],
+        );
+        if (!fila.rows[0])
+          throw new NotFoundException(
+            'El respaldo no existe o no tienes permiso para descargarlo.',
+          );
+        return fila.rows[0];
+      },
+    );
+    return this.leerArchivo(sesion, archivo);
+  }
+
+  // Guarda el archivo y la evidencia en una sola transacción (PB-138).
+  private guardar(
     sesion: Sesion,
     perfiles: Perfil[],
     datos: NuevaEvidencia | NuevaActa,
     archivo: ArchivoSubido,
     comprobarOrigen: (db: PoolClient) => Promise<Origen>,
   ): Promise<{ id: string }> {
-    const clave = `${sesion.establecimiento_id}/evidencias/${randomUUID()}.${datos.archivo.formato}`;
-    let subido = false;
-    try {
-      return await this.cuentas.operar(
-        sesion,
-        { tipo: 'establecimiento', perfiles },
-        async (db) => {
-          const origen = await comprobarOrigen(db);
-          const guardado = await db.query<{ id: string }>(
-            `INSERT INTO convi.archivos
-               (establecimiento_id, clave_almacenamiento, nombre_original,
-                tipo_mime, tamano_bytes, sha256, subido_por)
-             VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5,
-                     convi.membresia_actual())
-             RETURNING id`,
-            [
-              clave,
-              datos.archivo.nombre,
-              datos.archivo.mime,
-              datos.archivo.tamano,
-              datos.archivo.sha256,
-            ],
-          );
-          const evidencia = await db.query<{ id: string }>(
-            `INSERT INTO convi.evidencias
+    return this.guardarConArchivo(
+      sesion,
+      perfiles,
+      datos.archivo,
+      archivo,
+      async (db, insertarArchivo) => {
+        const origen = await comprobarOrigen(db);
+        const archivoId = await insertarArchivo();
+        const evidencia = await db.query<{ id: string }>(
+          `INSERT INTO convi.evidencias
                (establecimiento_id, archivo_id, tipo_evidencia, titulo,
                 descripcion, ${origen.columna}, paso_caso_id, fecha_documento,
                 creado_por)
              VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5, $6,
                      ${INICIO_DEL_DIA('$7')}, convi.membresia_actual())
              RETURNING id`,
-            [
-              guardado.rows[0].id,
-              datos.tipo,
-              datos.titulo,
-              datos.descripcion,
-              origen.id,
-              origen.paso_caso_id ?? null,
-              // PB-072: la fecha del acta es un día de la escuela.
-              'fecha_documento' in datos ? datos.fecha_documento : null,
-            ],
-          );
+          [
+            archivoId,
+            datos.tipo,
+            datos.titulo,
+            datos.descripcion,
+            origen.id,
+            origen.paso_caso_id ?? null,
+            // PB-072: la fecha del acta es un día de la escuela.
+            'fecha_documento' in datos ? datos.fecha_documento : null,
+          ],
+        );
+        return { id: evidencia.rows[0].id };
+      },
+    );
+  }
+
+  /**
+   * Registra un archivo privado junto con lo que lo usa, en una sola
+   * transacción (PB-138). registrar comprueba el origen, llama a
+   * insertarArchivo y guarda su registro; al final se sube el archivo al
+   * espacio privado, de modo que si Storage falla la base deshace todo y no
+   * queda un registro sin archivo. PB-067: también lo usa el respaldo de una
+   * comunicación.
+   */
+  async guardarConArchivo<T>(
+    sesion: Sesion,
+    perfiles: Perfil[],
+    valido: ArchivoValido,
+    archivo: ArchivoSubido,
+    registrar: (
+      db: PoolClient,
+      insertarArchivo: () => Promise<string>,
+    ) => Promise<T>,
+  ): Promise<T> {
+    const clave = `${sesion.establecimiento_id}/evidencias/${randomUUID()}.${valido.formato}`;
+    let subido = false;
+    try {
+      return await this.cuentas.operar(
+        sesion,
+        { tipo: 'establecimiento', perfiles },
+        async (db) => {
+          const resultado = await registrar(db, async () => {
+            const guardado = await db.query<{ id: string }>(
+              `INSERT INTO convi.archivos
+                 (establecimiento_id, clave_almacenamiento, nombre_original,
+                  tipo_mime, tamano_bytes, sha256, subido_por)
+               VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5,
+                       convi.membresia_actual())
+               RETURNING id`,
+              [clave, valido.nombre, valido.mime, valido.tamano, valido.sha256],
+            );
+            return guardado.rows[0].id;
+          });
           const { error } = await this.supabase.storage
             .from(ESPACIO)
             .upload(clave, archivo.buffer, {
-              contentType: datos.archivo.mime,
+              contentType: valido.mime,
               upsert: false,
             });
           if (error)
@@ -487,7 +548,7 @@ export class EvidenciasService {
               'No pudimos guardar el archivo. Inténtalo de nuevo en unos minutos.',
             );
           subido = true;
-          return { id: evidencia.rows[0].id };
+          return resultado;
         },
       );
     } catch (error) {

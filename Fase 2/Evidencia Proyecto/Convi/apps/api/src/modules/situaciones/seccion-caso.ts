@@ -12,6 +12,8 @@ export const SECCIONES_CASO = [
   'encuentros',
   'compromisos',
   'seguimientos',
+  // PB-067 (HU-058): llamadas, conversaciones y otros contactos del caso.
+  'comunicaciones',
   'evidencias',
   'ia',
   'historial',
@@ -33,7 +35,14 @@ const PESTANAS = {
   // Planes de intervención y responsables de sus acciones.
   plan: ['plan'],
   // hoy y ahora en la zona horaria de la escuela.
-  fechas: ['protocolo', 'plan', 'encuentros', 'compromisos', 'seguimientos'],
+  fechas: [
+    'protocolo',
+    'plan',
+    'encuentros',
+    'compromisos',
+    'seguimientos',
+    'comunicaciones',
+  ],
   compromisos_seguimientos: ['resumen', 'compromisos', 'seguimientos'],
   actuaciones_origen: ['compromisos', 'seguimientos'],
   encuentros: ['encuentros'],
@@ -42,6 +51,8 @@ const PESTANAS = {
   acciones_encuentro: ['encuentros'],
   // PB-055: cuentas de Convivencia activas que pueden ser responsables de un paso.
   responsables_paso: ['protocolo'],
+  // PB-067: comunicaciones del caso y sus destinatarios posibles.
+  comunicaciones: ['comunicaciones'],
 } satisfies Record<string, readonly SeccionCaso[]>;
 
 export type DatosCaso = keyof typeof PESTANAS;
