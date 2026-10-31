@@ -1,5 +1,11 @@
 import { ConflictException } from '@nestjs/common';
 import type { PoolClient } from 'pg';
+import {
+  avisaUrgencia,
+  crearAvisos,
+  EQUIPO,
+  TEXTO_AVISO,
+} from '../alertas/crear-avisos.js';
 
 // Pasos comunes del registro de una situación, del profesor (PB-042) y de
 // Convivencia por otros canales (PB-043). Cada servicio decide quién puede
@@ -192,5 +198,18 @@ export async function insertarSituacion(
       participantes.map((p) => p.matricula_id),
     ],
   );
+
+  // PB-094 (HU-081 CA1): una situación Urgente o Inmediata avisa a todo el
+  // equipo de Convivencia. Las del registro histórico ya ocurrieron hace
+  // tiempo y no avisan (por defecto).
+  if (!situacion.registro_historico && avisaUrgencia(situacion.urgencia))
+    await crearAvisos(db, {
+      tipo: 'SITUACION_URGENTE',
+      ...TEXTO_AVISO.situacionUrgente(registrada.codigo, situacion.urgencia),
+      tipoRecurso: 'situaciones',
+      recursoId: registrada.id,
+      destinatario: EQUIPO,
+      evento: registrada.id,
+    });
   return registrada;
 }

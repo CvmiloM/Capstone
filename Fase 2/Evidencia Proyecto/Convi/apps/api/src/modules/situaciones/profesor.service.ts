@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import { crearAvisos, TEXTO_AVISO } from '../alertas/crear-avisos.js';
 import { EvaluacionReglas } from '../alertas/evaluacion.service.js';
 import {
   errorDeCampos,
@@ -396,20 +397,32 @@ export class ProfesorService {
 
         // CA1: guarda la respuesta y quién respondió; respondido_en lo pone la base.
         const respondida = await db.query<
-          Omit<AclaracionRespondida, 'estado_situacion'>
+          Omit<AclaracionRespondida, 'estado_situacion'> & {
+            solicitado_por: string;
+          }
         >(
           `UPDATE convi.aclaraciones_situacion
            SET estado = 'RESPONDIDA', respuesta = $2,
                respondido_por = convi.membresia_actual()
            WHERE id = $1
-           RETURNING id, situacion_id, estado, respondido_en`,
+           RETURNING id, situacion_id, estado, respondido_en, solicitado_por`,
           [aclaracionId, respuesta],
         );
-        const fila = respondida.rows[0];
-        const situacion = await db.query<{ estado: string }>(
-          'SELECT estado FROM convi.situaciones WHERE id = $1',
+        const { solicitado_por, ...fila } = respondida.rows[0];
+        const situacion = await db.query<{ estado: string; codigo: string }>(
+          'SELECT estado, codigo FROM convi.situaciones WHERE id = $1',
           [fila.situacion_id],
         );
+        // PB-094 (HU-081 CA1): avisa a quien pidió la aclaración, si sigue
+        // activo en Convivencia. El profesor no ve a quién se avisó.
+        await crearAvisos(db, {
+          tipo: 'ACLARACION_RESPONDIDA',
+          ...TEXTO_AVISO.aclaracionRespondida(situacion.rows[0].codigo),
+          tipoRecurso: 'aclaraciones_situacion',
+          recursoId: fila.id,
+          destinatario: solicitado_por,
+          evento: fila.id,
+        });
         return { ...fila, estado_situacion: situacion.rows[0].estado };
       },
     );

@@ -10,6 +10,7 @@ import type { PoolClient } from 'pg';
 import { createHash } from 'node:crypto';
 import { CuentaService } from '../../database/cuenta.service.js';
 import type { Sesion } from '../../common/sesion.js';
+import { avisarDocumentoProcesado } from '../alertas/crear-avisos.js';
 import { validarArchivo } from '../situaciones/archivo-evidencia.js';
 import { DocumentosService } from './documentos.service.js';
 import type { TrabajoDocumento } from './cola.js';
@@ -217,6 +218,8 @@ export class PreparacionDocumentos {
           procesado_en = now(), detalle_error_procesamiento = NULL WHERE id = $1`,
           [id],
         );
+        // PB-094 (HU-081 CA1, Fernando): avisa a quien subió la versión.
+        await avisarDocumentoProcesado(db, id, true);
       });
     } catch (error) {
       if (
@@ -233,14 +236,16 @@ export class PreparacionDocumentos {
               true,
             );
       // La misma cuenta debe seguir autorizada también al registrar el fallo.
-      await this.operar(sesion, (db) =>
-        db.query(
+      await this.operar(sesion, async (db) => {
+        const fallido = await db.query(
           `UPDATE convi.versiones_documento
         SET estado_procesamiento = 'FALLIDO', detalle_error_procesamiento = $3
         WHERE id = $1 AND intentos_procesamiento = $2 AND estado_procesamiento = 'PROCESANDO'`,
           [id, inicio.intento, seguro.message],
-        ),
-      ).catch(() => {});
+        );
+        // PB-094 (HU-081 CA1, Fernando): avisa a quien subió la versión.
+        if (fallido.rowCount) await avisarDocumentoProcesado(db, id, false);
+      }).catch(() => {});
       throw seguro;
     }
   }

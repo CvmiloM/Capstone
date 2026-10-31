@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import { crearAvisos, TEXTO_AVISO } from '../alertas/crear-avisos.js';
 import { EvaluacionReglas } from '../alertas/evaluacion.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
 import {
@@ -553,13 +554,26 @@ export class ConvivenciaService {
         await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
           cambio.motivo ?? PRIMERA_ASIGNACION,
         ]);
-        const resultado = await db.query<ResponsableAsignado>(
+        const resultado = await db.query<
+          ResponsableAsignado & { codigo: string }
+        >(
           `UPDATE convi.situaciones SET asignado_a_membresia_id = $2
            WHERE id = $1
-           RETURNING id, estado, asignado_a_membresia_id AS responsable_id`,
+           RETURNING id, estado, asignado_a_membresia_id AS responsable_id, codigo`,
           [id, cambio.responsable_id],
         );
-        return resultado.rows[0];
+        const { codigo, ...asignado } = resultado.rows[0];
+        // PB-094 (HU-081 CA1): avisa al nuevo responsable, salvo que se haya
+        // asignado a sí mismo.
+        await crearAvisos(db, {
+          tipo: 'SITUACION_ASIGNADA',
+          ...TEXTO_AVISO.situacionAsignada(codigo),
+          tipoRecurso: 'situaciones',
+          recursoId: id,
+          destinatario: cambio.responsable_id,
+          evento: `${id}:${cambio.responsable_id}:${Date.now()}`,
+        });
+        return asignado;
       },
     );
   }

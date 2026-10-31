@@ -214,6 +214,8 @@ function entorno() {
     pagina_hasta: number | null;
   }[] = [];
   const insertados: unknown[] = [];
+  // PB-094: avisos a quien subió la versión, con true si quedó lista.
+  const avisos: unknown[] = [];
   const query = vi.fn(async (sql: string, valores: unknown[] = []) => {
     if (
       sql.includes('SELECT v.estado_procesamiento') ||
@@ -239,7 +241,11 @@ function entorno() {
     if (sql.includes("SET estado_procesamiento = 'FALLIDO'")) {
       version.estado_procesamiento = 'FALLIDO';
       version.detalle_error_procesamiento = String(valores[2]);
-      return { rows: [] };
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('INSERT INTO convi.notificaciones')) {
+      avisos.push(valores[1]);
+      return { rows: [], rowCount: 1 };
     }
     throw new Error('Consulta no prevista en la prueba');
   });
@@ -265,6 +271,7 @@ function entorno() {
   return {
     version,
     insertados,
+    avisos,
     operar,
     query,
     descargar,
@@ -283,6 +290,7 @@ describe('PB-079: preparación autorizada y recuperación', () => {
     expect(e.version.estado_procesamiento).toBe('LISTO');
     expect(e.insertados).toHaveLength(1);
     expect(e.version.intentos_procesamiento).toBe(1);
+    expect(e.avisos).toEqual([true]);
     expect(
       e.operar.mock.calls.every(
         ([s, a]) => s === sesion && a.perfiles.includes('ADMIN'),
@@ -319,6 +327,7 @@ describe('PB-079: preparación autorizada y recuperación', () => {
       e.motor.procesar({ sesion, version_id: 'version' }),
     ).rejects.toThrow(/configurar/);
     expect(e.version.estado_procesamiento).toBe('FALLIDO');
+    expect(e.avisos).toEqual([false]);
     expect(e.insertados).toHaveLength(0);
     expect(e.descargar).not.toHaveBeenCalled();
   });
