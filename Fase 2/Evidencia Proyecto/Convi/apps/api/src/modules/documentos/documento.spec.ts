@@ -8,7 +8,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Pool, PoolClient } from 'pg';
 import type { Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
-import { validarCarga, validarVigencia, TIPOS_DOCUMENTO } from './documento.js';
+import {
+  usaBusquedaIa,
+  validarCarga,
+  validarVigencia,
+  TIPOS_DOCUMENTO,
+} from './documento.js';
 import { DocumentosService } from './documentos.service.js';
 
 const pdf = Buffer.from('%PDF-1.7\nDocumento ficticio\n%%EOF');
@@ -359,5 +364,19 @@ describe('PB-079: altas de documentos sin bloquear la fila de la escuela', () =>
     query.mockResolvedValueOnce({ rows: [] });
     await servicio.listar(sesion);
     expect(operar.mock.calls[0]).toHaveLength(3);
+  });
+});
+
+describe('PB-079: tipos que se usan en la búsqueda con IA', () => {
+  it.each([
+    ['RICE', true],
+    ['FUENTE_PROTOCOLO', true],
+    ['PLAN', true],
+    ['POLITICA', true],
+    ['OTRO', true],
+    ['PLANTILLA', false],
+    ['DESCONOCIDO', false],
+  ])('%s se prepara para la búsqueda: %s', (tipo, esperado) => {
+    expect(usaBusquedaIa(tipo)).toBe(esperado);
   });
 });

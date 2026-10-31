@@ -16,9 +16,12 @@ type EstadoPreparacion = Pick<
 export function PreparacionDocumento({
   version,
   portal,
+  habilitable = false,
 }: {
   version: Version;
   portal: Portal;
+  /** PB-079: no es plantilla y la versión está en borrador o publicada. */
+  habilitable?: boolean;
 }) {
   const [estado, setEstado] = useState<EstadoPreparacion>({
     ...version,
@@ -128,11 +131,29 @@ export function PreparacionDocumento({
             versión esté publicada y vigente
           </p>
         )}
-        {estado.estado_procesamiento === "NO_APLICA" && (
+        {estado.estado_procesamiento === "NO_APLICA" && !habilitable && (
           <p>
             Este documento se conserva para consulta y descarga, no está
             habilitado como fuente de búsqueda con IA
           </p>
+        )}
+        {estado.estado_procesamiento === "NO_APLICA" && habilitable && (
+          <form action={accion} className="space-y-2">
+            <p>
+              Esta versión todavía no se usa en la búsqueda con IA: al
+              habilitarla
+              {version.estado === "PUBLICADO"
+                ? ", CONVI la publica de nuevo con el mismo archivo y las mismas fechas, archiva esta y prepara la nueva"
+                : " se prepara su texto y se usará cuando esté publicada y vigente"}
+            </p>
+            <input type="hidden" name="accion" value="habilitar" />
+            <input type="hidden" name="version" value={version.id} />
+            <input type="hidden" name="portal" value={portal} />
+            {resultado.mensaje && <AvisoError>{resultado.mensaje}</AvisoError>}
+            <BotonEnviar pendiente={pendiente} textoPendiente="Habilitando…">
+              Habilitar para búsqueda con IA
+            </BotonEnviar>
+          </form>
         )}
         {estado.detalle_error_procesamiento && (
           <p role="alert">{estado.detalle_error_procesamiento}</p>
