@@ -26,9 +26,12 @@ const claseControl =
 export function FormularioEvidencia({
   destino,
   registroId,
+  pasoId,
 }: {
   destino: DestinoEvidencia;
   registroId: string;
+  /** PB-055: paso del protocolo del caso al que respalda (destino convivencia-paso). */
+  pasoId?: string;
 }) {
   const [estado, accion, pendiente] = useActionState(
     adjuntarEvidencia,
@@ -76,6 +79,7 @@ export function FormularioEvidencia({
     >
       <input type="hidden" name="destino" value={destino} />
       <input type="hidden" name="registro_id" value={registroId} />
+      {pasoId && <input type="hidden" name="paso_caso_id" value={pasoId} />}
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
       )}

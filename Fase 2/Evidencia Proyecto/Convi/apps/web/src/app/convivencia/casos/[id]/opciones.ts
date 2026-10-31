@@ -29,6 +29,26 @@ export const NOMBRE_PERFIL_RESPONSABLE: Record<string, string> = {
   ADMIN: "Administración",
 };
 
+// PB-082, PB-055 y PB-056 (HU-071, HU-048 y HU-049): protocolo aplicado y sus
+// pasos. Mismos límites que valida la API
+// (apps/api/src/modules/situaciones/pasos-protocolo.ts).
+export const LARGO_MAXIMO_NOTAS_PASO = 2000;
+export const LARGO_MAXIMO_MOTIVO_PROTOCOLO = 500;
+
+export const NOMBRE_ESTADO_PROTOCOLO: Record<string, string> = {
+  ACTIVO: "Activo",
+  COMPLETADO: "Completado",
+  CANCELADO: "Cancelado",
+};
+
+export const NOMBRE_ESTADO_PASO: Record<string, string> = {
+  PENDIENTE: "Pendiente",
+  EN_PROGRESO: "En progreso",
+  COMPLETADO: "Completado",
+  OMITIDO: "Omitido",
+  VENCIDO: "Vencido",
+};
+
 // PB-063 y PB-064 (HU-055): encuentros del caso. Mismos límites que valida la
 // API (apps/api/src/modules/situaciones/encuentros.ts).
 export const LARGO_MAXIMO_OBJETIVO_ENCUENTRO = 1000;

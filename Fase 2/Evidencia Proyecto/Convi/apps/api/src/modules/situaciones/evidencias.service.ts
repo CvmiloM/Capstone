@@ -85,7 +85,8 @@ export async function evidenciasDelCaso(
 ): Promise<EvidenciaRegistrada[]> {
   const evidencias = await db.query<EvidenciaRegistrada>(
     `SELECT ${COLUMNAS_EVIDENCIA},
-            CASE WHEN ev.caso_id IS NOT NULL THEN 'Caso'
+            CASE WHEN ev.paso_caso_id IS NOT NULL THEN 'Paso del protocolo'
+                 WHEN ev.caso_id IS NOT NULL THEN 'Caso'
                  WHEN ev.situacion_id IS NOT NULL THEN 'Situación ' || s.codigo
                  WHEN ev.aclaracion_id IS NOT NULL THEN 'Aclaración de ' || sa.codigo
                  WHEN ev.actuacion_id IS NOT NULL THEN 'Actuación'
@@ -102,7 +103,14 @@ export async function evidenciasDelCaso(
   return evidencias.rows;
 }
 
-type Origen = { columna: 'situacion_id' | 'caso_id'; id: string };
+type Origen = {
+  columna: 'situacion_id' | 'caso_id';
+  id: string;
+  /** PB-055 (HU-048 CA3): paso del protocolo del caso al que respalda. */
+  paso_caso_id?: string;
+};
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class EvidenciasService {
@@ -161,6 +169,9 @@ export class EvidenciasService {
 
   // Decisión del PO (por defecto): un caso cerrado conserva sus evidencias
   // pero no recibe nuevas; para agregarlas hay que reabrirlo (PB-058).
+  // PB-055 (HU-048 CA3): si el cuerpo trae paso_caso_id, la evidencia del
+  // caso también respalda ese paso, que debe seguir abierto en un protocolo
+  // Activo del mismo caso.
   adjuntarACaso(
     sesion: Sesion,
     casoId: string,
@@ -168,6 +179,10 @@ export class EvidenciasService {
     archivo: ArchivoSubido | undefined,
   ) {
     const datos = validarEvidencia(cuerpo, archivo);
+    const paso = (cuerpo as { paso_caso_id?: unknown } | null)?.paso_caso_id;
+    const pasoId = typeof paso === 'string' && paso ? paso : undefined;
+    if (pasoId !== undefined && !UUID.test(pasoId))
+      throw new NotFoundException('El paso del protocolo no existe.');
     return this.guardar(
       sesion,
       ['CONVIVENCIA'],
@@ -192,7 +207,34 @@ export class EvidenciasService {
           throw new ConflictException(
             'El caso está cerrado: conserva sus evidencias, pero no recibe nuevas.',
           );
-        return { columna: 'caso_id', id: casoId };
+        if (pasoId === undefined) return { columna: 'caso_id', id: casoId };
+        // FOR SHARE impide que el paso se complete u omita mientras se adjunta.
+        const estado = await db
+          .query<{ paso: string; protocolo: string }>(
+            `SELECT ep.estado AS paso, pc.estado AS protocolo
+             FROM convi.estados_pasos_protocolo_caso ep
+             JOIN convi.protocolos_caso pc ON pc.id = ep.protocolo_caso_id
+             WHERE ep.id = $1 AND pc.caso_id = $2 FOR SHARE OF ep`,
+            [pasoId, casoId],
+          )
+          .catch((error: unknown) => {
+            if ((error as { code?: string }).code === '40001')
+              throw new ConflictException(
+                'El paso cambió mientras adjuntabas. Recarga la página e inténtalo nuevamente.',
+              );
+            throw error;
+          });
+        if (!estado.rows[0])
+          throw new NotFoundException('El paso del protocolo no existe.');
+        if (estado.rows[0].protocolo !== 'ACTIVO')
+          throw new ConflictException(
+            'El protocolo ya terminó y sus pasos se conservan como quedaron.',
+          );
+        if (['COMPLETADO', 'OMITIDO'].includes(estado.rows[0].paso))
+          throw new ConflictException(
+            'El paso ya está completado u omitido y no recibe nuevos respaldos.',
+          );
+        return { columna: 'caso_id', id: casoId, paso_caso_id: pasoId };
       },
     );
   }
@@ -339,8 +381,8 @@ export class EvidenciasService {
           const evidencia = await db.query<{ id: string }>(
             `INSERT INTO convi.evidencias
                (establecimiento_id, archivo_id, tipo_evidencia, titulo,
-                descripcion, ${origen.columna}, creado_por)
-             VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5,
+                descripcion, ${origen.columna}, paso_caso_id, creado_por)
+             VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5, $6,
                      convi.membresia_actual())
              RETURNING id`,
             [
@@ -349,6 +391,7 @@ export class EvidenciasService {
               datos.titulo,
               datos.descripcion,
               origen.id,
+              origen.paso_caso_id ?? null,
             ],
           );
           const { error } = await this.supabase.storage

@@ -33,13 +33,15 @@ const PESTANAS = {
   // Planes de intervención y responsables de sus acciones.
   plan: ['plan'],
   // hoy y ahora en la zona horaria de la escuela.
-  fechas: ['plan', 'encuentros', 'compromisos', 'seguimientos'],
+  fechas: ['protocolo', 'plan', 'encuentros', 'compromisos', 'seguimientos'],
   compromisos_seguimientos: ['resumen', 'compromisos', 'seguimientos'],
   actuaciones_origen: ['compromisos', 'seguimientos'],
   encuentros: ['encuentros'],
   // Responsables y asistentes posibles, que también usa el formulario de seguimientos.
   personas_encuentro: ['encuentros', 'compromisos', 'seguimientos'],
   acciones_encuentro: ['encuentros'],
+  // PB-055: cuentas de Convivencia activas que pueden ser responsables de un paso.
+  responsables_paso: ['protocolo'],
 } satisfies Record<string, readonly SeccionCaso[]>;
 
 export type DatosCaso = keyof typeof PESTANAS;

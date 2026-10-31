@@ -23,6 +23,7 @@ const GRUPOS: DatosCaso[] = [
   'encuentros',
   'personas_encuentro',
   'acciones_encuentro',
+  'responsables_paso',
 ];
 
 // Grupos que llegan a consultar la base con la sección indicada.
@@ -105,11 +106,16 @@ describe('cargadorDeSeccion', () => {
     expect(await consultados('seguimientos')).toEqual(esperados);
   });
 
-  it('protocolo y estado consultan solo sus grupos', async () => {
+  it('protocolo consulta sus pasos, la normativa y los responsables posibles', async () => {
     expect(await consultados('protocolo')).toEqual([
       'protocolos_aplicados',
       'normativa',
+      'fechas',
+      'responsables_paso',
     ]);
+  });
+
+  it('estado consulta solo su grupo', async () => {
     expect(await consultados('estado')).toEqual(['estado']);
   });
 });
