@@ -8,6 +8,7 @@ import {
 } from '../academico/estudiante.js';
 import { CAMPOS } from './campos.js';
 import type { Contexto, CursoExistente, PersonaExistente } from './contexto.js';
+import type { Correccion } from './correccion.js';
 import type { TipoImportacion } from './importacion.js';
 import { type Revision, valoresDeFila } from './mapeo.js';
 import {
@@ -38,6 +39,8 @@ export type FilaRevisada = {
   /** Los valores ya normalizados, por campo. */
   datos: Record<string, string | boolean | null>;
   problemas: Problema[];
+  /** PB-024: la corrección de la fila, que se conserva al volver a revisar. */
+  correccion?: Correccion;
 };
 
 // Mismos criterios que la ficha del estudiante (estudiante.ts) y que
@@ -181,7 +184,11 @@ class Fila {
 
 export function revisarFilas(
   tipo: TipoImportacion,
-  filas: { numero_fila: number; datos_originales: Record<string, string> }[],
+  filas: {
+    numero_fila: number;
+    datos_originales: Record<string, string>;
+    correccion?: Correccion | null;
+  }[],
   columnas: string[],
   revision: Revision,
   contexto: Contexto,
@@ -193,9 +200,15 @@ export function revisarFilas(
     (c) => c.ejemplo && relacionados.has(c.clave),
   );
 
-  return filas.map(({ numero_fila, datos_originales }) => {
+  return filas.map(({ numero_fila, datos_originales, correccion }) => {
+    // PB-024 (HU-019 CA2): lo corregido en los campos relacionados reemplaza
+    // lo que trae el archivo, que no cambia.
     const valores = valoresDeFila(datos_originales, revision.mapeo, columnas);
+    for (const [campo, valor] of Object.entries(correccion?.valores ?? {}))
+      if (relacionados.has(campo)) valores[campo] = valor;
     const fila = new Fila(numero_fila, valores, revision, contexto, archivo);
+    const resultado = () =>
+      correccion ? { ...fila.resultado(), correccion } : fila.resultado();
 
     // Si quedó la fila de ejemplo de la plantilla, no se importa.
     if (
@@ -204,7 +217,7 @@ export function revisarFilas(
     ) {
       fila.datos = { ...valores };
       fila.error(null, 'Es la fila de ejemplo de la plantilla: bórrala.');
-      return fila.resultado();
+      return resultado();
     }
 
     for (const campo of campos)
@@ -216,7 +229,7 @@ export function revisarFilas(
         fila.error(campo.clave, 'Falta este dato obligatorio.');
 
     REVISAR[tipo](fila);
-    return fila.resultado();
+    return resultado();
   });
 }
 

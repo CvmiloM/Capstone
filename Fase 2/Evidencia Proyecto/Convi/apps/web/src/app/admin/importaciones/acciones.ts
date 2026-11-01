@@ -4,9 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   enviarArchivo,
+  enviarCancelacion,
   enviarConfirmacion,
+  enviarCorreccion,
   enviarOmision,
   enviarReanudacion,
+  enviarRestauracion,
+  enviarRevalidacion,
   enviarRevision,
 } from "./datos";
 
@@ -114,4 +118,67 @@ export async function omitirFilas(id: string): Promise<EstadoFormulario> {
         ? "Se omitieron las filas con error y la importación quedó Confirmada."
         : "Se omitieron las filas con error. Quedan filas por confirmar.",
   };
+}
+
+// PB-024 (HU-019 CA2 y CA3): guarda lo corregido en una fila (los campos
+// "valor-clave") o, con el botón Quitar, la devuelve a los valores del
+// archivo. Vuelve a la misma página de la vista previa con el aviso.
+export async function corregirFila(
+  id: string,
+  numero: number,
+  volver: string,
+  _anterior: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const valores: Record<string, string> = {};
+  for (const [clave, valor] of formData.entries()) {
+    const campo = /^valor-(.+)$/.exec(clave)?.[1];
+    if (campo && typeof valor === "string") valores[campo] = valor;
+  }
+  const quitar = formData.get("accion") === "QUITAR";
+  const resultado = await enviarCorreccion(id, numero, quitar ? {} : valores);
+  if (!resultado.ok) {
+    return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
+  }
+  revalidatePath("/admin", "layout");
+  const consulta = new URLSearchParams(volver);
+  consulta.set("aviso", quitar ? "sin-correccion" : "corregida");
+  consulta.set("fila", String(numero));
+  redirect(`/admin/importaciones/${id}?${consulta.toString()}`);
+}
+
+// PB-024 (HU-019 CA3): revisa de nuevo las filas abiertas con lo que hay hoy
+// en la escuela. No necesita nada del formulario: solo el id.
+export async function revalidarFilas(id: string): Promise<EstadoFormulario> {
+  const resultado = await enviarRevalidacion(id);
+  revalidatePath("/admin", "layout");
+  return resultado.ok
+    ? { exito: "Se revisaron de nuevo las filas abiertas." }
+    : { mensaje: resultado.mensaje };
+}
+
+// PB-025 (HU-019 CA4 a CA6): cancela la importación o la restaura a su estado
+// anterior, con el motivo que queda en la auditoría.
+export async function cambiarCancelacion(
+  id: string,
+  accion: "cancelar" | "restaurar",
+  _anterior: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const motivo = String(formData.get("motivo") ?? "");
+  const resultado =
+    accion === "cancelar"
+      ? await enviarCancelacion(id, motivo)
+      : await enviarRestauracion(id, motivo);
+  if (!resultado.ok) {
+    return {
+      mensaje: resultado.mensaje,
+      errores: resultado.errores,
+      valores: { motivo },
+    };
+  }
+  revalidatePath("/admin", "layout");
+  redirect(
+    `/admin/importaciones/${id}?aviso=${accion === "cancelar" ? "cancelada" : "restaurada"}`,
+  );
 }

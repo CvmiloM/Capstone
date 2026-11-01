@@ -3,8 +3,8 @@ import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { pedirAdmin } from "../datos";
 import type { EstadoFila, TipoImportacion } from "./opciones";
 
-// PB-019, PB-020, PB-026 y PB-027 (HU-015 y HU-020): importaciones del portal
-// de administración. Se piden a la API desde el servidor de Next con el token
+// PB-019, PB-020, PB-026 y PB-027 (HU-015 y HU-020), y PB-024 y PB-025
+// (HU-019): importaciones del portal de administración. Se piden a la API desde el servidor de Next con el token
 // de la sesión; la API vuelve a comprobar el perfil ADMIN, el segundo factor y
 // la escuela.
 
@@ -50,6 +50,24 @@ export type FilaImportacion = {
     string,
     { id: string; accion: "CREADO" | "REUTILIZADO" }
   >;
+  /** PB-024 (HU-019 CA2): lo corregido por campo; null si no se corrigió. */
+  correccion: {
+    valores: Record<string, string>;
+    /** Nombre de quien corrigió. */
+    por: string;
+    /** Fecha y hora ISO. */
+    en: string;
+  } | null;
+};
+
+/** PB-025 (HU-019 CA4): la última cancelación, según la auditoría. */
+export type Cancelacion = {
+  motivo: string;
+  por: string;
+  /** Fecha y hora ISO. */
+  en: string;
+  /** El estado al que vuelve si se restaura. */
+  estado_anterior: string;
 };
 
 export type CampoImportacion = {
@@ -89,6 +107,8 @@ export type DetalleImportacion = Importacion & {
   muestra: FilaImportacion[];
   /** La confirmación en curso o la última; null si nunca se confirmó. */
   confirmacion: EstadoConfirmacion | null;
+  /** PB-025: quién la canceló, cuándo y por qué; null si no está Cancelada. */
+  cancelacion: Cancelacion | null;
 };
 
 /** Lo que se envía para revisar las filas (HU-015 CA3). */
@@ -148,6 +168,12 @@ const SIN_REANUDACION =
   "No pudimos reanudar la confirmación. Inténtalo de nuevo en unos minutos.";
 const SIN_OMISION =
   "No pudimos omitir las filas. Inténtalo de nuevo en unos minutos.";
+const SIN_CORRECCION =
+  "No pudimos guardar la corrección. Inténtalo de nuevo en unos minutos.";
+const SIN_CANCELACION =
+  "No pudimos cancelar la importación. Inténtalo de nuevo en unos minutos.";
+const SIN_RESTAURACION =
+  "No pudimos restaurar la importación. Inténtalo de nuevo en unos minutos.";
 
 async function tokenDeSesion() {
   const supabase = await crearClienteServidor();
@@ -323,6 +349,63 @@ export async function enviarOmision(
   return resultado.ok
     ? { ok: true, estado: String(resultado.datos.estado) }
     : resultado;
+}
+
+/**
+ * PB-024 (HU-019 CA2 y CA3): guarda lo corregido en una fila (sin valores, la
+ * fila vuelve a los del archivo) y la API revisa de nuevo las filas abiertas.
+ */
+export async function enviarCorreccion(
+  id: string,
+  numero: number,
+  valores: Record<string, string>,
+): Promise<Resultado> {
+  const resultado = await enviarAccion(
+    `/admin/importaciones/${encodeURIComponent(id)}/filas/${numero}/correccion`,
+    { valores },
+    SIN_CORRECCION,
+    60,
+  );
+  return resultado.ok ? { ok: true, id } : resultado;
+}
+
+/** PB-024 (HU-019 CA3): revisa de nuevo las filas abiertas. */
+export async function enviarRevalidacion(id: string): Promise<Resultado> {
+  const resultado = await enviarAccion(
+    `/admin/importaciones/${encodeURIComponent(id)}/revalidacion`,
+    {},
+    SIN_REVISION,
+    60,
+  );
+  return resultado.ok ? { ok: true, id } : resultado;
+}
+
+/** PB-025 (HU-019 CA4 y CA6): cancela la importación con su motivo. */
+export async function enviarCancelacion(
+  id: string,
+  motivo: string,
+): Promise<Resultado> {
+  const resultado = await enviarAccion(
+    `/admin/importaciones/${encodeURIComponent(id)}/cancelacion`,
+    { motivo },
+    SIN_CANCELACION,
+    30,
+  );
+  return resultado.ok ? { ok: true, id } : resultado;
+}
+
+/** PB-025 (HU-019 CA5): la restaura a su estado anterior, con su motivo. */
+export async function enviarRestauracion(
+  id: string,
+  motivo: string,
+): Promise<Resultado> {
+  const resultado = await enviarAccion(
+    `/admin/importaciones/${encodeURIComponent(id)}/restauracion`,
+    { motivo },
+    SIN_RESTAURACION,
+    30,
+  );
+  return resultado.ok ? { ok: true, id } : resultado;
 }
 
 /**

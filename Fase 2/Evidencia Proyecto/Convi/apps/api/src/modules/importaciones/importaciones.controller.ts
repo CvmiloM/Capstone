@@ -5,6 +5,7 @@ import {
   HttpCode,
   Inject,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Query,
@@ -22,10 +23,10 @@ import {
   validarFiltro,
 } from './importaciones.service.js';
 
-// PB-019, PB-020, PB-026 y PB-027 (HU-015 y HU-020): importaciones del portal
-// de administración. El decorador de la clase aplica a todas las rutas: solo
-// entra una cuenta ADMIN activa con el segundo factor completo, y se comprueba
-// antes de recibir el archivo.
+// PB-019, PB-020, PB-026 y PB-027 (HU-015 y HU-020), y PB-024 y PB-025
+// (HU-019): importaciones del portal de administración. El decorador de la
+// clase aplica a todas las rutas: solo entra una cuenta ADMIN activa con el
+// segundo factor completo, y se comprueba antes de recibir el archivo.
 @Controller('admin/importaciones')
 @PerfilesPermitidos('ADMIN')
 export class ImportacionesController {
@@ -97,7 +98,7 @@ export class ImportacionesController {
     return this.importaciones.revisar(peticion.sesion, id, cuerpo);
   }
 
-    // PB-026 y PB-027: { incluir_advertencias: boolean }. Vuelve a revisar las
+  // PB-026 y PB-027: { incluir_advertencias: boolean }. Vuelve a revisar las
   // filas y deja la confirmación en la cola: responde 202 con la importación
   // Procesando (o En revisión, si no quedó nada que confirmar).
   @Post(':id/confirmacion')
@@ -119,7 +120,7 @@ export class ImportacionesController {
   ) {
     return this.importaciones.omitir(peticion.sesion, id);
   }
- 
+
   // PB-027: vuelve a encolar una confirmación que se detuvo. Sigue desde la
   // fila donde quedó.
   @Post(':id/reanudacion')
@@ -138,5 +139,50 @@ export class ImportacionesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.importaciones.avance(peticion.sesion, id);
+  }
+
+  // PB-024 (HU-019 CA2): { valores: { campo: valor } } de una fila, por su
+  // número en el archivo. Responde con la importación y sus filas revisadas.
+  @Post(':id/filas/:numero/correccion')
+  @HttpCode(200)
+  corregir(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('numero', ParseIntPipe) numero: number,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.importaciones.corregir(peticion.sesion, id, numero, cuerpo);
+  }
+
+  // PB-024 (HU-019 CA3): revisa de nuevo las filas abiertas.
+  @Post(':id/revalidacion')
+  @HttpCode(200)
+  revalidar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.importaciones.revalidar(peticion.sesion, id);
+  }
+
+  // PB-025 (HU-019 CA4): { motivo }. La importación queda Cancelada.
+  @Post(':id/cancelacion')
+  @HttpCode(200)
+  cancelar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.importaciones.cancelar(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-025 (HU-019 CA5): { motivo }. Vuelve al estado anterior a cancelarla.
+  @Post(':id/restauracion')
+  @HttpCode(200)
+  restaurar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.importaciones.restaurar(peticion.sesion, id, cuerpo);
   }
 }

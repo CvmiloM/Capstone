@@ -87,6 +87,21 @@ export default async function PaginaImportaciones() {
                       <td className="px-4 py-3">
                         {NOMBRE_ESTADO[importacion.estado] ??
                           importacion.estado}
+                        {/* PB-024 (HU-019 CA1): se retoma donde quedó. */}
+                        {["CARGADO", "REVISION", "FALLIDO"].includes(
+                          importacion.estado,
+                        ) && (
+                          <Link
+                            href={`/admin/importaciones/${importacion.id}`}
+                            className={`mt-0.5 block text-xs ${claseEnlace}`}
+                          >
+                            Retomar
+                            <span className="sr-only">
+                              {" "}
+                              {importacion.archivo_nombre}
+                            </span>
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   ))}
