@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { claseEnlace, Encabezado } from "@/app/components/formulario";
+import {
+    claseBotonPrimario,
+    claseEnlace,
+    Encabezado,
+} from "@/app/components/formulario";
 import { Icono, type NombreIcono } from "@/app/components/icono";
 import { obtenerContextoAdmin, obtenerResumen } from "./datos";
 
@@ -20,10 +25,13 @@ const formatoNumero = new Intl.NumberFormat("es-CL");
 
 // HU-033: resumen de la escuela para el administrador.
 export default async function PaginaResumen() {
-    const [resumen, { escuela }] = await Promise.all([
+    const [resumen, { escuela, guia }] = await Promise.all([
         obtenerResumen(),
         obtenerContextoAdmin(),
     ]);
+    // PB-032 y PB-038: la guía inicial se abre sola hasta que se empieza o
+    // se elige ir al portal por ahora; después, este aviso la recuerda.
+    if (!guia.terminada && !guia.iniciada) redirect("/admin/guia");
     const { anioActivo, profesores, convivencia } = resumen;
 
     // CA2: sin año activo no se inventa uno; se explica qué falta.
@@ -106,6 +114,21 @@ export default async function PaginaResumen() {
                 titulo="Resumen de la escuela"
                 descripcion={`Lo que está configurado en ${escuela.nombre}. Cifras actualizadas el ${calculadoEn} h.`}
             />
+
+            {!guia.terminada && (
+                <div
+                    role="note"
+                    className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/15 bg-accent px-4 py-3 text-sm text-accent-foreground"
+                >
+                    <p>
+                        <strong className="font-semibold">Tu escuela todavía no termina la guía inicial.</strong>{" "}
+                        Lo avanzado quedó guardado.
+                    </p>
+                    <Link href="/admin/guia" className={claseBotonPrimario}>
+                        Continuar la guía inicial
+                    </Link>
+                </div>
+            )}
 
             <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {cifras.map((cifra) => (
