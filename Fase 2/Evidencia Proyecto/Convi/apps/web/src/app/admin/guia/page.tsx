@@ -76,6 +76,8 @@ export default async function GuiaInicial({
 
   return (
     <>
+      {/* Mientras la guía está en curso, el layout oculta el menú del portal. */}
+      <span data-modo-guia="" hidden />
       <Encabezado
         titulo="Guía inicial"
         descripcion="Configura tu escuela paso a paso. Puedes omitir pasos y volver más tarde: lo avanzado queda guardado."
