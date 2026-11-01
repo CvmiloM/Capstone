@@ -23,7 +23,8 @@ import {
   type AvanceGuia,
 } from './guia.js';
 
-// PB-032 (HU-025) y PB-038 (HU-031): guía inicial del administrador. Solo
+// PB-032 (HU-025), PB-034 (HU-027), PB-036 (HU-029) y PB-038 (HU-031): guía
+// inicial del administrador. Solo
 // entra una cuenta ADMIN activa con segundo factor (HU-025 CA1). Cualquier
 // administrador de la escuela la avanza; la base audita cada cambio de la
 // escuela y conserva la fecha de término de la guía.
@@ -41,6 +42,11 @@ const HUELLA = `md5(e.contexto_onboarding::text || coalesce(e.metodo_registro_ac
 const PASOS_GUARDADOS = `CASE WHEN jsonb_typeof(e.contexto_onboarding->'pasos') = 'object'
   THEN e.contexto_onboarding->'pasos' ELSE '{}'::jsonb END`;
 
+/** PB-036: filas de estudiantes confirmadas en las importaciones de la escuela. */
+const ESTUDIANTES_CONFIRMADOS = `(SELECT count(*) FROM convi.filas_importacion f
+  JOIN convi.procesos_importacion p ON p.id = f.proceso_importacion_id
+  WHERE p.tipo_importacion = 'ESTUDIANTES' AND f.estado = 'CONFIRMADO')::int`;
+
 /** Avance con el paso marcado; $2 = paso y $3 = LISTO u OMITIDO. */
 const AVANCE_CON_PASO = `e.contexto_onboarding || jsonb_build_object(
     'iniciada_en', coalesce(e.contexto_onboarding->'iniciada_en', to_jsonb(now())),
@@ -56,14 +62,38 @@ export type Guia = Omit<AvanceGuia, 'pasos'> & {
   zona_horaria: string;
   /** PB-034: lo que ya existe, para marcarlo en la vista previa. */
   academico: {
-    anios: { id: string; anio: number; estado: string }[];
+    anios: {
+      id: string;
+      anio: number;
+      estado: string;
+      /** PB-036: sin fecha de inicio, la nómina debe traer la de matrícula. */
+      fecha_inicio: string | null;
+    }[];
     niveles: { nombre: string; ciclo: string; activo: boolean }[];
     cursos: {
       anio: number;
       nivel: string;
       ciclo: string;
       seccion: string | null;
+      /** PB-036: la nómina indica el curso por su código o su nombre. */
+      codigo: string;
+      nombre: string;
     }[];
+  };
+  /** PB-036 (HU-029): las importaciones de estudiantes de la escuela. */
+  estudiantes: {
+    /** Las 5 más recientes. */
+    importaciones: {
+      id: string;
+      estado: string;
+      archivo_nombre: string;
+      /** Fecha y hora ISO. */
+      creado_en: string;
+      filas: number;
+      confirmadas: number;
+    }[];
+    /** Filas de estudiantes confirmadas en todas las importaciones. */
+    confirmados: number;
   };
 };
 
@@ -94,6 +124,7 @@ export class GuiaAdminService {
         zona_horaria: string;
         nombres: Record<string, string>;
         academico: Guia['academico'];
+        estudiantes: Guia['estudiantes'];
       }>(
         `SELECT e.onboarding_completado_en AS terminada_en, e.metodo_registro_actual,
            e.contexto_onboarding, ${HUELLA} AS version,
@@ -105,18 +136,33 @@ export class GuiaAdminService {
               SELECT x.value->>'por' FROM jsonb_each(${PASOS_GUARDADOS}) x)) AS nombres,
            jsonb_build_object(
              'anios', (SELECT coalesce(jsonb_agg(jsonb_build_object(
-                 'id', a.id, 'anio', a.anio, 'estado', a.estado) ORDER BY a.anio DESC), '[]'::jsonb)
+                 'id', a.id, 'anio', a.anio, 'estado', a.estado,
+                 'fecha_inicio', a.fecha_inicio) ORDER BY a.anio DESC), '[]'::jsonb)
                FROM convi.anios_academicos a),
              'niveles', (SELECT coalesce(jsonb_agg(jsonb_build_object(
                  'nombre', n.nombre, 'ciclo', n.ciclo, 'activo', n.activo) ORDER BY n.orden), '[]'::jsonb)
                FROM convi.niveles_educativos n),
              'cursos', (SELECT coalesce(jsonb_agg(jsonb_build_object(
-                 'anio', a.anio, 'nivel', n.nombre, 'ciclo', n.ciclo, 'seccion', c.seccion)), '[]'::jsonb)
+                 'anio', a.anio, 'nivel', n.nombre, 'ciclo', n.ciclo, 'seccion', c.seccion,
+                 'codigo', c.codigo, 'nombre', c.nombre) ORDER BY a.anio, n.orden, c.seccion), '[]'::jsonb)
                FROM convi.cursos c
                JOIN convi.anios_academicos a ON a.id = c.anio_academico_id
                JOIN convi.niveles_educativos n ON n.id = c.nivel_id
                WHERE a.estado <> 'CERRADO')
-           ) AS academico
+           ) AS academico,
+           jsonb_build_object(
+             'importaciones', (SELECT coalesce(jsonb_agg(to_jsonb(i) ORDER BY i.creado_en DESC), '[]'::jsonb)
+               FROM (SELECT p.id, p.estado, a.nombre_original AS archivo_nombre, p.creado_en,
+                       (SELECT count(*) FROM convi.filas_importacion f
+                        WHERE f.proceso_importacion_id = p.id)::int AS filas,
+                       (SELECT count(*) FROM convi.filas_importacion f
+                        WHERE f.proceso_importacion_id = p.id AND f.estado = 'CONFIRMADO')::int AS confirmadas
+                     FROM convi.procesos_importacion p
+                     JOIN convi.archivos a ON a.id = p.archivo_id
+                     WHERE p.tipo_importacion = 'ESTUDIANTES'
+                     ORDER BY p.creado_en DESC LIMIT 5) i),
+             'confirmados', ${ESTUDIANTES_CONFIRMADOS}
+           ) AS estudiantes
          FROM convi.establecimientos e WHERE e.id = $1`,
         [sesion.establecimiento_id],
       );
@@ -134,6 +180,7 @@ export class GuiaAdminService {
         version: fila.version,
         zona_horaria: fila.zona_horaria,
         academico: fila.academico,
+        estudiantes: fila.estudiantes,
       };
     });
   }
@@ -229,6 +276,33 @@ export class GuiaAdminService {
       },
       'READ COMMITTED',
     );
+  }
+
+  // PB-036 (HU-029): la nómina se carga, revisa y confirma en la misma
+  // importación del portal; el paso queda Listo cuando hay al menos un
+  // estudiante confirmado por importación (por defecto).
+  terminarEstudiantes(
+    sesion: Sesion,
+    cuerpo: unknown,
+  ): Promise<{ id: string }> {
+    const version = validarVersion(cuerpo);
+    return this.cuentas.operar(sesion, ACCESO, async (db) => {
+      const confirmados = await db.query<{ cantidad: number }>(
+        `SELECT ${ESTUDIANTES_CONFIRMADOS} AS cantidad`,
+      );
+      if (!confirmados.rows[0]?.cantidad)
+        throw new ConflictException(
+          'Todavía no hay estudiantes confirmados en una importación. Carga la nómina y confirma sus filas, o omite el paso por ahora.',
+        );
+      const cambio = await db.query<{ id: string }>(
+        `UPDATE convi.establecimientos e SET contexto_onboarding = ${AVANCE_CON_PASO}
+         WHERE e.id = $1 AND e.onboarding_completado_en IS NULL AND ${HUELLA} = $4
+         RETURNING e.id`,
+        [sesion.establecimiento_id, 'estudiantes', 'LISTO', version],
+      );
+      if (cambio.rows[0]) return cambio.rows[0];
+      return rechazarCambio(db, sesion.establecimiento_id);
+    });
   }
 
   // La guía se abre sola hasta que se empieza o se elige ir al portal por

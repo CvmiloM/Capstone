@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { validarDatosAnio } from '../academico/anio-academico.js';
+import { claveDeCurso } from '../importaciones/valores.js';
 
 // PB-032 (HU-025) y PB-038 (HU-031): guía inicial del administrador. El avance
 // se guarda en establecimientos.contexto_onboarding (HU-031 CA2) y la respuesta
@@ -261,33 +262,12 @@ export function validarCursosGuia(cuerpo: unknown): CursosGuia {
   };
 }
 
-const ROMANOS: Record<string, string> = {
-  i: '1',
-  ii: '2',
-  iii: '3',
-  iv: '4',
-  v: '5',
-  vi: '6',
-  vii: '7',
-  viii: '8',
-};
-
 /**
  * CA3: el mismo nivel puede estar escrito distinto en la escuela, como
- * «I medio» o «1° Medio». Se compara sin tildes, sin «°» ni puntos y con los
- * números romanos del inicio cambiados por cifras.
+ * «I medio» o «1° Medio». Se compara igual que los cursos de una importación
+ * (PB-036): sin tildes, sin «°» ni puntos y con los números romanos del inicio
+ * cambiados por cifras.
  */
 export function mismoNivel(a: string, b: string) {
-  return normalizarNivel(a) === normalizarNivel(b);
-}
-
-function normalizarNivel(nombre: string) {
-  return nombre
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[°º.]/g, ' ')
-    .trim()
-    .replace(/^(viii|vii|vi|iv|v|iii|ii|i)\b/, (r) => ROMANOS[r])
-    .replace(/\s+/g, ' ');
+  return claveDeCurso(a) === claveDeCurso(b);
 }

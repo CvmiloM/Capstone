@@ -88,7 +88,7 @@ const CURSO: Campo = {
   titulo: 'Curso',
   obligatorio: true,
   descripcion:
-    'Código del curso en CONVI (Administración > Cursos), en el año que elijas al revisar.',
+    'Código o nombre del curso en CONVI (Administración > Cursos), como 1A o 1° básico A, en el año que elijas al revisar.',
   ejemplo: '1A',
   alias: ['codigo curso', 'curso codigo'],
 };

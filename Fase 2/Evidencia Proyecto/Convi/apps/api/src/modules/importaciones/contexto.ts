@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { ANIOS_EDITABLES, type Rol } from '../academico/curso.js';
 import { errorDeCampos, type TipoImportacion } from './importacion.js';
-import { claveDeNombre } from './valores.js';
+import { claveDeCurso, claveDeNombre } from './valores.js';
 
 // PB-020 (HU-015 CA4): lo que ya existe en la escuela, leído una sola vez para
 // revisar todas las filas en memoria (hasta 5.000) sin una consulta por fila.
@@ -45,6 +45,8 @@ export type Contexto = {
   niveles: Map<string, { activo: boolean }>;
   /** Cursos del año elegido, por código. */
   cursos: Map<string, CursoExistente>;
+  /** PB-036: los mismos cursos por su nombre (claveDeCurso); puede haber dos iguales. */
+  cursosPorNombre: Map<string, CursoExistente[]>;
   /** Matrículas de todos los años, por estudiante. */
   matriculas: Map<
     string,
@@ -170,6 +172,7 @@ export async function cargarContexto(
     porNombre: new Map(),
     niveles: new Map(),
     cursos: new Map(),
+    cursosPorNombre: new Map(),
     matriculas: new Map(),
     asignaciones: new Map(),
     vinculos: new Map(),
@@ -230,6 +233,9 @@ export async function cargarContexto(
       [anio.id],
     );
     for (const curso of cursos.rows) contexto.cursos.set(curso.codigo, curso);
+    contexto.cursosPorNombre = agrupar(cursos.rows, (curso) =>
+      claveDeCurso(curso.nombre),
+    );
   }
 
   if (tipo === 'ESTUDIANTES' || tipo === 'MATRICULAS') {
