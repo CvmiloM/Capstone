@@ -11,6 +11,29 @@ import type { PeticionConSesion } from '../../common/sesion.guard.js';
 export class AuthController {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
+  @Get('perfil')
+  @PerfilesPermitidos(...PERFILES)
+  perfil(@Req() peticion: PeticionConSesion) {
+    return this.cuentas.operar(
+      peticion.sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const resultado = await db.query(
+          `SELECT p.nombres, p.apellidos, m.codigo_perfil,
+          CASE WHEN m.codigo_perfil = 'CONVIVENCIA' THEN (
+            SELECT count(*)::int FROM convi.notificaciones n
+            WHERE n.membresia_destinatario_id = m.id AND n.leido_en IS NULL
+              AND (n.expira_en IS NULL OR n.expira_en > now())
+          ) ELSE 0 END AS avisos_no_leidos
+          FROM convi.membresias_establecimiento m JOIN convi.personas p ON p.id = m.persona_id
+          WHERE m.id = $1 AND m.establecimiento_id = $2`,
+          [peticion.sesion.membresia_id, peticion.sesion.establecimiento_id],
+        );
+        return resultado.rows[0];
+      },
+    );
+  }
+
   @Get('zona-horaria')
   @PerfilesPermitidos(...PERFILES)
   zonaHoraria(@Req() peticion: PeticionConSesion) {

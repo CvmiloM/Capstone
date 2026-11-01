@@ -31,23 +31,23 @@ export const metadata: Metadata = { title: "Revisión de la situación" };
 
 const AVISOS: Record<string, string> = {
   registrada:
-    "Registraste la situación. Quedó Nueva en la bandeja, con su código.",
+    "Registraste la situación, quedó Nueva en la bandeja con su código",
   revision:
-    "Iniciaste la revisión. La situación quedó En revisión y su urgencia no cambió.",
+    "Iniciaste la revisión, la situación quedó En revisión y su urgencia no cambió.",
   urgencia:
-    "Cambiaste la urgencia. El cambio y su motivo quedaron en el historial de cambios.",
+    "Cambiaste la urgencia, el cambio y su motivo quedaron en el historial de cambios.",
   aclaracion:
-    "Enviaste la pregunta al profesor. La situación quedó en Información solicitada hasta que responda.",
+    "Enviaste la pregunta al profesor, la situación quedó en Información solicitada hasta que responda.",
   responsable:
-    "Guardaste el responsable de la revisión. El cambio quedó en el historial de cambios y el estado no cambió.",
+    "Guardaste el responsable de la revisión, el cambio quedó en el historial de cambios y el estado no cambió.",
   normativa:
-    "Guardaste la revisión normativa. Quedó en el historial de la situación y su estado no cambió.",
+    "Guardaste la revisión normativa, quedó en el historial de la situación y su estado no cambió.",
   antecedente:
-    "Guardaste la situación como antecedente. Quedó en el historial de sus estudiantes, sin abrir un caso.",
+    "Guardaste la situación como antecedente, quedó en el historial de sus estudiantes, sin abrir un caso.",
   descartada:
-    "Descartaste la situación. Se conserva con el motivo del descarte y ya no queda pendiente en la bandeja.",
+    "Descartaste la situación, se conserva con el motivo del descarte y ya no queda pendiente en la bandeja.",
   evidencia:
-    "Adjuntaste la evidencia. Quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
+    "Adjuntaste la evidencia, quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
 };
 
 // PB-142 (HU-121): nombre de cada dato que cambia y cómo se muestra su valor.
@@ -58,8 +58,10 @@ const NOMBRE_CAMPO: Record<string, string> = {
 };
 
 function valorCambio(campo: string, valor: string | null) {
-  if (campo === "estado") return valor ? (NOMBRE_ESTADO[valor] ?? valor) : "Sin estado";
-  if (campo === "urgencia") return valor ? (URGENCIA[valor]?.texto ?? valor) : "Sin urgencia";
+  if (campo === "estado")
+    return valor ? (NOMBRE_ESTADO[valor] ?? valor) : "Sin estado";
+  if (campo === "urgencia")
+    return valor ? (URGENCIA[valor]?.texto ?? valor) : "Sin urgencia";
   return valor ?? "Sin responsable";
 }
 
@@ -74,14 +76,42 @@ export default async function PaginaRevisionSituacion({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ aviso?: string }>;
+  searchParams: Promise<{ aviso?: string; seccion?: string }>;
 }) {
-  const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
-  const [respuesta, formatearFecha] = await Promise.all([obtenerSituacion(id), obtenerFormatoFecha()]);
+  const [{ id }, { aviso, seccion: solicitada }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
+  const [respuesta, formatearFecha] = await Promise.all([
+    obtenerSituacion(id),
+    obtenerFormatoFecha(),
+  ]);
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia" />;
   const situacion = respuesta.datos;
   const urgencia = URGENCIA[situacion.urgencia] ?? URGENCIA.NORMAL;
   const textoAviso = aviso ? AVISOS[aviso] : undefined;
+  const pestanas = [
+    ["antecedentes", "Antecedentes"],
+    ["revision", "Revisión"],
+    ["decision", "Decisión"],
+    ["caso", "Vincular o abrir caso"],
+    ["evidencias", "Evidencias"],
+    ["historial", "Historial"],
+  ];
+  const destinoAviso: Record<string, string> = {
+    revision: "revision",
+    urgencia: "revision",
+    aclaracion: "revision",
+    responsable: "revision",
+    normativa: "revision",
+    antecedente: "decision",
+    descartada: "decision",
+    evidencia: "evidencias",
+  };
+  const seccion = pestanas.some(([clave]) => clave === solicitada)
+    ? solicitada
+    : (destinoAviso[aviso ?? ""] ?? "antecedentes");
+
   // HU-038 CA2: solo se pregunta al profesor que registró la situación, y
   // mientras la revisión sigue abierta.
   const deProfesor = situacion.tipo_origen === "PROFESOR";
@@ -114,7 +144,9 @@ export default async function PaginaRevisionSituacion({
       )}
 
       <div className="mt-4 mb-6">
-        <p className="font-mono text-sm text-muted-foreground">{situacion.codigo}</p>
+        <p className="font-mono text-sm text-muted-foreground">
+          {situacion.codigo}
+        </p>
         <h1 className="mt-1 text-2xl font-semibold">
           {situacion.categoria ?? "Situación sin categoría"}
         </h1>
@@ -122,7 +154,9 @@ export default async function PaginaRevisionSituacion({
           <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
             Estado: {NOMBRE_ESTADO[situacion.estado] ?? situacion.estado}
           </span>
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${urgencia.clase}`}>
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${urgencia.clase}`}
+          >
             Urgencia: {urgencia.texto}
           </span>
           {situacion.registro_historico && (
@@ -136,38 +170,75 @@ export default async function PaginaRevisionSituacion({
       {situacion.estado === "NUEVA" && (
         <section className="mb-4 flex flex-col gap-4 rounded-2xl border border-primary/30 bg-accent p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold">Esta situación todavía no se revisa</h2>
+            <h2 className="text-base font-semibold">
+              Esta situación todavía no se revisa
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Al iniciar la revisión pasa a En revisión. Su urgencia se mantiene.
+              Al iniciar la revisión pasa a En revisión. Su urgencia se
+              mantiene.
             </p>
           </div>
           <FormularioRevision situacionId={situacion.id} />
         </section>
       )}
 
+      <nav
+        aria-label="Secciones de la situación"
+        className="mb-6 flex flex-wrap gap-2 border-b border-border pb-3"
+      >
+        {pestanas.map(([clave, titulo]) => (
+          <Link
+            key={clave}
+            href={`/convivencia/situaciones/${id}?seccion=${clave}`}
+            scroll={false}
+            prefetch={false}
+            aria-current={seccion === clave ? "page" : undefined}
+            className={`rounded-xl px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring ${seccion === clave ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+          >
+            {titulo}
+          </Link>
+        ))}
+      </nav>
       <div className="grid gap-4 lg:grid-cols-3">
-        <Seccion titulo="Lo que se informó" className="lg:col-span-2">
+        <Seccion
+          visible={seccion === "antecedentes"}
+          titulo="Lo que se informó"
+          className="lg:col-span-2"
+        >
           <p className="whitespace-pre-line text-sm">{situacion.descripcion}</p>
         </Seccion>
 
-        <Seccion titulo="Datos del registro">
+        <Seccion
+          visible={seccion === "antecedentes"}
+          titulo="Datos del registro"
+        >
           <dl className="space-y-3 text-sm">
-            <Dato nombre="Ocurrió">{formatearFecha(situacion.ocurrido_en)}</Dato>
-            <Dato nombre="Registrada">{formatearFecha(situacion.reportado_en)}</Dato>
+            <Dato nombre="Ocurrió">
+              {formatearFecha(situacion.ocurrido_en)}
+            </Dato>
+            <Dato nombre="Registrada">
+              {formatearFecha(situacion.reportado_en)}
+            </Dato>
             {/* HU-036 CA2: quién informó y quién registró, por separado. */}
             {quienInformo(situacion) && (
               <Dato nombre="Informó">{quienInformo(situacion)}</Dato>
             )}
             <Dato nombre="Registró">
               {situacion.reportado_por}
-              {situacion.tipo_origen === "PROFESOR" ? " (profesor)" : " (Convivencia)"}
+              {situacion.tipo_origen === "PROFESOR"
+                ? " (profesor)"
+                : " (Convivencia)"}
             </Dato>
             <Dato nombre="Curso">{situacion.curso ?? "Sin curso"}</Dato>
             <Dato nombre="Lugar">{situacion.lugar ?? "No indicado"}</Dato>
           </dl>
         </Seccion>
 
-        <Seccion titulo="Estudiantes participantes" className="lg:col-span-3">
+        <Seccion
+          visible={seccion === "antecedentes"}
+          titulo="Estudiantes participantes"
+          className="lg:col-span-3"
+        >
           <ul className="divide-y divide-border text-sm">
             {situacion.participantes.map((p) => (
               <li
@@ -182,11 +253,11 @@ export default async function PaginaRevisionSituacion({
                         href={`/convivencia/estudiantes/${p.estudiante_id}`}
                         className={claseEnlace}
                       >
-                        {p.apellidos}, {p.nombres}
+                        {p.nombres} {p.apellidos}
                       </Link>
                     ) : (
                       <>
-                        {p.apellidos}, {p.nombres}
+                        {p.nombres} {p.apellidos}
                       </>
                     )}
                     {p.codigo_estudiante && (
@@ -214,7 +285,11 @@ export default async function PaginaRevisionSituacion({
           </ul>
         </Seccion>
 
-        <Seccion titulo="Aclaraciones pedidas" className="lg:col-span-2">
+        <Seccion
+          visible={seccion === "revision"}
+          titulo="Aclaraciones pedidas"
+          className="lg:col-span-2"
+        >
           {situacion.aclaraciones.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Todavía no se han pedido aclaraciones.
@@ -222,10 +297,14 @@ export default async function PaginaRevisionSituacion({
           ) : (
             <ul className="space-y-4">
               {situacion.aclaraciones.map((a) => (
-                <li key={a.id} className="rounded-xl border border-border p-4 text-sm">
+                <li
+                  key={a.id}
+                  className="rounded-xl border border-border p-4 text-sm"
+                >
                   <p className="font-medium">{a.pregunta}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Pedida por {a.solicitado_por} el {formatearFecha(a.solicitado_en)}
+                    Pedida por {a.solicitado_por} el{" "}
+                    {formatearFecha(a.solicitado_en)}
                   </p>
                   {a.estado === "RESPONDIDA" && a.respuesta ? (
                     <div className="mt-3 border-l-2 border-verde pl-3">
@@ -259,12 +338,17 @@ export default async function PaginaRevisionSituacion({
         </Seccion>
 
         <div className="space-y-4">
-          <Seccion titulo="Responsable de la revisión">
+          <Seccion
+            visible={seccion === "revision"}
+            titulo="Responsable de la revisión"
+          >
             <p className="mb-4 text-sm">
               {situacion.responsable ? (
                 <span className="font-medium">{situacion.responsable}</span>
               ) : (
-                <span className="text-muted-foreground">Sin responsable asignado</span>
+                <span className="text-muted-foreground">
+                  Sin responsable asignado
+                </span>
               )}
             </p>
             {ESTADOS_ABIERTOS.includes(situacion.estado) ? (
@@ -275,12 +359,13 @@ export default async function PaginaRevisionSituacion({
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                La revisión de esta situación terminó; su responsable ya no se cambia.
+                La revisión de esta situación terminó; su responsable ya no se
+                cambia.
               </p>
             )}
           </Seccion>
 
-          <Seccion titulo="Urgencia">
+          <Seccion visible={seccion === "revision"} titulo="Urgencia">
             {ESTADOS_ABIERTOS.includes(situacion.estado) ? (
               <FormularioUrgencia
                 situacionId={situacion.id}
@@ -288,14 +373,19 @@ export default async function PaginaRevisionSituacion({
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                La revisión de esta situación terminó; su urgencia ya no se cambia.
+                La revisión de esta situación terminó; su urgencia ya no se
+                cambia.
               </p>
             )}
           </Seccion>
         </div>
 
         {/* PB-155 (HU-134): lo que indica la normativa, antes de decidir. */}
-        <Seccion titulo="Revisión normativa" className="lg:col-span-3">
+        <Seccion
+          visible={seccion === "revision"}
+          titulo="Revisión normativa"
+          className="lg:col-span-3"
+        >
           {situacion.revisiones_normativas.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Todavía no se registra lo que indica el reglamento o el protocolo.
@@ -303,7 +393,10 @@ export default async function PaginaRevisionSituacion({
           ) : (
             <ul className="space-y-4">
               {situacion.revisiones_normativas.map((r) => (
-                <li key={r.id} className="rounded-xl border border-border p-4 text-sm">
+                <li
+                  key={r.id}
+                  className="rounded-xl border border-border p-4 text-sm"
+                >
                   <div className="flex flex-wrap gap-1.5">
                     <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
                       {APLICABILIDAD[r.aplicabilidad] ?? r.aplicabilidad}
@@ -315,18 +408,23 @@ export default async function PaginaRevisionSituacion({
                   <p className="mt-2 whitespace-pre-line">{r.fundamento}</p>
                   {r.protocolo && (
                     <p className="mt-2 text-muted-foreground">
-                      Protocolo: <span className="text-foreground">{r.protocolo}</span>
+                      Protocolo:{" "}
+                      <span className="text-foreground">{r.protocolo}</span>
                     </p>
                   )}
                   {r.referencias.length > 0 && (
                     <ul className="mt-2 list-inside list-disc text-muted-foreground">
                       {r.referencias.map((ref, n) => (
                         <li key={n}>
-                          <Link className={claseEnlace} href={`/convivencia/documentos/versiones/${ref.version_documento_id}?pagina=${ref.pagina_desde ?? 1}`}>
+                          <Link
+                            className={claseEnlace}
+                            href={`/convivencia/documentos/versiones/${ref.version_documento_id}?pagina=${ref.pagina_desde ?? 1}`}
+                          >
                             {ref.documento} ({ref.version})
                           </Link>
                           {ref.pagina_desde &&
-                            (ref.pagina_hasta && ref.pagina_hasta !== ref.pagina_desde
+                            (ref.pagina_hasta &&
+                            ref.pagina_hasta !== ref.pagina_desde
                               ? `, páginas ${ref.pagina_desde} a ${ref.pagina_hasta}`
                               : `, página ${ref.pagina_desde}`)}
                           {ref.titulo_seccion && `, ${ref.titulo_seccion}`}
@@ -335,13 +433,16 @@ export default async function PaginaRevisionSituacion({
                     </ul>
                   )}
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Registrada por {r.revisado_por} el {formatearFecha(r.revisado_en)}
+                    Registrada por {r.revisado_por} el{" "}
+                    {formatearFecha(r.revisado_en)}
                   </p>
                 </li>
               ))}
             </ul>
           )}
-          {["EN_REVISION", "INFORMACION_SOLICITADA"].includes(situacion.estado) && (
+          {["EN_REVISION", "INFORMACION_SOLICITADA"].includes(
+            situacion.estado,
+          ) && (
             <div className="mt-4 border-t border-border pt-4">
               <FormularioRevisionNormativa
                 situacionId={situacion.id}
@@ -358,11 +459,18 @@ export default async function PaginaRevisionSituacion({
         </Seccion>
 
         {/* PB-047, PB-048 y PB-051: decisiones que cierran la revisión. */}
-        <Seccion titulo="Decisión" className="lg:col-span-3">
+        <Seccion
+          visible={seccion === "decision"}
+          titulo="Decisión"
+          className="lg:col-span-3"
+        >
           {situacion.decisiones.length > 0 && (
             <ul className="mb-4 space-y-4">
               {situacion.decisiones.map((d) => (
-                <li key={d.id} className="rounded-xl border border-border p-4 text-sm">
+                <li
+                  key={d.id}
+                  className="rounded-xl border border-border p-4 text-sm"
+                >
                   <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
                     {NOMBRE_DECISION[d.resultado] ?? d.resultado}
                   </span>
@@ -370,11 +478,14 @@ export default async function PaginaRevisionSituacion({
                   {d.duplicada_de && (
                     <p className="mt-2 text-muted-foreground">
                       Duplicado de{" "}
-                      <span className="font-mono text-foreground">{d.duplicada_de}</span>
+                      <span className="font-mono text-foreground">
+                        {d.duplicada_de}
+                      </span>
                     </p>
                   )}
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Decidida por {d.revisado_por} el {formatearFecha(d.revisado_en)}
+                    Decidida por {d.revisado_por} el{" "}
+                    {formatearFecha(d.revisado_en)}
                   </p>
                 </li>
               ))}
@@ -387,11 +498,13 @@ export default async function PaginaRevisionSituacion({
             />
           ) : reconsiderar ? (
             <div className="border-t border-border pt-4">
-              <h3 className="text-sm font-semibold">Reconsiderar la decisión</h3>
+              <h3 className="text-sm font-semibold">
+                Reconsiderar la decisión
+              </h3>
               <p className="mt-1 mb-4 text-sm text-muted-foreground">
-                Si cambió la información, registra otra decisión con su motivo. La
-                anterior se conserva. También puedes vincularla a un caso o abrir
-                uno en la sección Caso.
+                Si cambió la información, registra otra decisión con su motivo.
+                La anterior se conserva. También puedes vincularla a un caso o
+                abrir uno en la sección Caso.
               </p>
               <FormularioDecision
                 situacionId={situacion.id}
@@ -414,7 +527,11 @@ export default async function PaginaRevisionSituacion({
 
         {/* PB-053 (HU-046): abrir un caso desde la situación. PB-052 (HU-045):
             o vincularla a un caso activo que comparte estudiantes con ella. */}
-        <Seccion titulo="Caso" className="lg:col-span-3">
+        <Seccion
+          visible={seccion === "caso"}
+          titulo="Caso"
+          className="lg:col-span-3"
+        >
           {situacion.caso_vinculado ? (
             <>
               <p className="text-sm">
@@ -437,33 +554,43 @@ export default async function PaginaRevisionSituacion({
             <>
               {situacion.opciones_caso.casos_relacionados.length > 0 && (
                 <div className="mb-6 border-b border-border pb-6">
-                  <h3 className="text-sm font-semibold">Vincular a un caso activo</h3>
+                  <h3 className="text-sm font-semibold">
+                    Vincular a un caso activo
+                  </h3>
                   <p className="mt-1 mb-4 text-sm text-muted-foreground">
-                    Ya hay casos activos con estos estudiantes. Puedes sumar esta
-                    situación a uno de ellos.
+                    Ya hay casos activos con estos estudiantes. Puedes sumar
+                    esta situación a uno de ellos.
                   </p>
                   <FormularioVinculacion
                     situacionId={situacion.id}
                     codigoSituacion={situacion.codigo}
                     ultimaRevisionId={situacion.ultima_revision_id}
-                    casos={situacion.opciones_caso.casos_relacionados.map((c) => ({
-                      id: c.id,
-                      codigo: c.codigo,
-                      titulo: c.titulo,
-                      estado: NOMBRE_ESTADO_CASO[c.estado_actual] ?? c.estado_actual,
-                    }))}
+                    casos={situacion.opciones_caso.casos_relacionados.map(
+                      (c) => ({
+                        id: c.id,
+                        codigo: c.codigo,
+                        titulo: c.titulo,
+                        estado:
+                          NOMBRE_ESTADO_CASO[c.estado_actual] ??
+                          c.estado_actual,
+                      }),
+                    )}
                     reconsiderar={reconsiderar}
                   />
                 </div>
               )}
               {situacion.opciones_caso.casos_relacionados.length > 0 && (
-                <h3 className="mb-4 text-sm font-semibold">O abrir un caso nuevo</h3>
+                <h3 className="mb-4 text-sm font-semibold">
+                  O abrir un caso nuevo
+                </h3>
               )}
               <FormularioCaso
                 situacionId={situacion.id}
                 ultimaRevisionId={situacion.ultima_revision_id}
                 categorias={situacion.opciones_caso.categorias}
-                categoriaSugeridaId={situacion.opciones_caso.categoria_sugerida_id}
+                categoriaSugeridaId={
+                  situacion.opciones_caso.categoria_sugerida_id
+                }
                 hoy={situacion.opciones_caso.hoy}
                 responsables={situacion.opciones_responsable}
                 responsableSugeridoId={
@@ -489,7 +616,11 @@ export default async function PaginaRevisionSituacion({
         </Seccion>
 
         {/* PB-066 (HU-057): evidencias de la situación, en cualquier estado. */}
-        <Seccion titulo="Evidencias" className="lg:col-span-3">
+        <Seccion
+          visible={seccion === "evidencias"}
+          titulo="Evidencias"
+          className="lg:col-span-3"
+        >
           <ListaEvidencias
             evidencias={situacion.evidencias}
             rutaDescarga="/convivencia/evidencias"
@@ -505,11 +636,17 @@ export default async function PaginaRevisionSituacion({
 
         {/* PB-142 (HU-121): la fecha del hecho y la del registro por separado, y
             cada cambio con quién lo hizo, cuándo y por qué. No se edita ni borra. */}
-        <Seccion titulo="Historial de cambios" className="lg:col-span-3">
+        <Seccion
+          visible={seccion === "historial"}
+          titulo="Historial de cambios"
+          className="lg:col-span-3"
+        >
           <ol className="divide-y divide-border text-sm">
             <li className="pb-3">
               <p className="font-medium">
-                {situacion.registro_historico ? "Registro histórico" : "Registro"}
+                {situacion.registro_historico
+                  ? "Registro histórico"
+                  : "Registro"}
               </p>
               <p className="mt-1">
                 El hecho ocurrió el {formatearFecha(situacion.ocurrido_en)} y se
@@ -524,15 +661,20 @@ export default async function PaginaRevisionSituacion({
                 <ul className="space-y-0.5">
                   {cambio.cambios.map((c) => (
                     <li key={c.campo}>
-                      <span className="text-muted-foreground">{NOMBRE_CAMPO[c.campo]}:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {NOMBRE_CAMPO[c.campo]}:
+                      </span>{" "}
                       {valorCambio(c.campo, c.antes)} →{" "}
-                      <span className="font-medium">{valorCambio(c.campo, c.despues)}</span>
+                      <span className="font-medium">
+                        {valorCambio(c.campo, c.despues)}
+                      </span>
                     </li>
                   ))}
                 </ul>
                 {cambio.motivo && (
                   <p className="mt-1 whitespace-pre-line">
-                    <span className="text-muted-foreground">Motivo:</span> {cambio.motivo}
+                    <span className="text-muted-foreground">Motivo:</span>{" "}
+                    {cambio.motivo}
                   </p>
                 )}
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -552,11 +694,14 @@ function Seccion({
   titulo,
   className = "",
   children,
+  visible = true,
 }: {
   titulo: string;
   className?: string;
   children: ReactNode;
+  visible?: boolean;
 }) {
+  if (!visible) return null;
   return (
     <section
       className={`rounded-2xl border border-border bg-card p-5 shadow-tarjeta ${className}`}

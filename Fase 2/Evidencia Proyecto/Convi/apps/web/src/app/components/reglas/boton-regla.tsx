@@ -1,7 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { claseBotonPrimario, claseBotonSecundario } from "@/app/components/formulario";
+import { ConfirmarEnvio } from "@/app/components/confirmar-envio";
+import {
+  claseBotonPrimario,
+  claseBotonSecundario,
+} from "@/app/components/formulario";
 import { cambiarRegla, type EstadoFormulario } from "./acciones";
 
 const estadoInicial: EstadoFormulario = {};
@@ -28,30 +32,30 @@ export function BotonRegla({
   confirmar?: string;
   principal?: boolean;
 }) {
-  const [estado, accion, pendiente] = useActionState(cambiarRegla, estadoInicial);
+  const [estado, accion, pendiente] = useActionState(
+    cambiarRegla,
+    estadoInicial,
+  );
 
   return (
-    <form
-      action={accion}
-      onSubmit={(evento) => {
-        if (confirmar && !window.confirm(confirmar)) evento.preventDefault();
-      }}
-    >
-      <input type="hidden" name="portal" value={portal} />
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="accion" value={tipoAccion} />
-      <button
-        type="submit"
-        disabled={pendiente}
-        className={principal ? claseBotonPrimario : claseBotonSecundario}
-      >
-        {pendiente ? textoPendiente : texto}
-      </button>
-      {estado.mensaje && (
-        <p role="alert" className="mt-2 max-w-sm text-sm text-destructive">
-          {estado.mensaje}
-        </p>
-      )}
-    </form>
+    <ConfirmarEnvio mensaje={confirmar}>
+      <form action={accion}>
+        <input type="hidden" name="portal" value={portal} />
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="accion" value={tipoAccion} />
+        <button
+          type="submit"
+          disabled={pendiente}
+          className={principal ? claseBotonPrimario : claseBotonSecundario}
+        >
+          {pendiente ? textoPendiente : texto}
+        </button>
+        {estado.mensaje && (
+          <p role="alert" className="mt-2 max-w-sm text-sm text-destructive">
+            {estado.mensaje}
+          </p>
+        )}
+      </form>
+    </ConfirmarEnvio>
   );
 }

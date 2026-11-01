@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { ConfirmarEnvio } from "@/app/components/confirmar-envio";
 import { claseBotonSecundario } from "@/app/components/formulario";
 import { type EstadoFormulario, terminarAsignacion } from "./acciones";
 import { CampoMotivo } from "./campo-motivo";
@@ -45,65 +46,66 @@ export function BotonTerminar({
   const porDefecto = estado.valores?.fecha_fin ?? sugerida;
 
   return (
-    <form
-      action={accion}
-      onSubmit={(evento) => {
-        const fecha = new FormData(evento.currentTarget).get("fecha_fin");
-        const pregunta = correccion
-          ? `¿Corregir el último día de ${profesor} a ${fecha}? La corrección y su motivo quedan en la auditoría.`
-          : `¿Terminar la asignación de ${profesor} con último día ${fecha}? Después de ese día no podrá registrar situaciones de este curso, y no se puede reabrir.`;
-        if (!window.confirm(pregunta)) evento.preventDefault();
-      }}
-      className={
+    <ConfirmarEnvio
+      mensaje={
         correccion
-          ? "space-y-3"
-          : "flex flex-wrap items-center justify-end gap-2"
+          ? `¿Corregir el término de la asignación de ${profesor}? El cambio y su motivo quedarán en auditoría`
+          : `¿Terminar la asignación de ${profesor}? Se conservará su participación histórica y se aplicará la fecha que elegiste`
       }
     >
-      <input type="hidden" name="asignacion_id" value={asignacionId} />
-      <label
-        className={correccion ? "block text-sm font-medium" : "sr-only"}
-        htmlFor={`fin-${asignacionId}`}
+      <form
+        action={accion}
+        className={
+          correccion
+            ? "space-y-3"
+            : "flex flex-wrap items-center justify-end gap-2"
+        }
       >
-        Último día de {profesor}
-      </label>
-      <input
-        id={`fin-${asignacionId}`}
-        name="fecha_fin"
-        type="date"
-        defaultValue={porDefecto}
-        min={desde ?? undefined}
-        max={correccion ? undefined : (hasta ?? undefined)}
-        className="rounded-lg border border-input bg-card px-2 py-1.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/15"
-      />
-      {correccion && (
-        <CampoMotivo
-          id={`motivo-fin-${asignacionId}`}
-          anio={anioCerrado}
-          defaultValue={estado.valores?.motivo}
-        />
-      )}
-      <button
-        type="submit"
-        disabled={pendiente}
-        className={claseBotonSecundario}
-      >
-        {pendiente
-          ? correccion
-            ? "Corrigiendo…"
-            : "Terminando…"
-          : correccion
-            ? "Corregir término"
-            : "Terminar"}
-      </button>
-      {estado.mensaje && (
-        <p
-          role="alert"
-          className={`w-full text-sm text-destructive ${correccion ? "" : "text-right"}`}
+        <input type="hidden" name="asignacion_id" value={asignacionId} />
+        <label
+          className={correccion ? "block text-sm font-medium" : "sr-only"}
+          htmlFor={`fin-${asignacionId}`}
         >
-          {estado.mensaje}
-        </p>
-      )}
-    </form>
+          Último día de {profesor}
+        </label>
+        <input
+          id={`fin-${asignacionId}`}
+          name="fecha_fin"
+          type="date"
+          defaultValue={porDefecto}
+          min={desde ?? undefined}
+          max={correccion ? undefined : (hasta ?? undefined)}
+          className="rounded-lg border border-input bg-card px-2 py-1.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/15"
+        />
+        {correccion && (
+          <CampoMotivo
+            id={`motivo-fin-${asignacionId}`}
+            anio={anioCerrado}
+            defaultValue={estado.valores?.motivo}
+          />
+        )}
+        <button
+          type="submit"
+          disabled={pendiente}
+          className={claseBotonSecundario}
+        >
+          {pendiente
+            ? correccion
+              ? "Corrigiendo…"
+              : "Terminando…"
+            : correccion
+              ? "Corregir término"
+              : "Terminar"}
+        </button>
+        {estado.mensaje && (
+          <p
+            role="alert"
+            className={`w-full text-sm text-destructive ${correccion ? "" : "text-right"}`}
+          >
+            {estado.mensaje}
+          </p>
+        )}
+      </form>
+    </ConfirmarEnvio>
   );
 }

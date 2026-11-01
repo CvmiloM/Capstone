@@ -1,3 +1,5 @@
+import { codigoAutomatico } from './codigo-automatico.js';
+import { objeto, texto, fechaValida } from './curso.js';
 import {
   ConflictException,
   Inject,
@@ -75,18 +77,26 @@ type ErrorPostgres = { code?: string; constraint?: string };
 
 // Un estudiante tiene a lo más una matrícula activa: la base no deja dos con
 // períodos superpuestos y una activa no tiene fecha de término.
+// Materializar las matrículas evita repetir la seguridad por fila al recorrer cada estudiante.
+const MATRICULAS_NOMINA = `WITH estudiantes_nomina AS MATERIALIZED (
+  SELECT id, persona_id, codigo_estudiante, estado FROM convi.estudiantes
+  WHERE establecimiento_id = (SELECT convi.establecimiento_actual())
+), personas_nomina AS MATERIALIZED (
+  SELECT id, nombres, apellidos, rut FROM convi.personas
+  WHERE establecimiento_id = (SELECT convi.establecimiento_actual())
+), cursos_nomina AS MATERIALIZED (
+  SELECT c.id, c.nombre, an.anio FROM convi.cursos c
+  JOIN convi.anios_academicos an ON an.id = c.anio_academico_id
+  WHERE c.establecimiento_id = (SELECT convi.establecimiento_actual())
+), matriculas_nomina AS MATERIALIZED (
+  SELECT m.estudiante_id, c.id AS curso_id, c.nombre AS curso_nombre, c.anio
+  FROM convi.matriculas m JOIN cursos_nomina c ON c.id = m.curso_id
+  WHERE m.establecimiento_id = (SELECT convi.establecimiento_actual()) AND m.estado = 'ACTIVO'
+)`;
 const DESDE_NOMINA = `
-  FROM convi.estudiantes e
-  JOIN convi.personas p ON p.id = e.persona_id
-  LEFT JOIN LATERAL (
-    SELECT m.curso_id, c.nombre AS curso_nombre, an.anio
-    FROM convi.matriculas m
-    JOIN convi.cursos c ON c.id = m.curso_id
-    JOIN convi.anios_academicos an ON an.id = m.anio_academico_id
-    WHERE m.estudiante_id = e.id AND m.estado = 'ACTIVO'
-    ORDER BY m.matriculado_en DESC
-    LIMIT 1
-  ) actual ON true`;
+  FROM estudiantes_nomina e
+  JOIN personas_nomina p ON p.id = e.persona_id
+  LEFT JOIN matriculas_nomina actual ON actual.estudiante_id = e.id`;
 
 // El nombre se busca sin tildes ni diéresis, para que "perez" encuentre a
 // "Pérez"; la ñ se mantiene.
@@ -113,6 +123,78 @@ const COLUMNAS_FICHA = `
 export class EstudiantesService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
+  desactivar(sesion: Sesion, cuerpo: unknown) {
+    const datos = objeto(cuerpo);
+    const filtro = validarFiltro(datos.buscar, datos.curso, '1');
+    const motivo = texto(datos.motivo);
+    const fecha = texto(datos.fecha);
+    if (
+      datos.confirmado !== true ||
+      !Number.isInteger(datos.total_esperado) ||
+      Number(datos.total_esperado) < 1 ||
+      Number(datos.total_esperado) > 10000 ||
+      motivo.length < 5 ||
+      motivo.length > 500 ||
+      !fechaValida(fecha)
+    )
+      throw errorDeCampos(
+        {},
+        'Confirma la cantidad, una fecha válida y el motivo de la desactivación',
+      );
+    const busqueda = `%${filtro.buscar.replace(/[\\%_]/g, '\\$&')}%`;
+    return this.operar(sesion, async (db) => {
+      await db.query('SET LOCAL jit = off');
+      // Las políticas subestiman la nómina, evita cruzar miles de matrículas por cada estudiante.
+      await db.query('SET LOCAL enable_nestloop = off');
+      const hoy = (
+        await db.query<{ hoy: string }>(
+          `SELECT (now() AT TIME ZONE zona_horaria)::date::text AS hoy FROM convi.establecimientos WHERE id=convi.establecimiento_actual()`,
+        )
+      ).rows[0].hoy;
+      if (fecha > hoy)
+        throw errorDeCampos({ fecha: 'La fecha no puede ser futura' });
+      const elegidos = await db.query<{ id: string }>(
+        ` ${MATRICULAS_NOMINA} SELECT e.id ${DESDE_NOMINA} ${FILTRO_NOMINA} ORDER BY e.id LIMIT 10001`,
+        [busqueda, normalizarParcial(filtro.buscar), filtro.curso, 'ACTIVO'],
+      );
+      if (elegidos.rows.length !== datos.total_esperado)
+        throw new ConflictException(
+          'La cantidad de estudiantes cambió, vuelve a buscar y confirma la lista actual',
+        );
+      const ids = elegidos.rows.map((e) => e.id);
+      // Bloques acotados, dentro de la misma transacción para conservar todo o nada.
+      for (let i = 0; i < ids.length; i += 250)
+        await db.query(
+          'SELECT id FROM convi.estudiantes WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+          [ids.slice(i, i + 250)],
+        );
+      const futuras = await db.query(
+        `SELECT 1 FROM convi.matriculas WHERE estudiante_id=ANY($1::uuid[]) AND estado='ACTIVO' AND matriculado_en>$2::date LIMIT 1`,
+        [ids, fecha],
+      );
+      if (futuras.rowCount)
+        throw errorDeCampos({
+          fecha:
+            'Una matrícula comienza después de esa fecha, revisa las fichas antes de continuar',
+        });
+      await db.query("SELECT set_config('app.motivo_cambio',$1,true)", [
+        motivo,
+      ]);
+      for (let i = 0; i < ids.length; i += 250) {
+        const bloque = ids.slice(i, i + 250);
+        await db.query(
+          `UPDATE convi.matriculas SET estado='RETIRADO',finalizado_en=$2::date WHERE estudiante_id=ANY($1::uuid[]) AND estado='ACTIVO'`,
+          [bloque, fecha],
+        );
+        await db.query(
+          `UPDATE convi.estudiantes SET estado='INACTIVO' WHERE id=ANY($1::uuid[])`,
+          [bloque],
+        );
+      }
+      return { actualizados: ids.length };
+    });
+  }
+
   // Nómina por apellidos, de a 50, buscando por nombre, código o RUT y, si se
   // pide, solo los matriculados hoy en un curso. PB-031 (HU-024 CA2): por
   // defecto solo muestra a los estudiantes Activos.
@@ -129,12 +211,14 @@ export class EstudiantesService {
     const texto = `%${filtro.buscar.replace(/[\\%_]/g, '\\$&')}%`;
     const rut = normalizarParcial(filtro.buscar);
     return this.operar(sesion, async (db) => {
+      await db.query('SET LOCAL jit = off');
+      await db.query('SET LOCAL enable_nestloop = off');
       const total = await db.query<{ total: number }>(
-        `SELECT count(*)::int AS total ${DESDE_NOMINA} ${FILTRO_NOMINA}`,
+        ` ${MATRICULAS_NOMINA} SELECT count(*)::int AS total ${DESDE_NOMINA} ${FILTRO_NOMINA}`,
         [texto, rut, filtro.curso, estadoNomina],
       );
       const estudiantes = await db.query<Estudiante>(
-        `SELECT e.id, e.codigo_estudiante, p.nombres, p.apellidos, p.rut,
+        ` ${MATRICULAS_NOMINA} SELECT e.id, e.codigo_estudiante, p.nombres, p.apellidos, p.rut,
                 e.estado, actual.curso_id, actual.curso_nombre, actual.anio
          ${DESDE_NOMINA} ${FILTRO_NOMINA}
          ORDER BY p.apellidos, p.nombres, e.codigo_estudiante
@@ -164,33 +248,48 @@ export class EstudiantesService {
   // CA1 y CA2: crea la persona y su ficha de estudiante en la misma
   // operación. El estudiante queda Activo.
   crear(sesion: Sesion, cuerpo: unknown): Promise<FichaEstudiante> {
-    const datos = validarEstudiante(cuerpo);
-    return this.operar(sesion, async (db) => {
-      await revisarNacimiento(db, datos);
-      const persona = await db.query<{ id: string }>(
-        `INSERT INTO convi.personas
+    return this.operar(
+      sesion,
+      async (db) => {
+        const entrada = objeto(cuerpo);
+        const codigo =
+          texto(entrada.codigo_estudiante) ||
+          (await codigoAutomatico(db, 'estudiante'));
+        const datos = validarEstudiante({
+          ...entrada,
+          codigo_estudiante: codigo,
+        });
+        if (!datos.rut)
+          throw errorDeCampos({
+            rut: 'Ingresa un RUT válido para registrar al estudiante',
+          });
+        await revisarNacimiento(db, datos);
+        const persona = await db.query<{ id: string }>(
+          `INSERT INTO convi.personas
            (establecimiento_id, nombres, apellidos, rut, correo, telefono,
             direccion)
          VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [
-          datos.nombres,
-          datos.apellidos,
-          datos.rut,
-          datos.correo,
-          datos.telefono,
-          datos.direccion,
-        ],
-      );
-      const estudiante = await db.query<{ id: string }>(
-        `INSERT INTO convi.estudiantes
+          [
+            datos.nombres,
+            datos.apellidos,
+            datos.rut,
+            datos.correo,
+            datos.telefono,
+            datos.direccion,
+          ],
+        );
+        const estudiante = await db.query<{ id: string }>(
+          `INSERT INTO convi.estudiantes
            (establecimiento_id, persona_id, codigo_estudiante, fecha_nacimiento)
          VALUES (convi.establecimiento_actual(), $1, $2, $3)
          RETURNING id`,
-        [persona.rows[0].id, datos.codigo_estudiante, datos.fecha_nacimiento],
-      );
-      return buscarFicha(db, estudiante.rows[0].id);
-    });
+          [persona.rows[0].id, datos.codigo_estudiante, datos.fecha_nacimiento],
+        );
+        return buscarFicha(db, estudiante.rows[0].id);
+      },
+      'READ COMMITTED',
+    );
   }
 
   // PB-021 (HU-016): la ficha se corrige aquí. Conserva el estudiante y su
@@ -246,7 +345,11 @@ export class EstudiantesService {
   }
 
   // Todas las rutas son del administrador y traducen igual los errores del modelo.
-  private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
+  private operar<T>(
+    sesion: Sesion,
+    trabajo: (db: PoolClient) => Promise<T>,
+    aislamiento: 'REPEATABLE READ' | 'READ COMMITTED' = 'REPEATABLE READ',
+  ) {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
@@ -257,6 +360,7 @@ export class EstudiantesService {
           throw traducirError(error);
         }
       },
+      aislamiento,
     );
   }
 }

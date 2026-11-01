@@ -27,8 +27,8 @@ export default async function PaginaRegistrar() {
       </div>
       {respuesta.datos.cursos.length === 0 ? (
         <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Todavía no hay estudiantes con matrícula activa en la escuela, así
-          que no se puede registrar una situación.
+          Todavía no hay estudiantes con matrícula activa en la escuela, así que
+          no se puede registrar una situación.
         </p>
       ) : (
         <FormularioRegistro opciones={respuesta.datos} />

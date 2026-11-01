@@ -17,9 +17,14 @@ export default async function PaginaNiveles() {
     <>
       <Encabezado
         titulo="Niveles educativos"
-        descripcion="Los niveles con que se agrupan los cursos, del primero al último. Un nivel no se borra: si deja de usarse, desactívalo y los cursos que ya lo tienen lo conservan."
+        descripcion="Define los grados que imparte tu escuela, por ejemplo Kínder, Primero básico u Octavo básico, después podrás crear cursos como Primero A y Primero B dentro de cada nivel"
       />
 
+      <p className="-mt-3 mb-5 max-w-3xl text-sm text-muted-foreground">
+        Convi asigna el código y el orden automáticamente, configura los niveles
+        una vez y desactiva los que dejen de impartirse, sus cursos e historia
+        se conservan
+      </p>
       <div className="grid gap-6 xl:grid-cols-3">
         <section aria-labelledby="titulo-niveles" className="xl:col-span-2">
           <h2 id="titulo-niveles" className="sr-only">

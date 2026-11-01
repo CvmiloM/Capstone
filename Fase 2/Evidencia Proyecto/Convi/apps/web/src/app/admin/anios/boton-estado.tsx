@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { ConfirmarEnvio } from "@/app/components/confirmar-envio";
 import {
   claseBotonPrimario,
   claseBotonSecundario,
@@ -20,7 +21,7 @@ const TEXTOS = {
     boton: "Cerrar año",
     pendiente: "Cerrando…",
     confirmar: (anio: number) =>
-      `¿Cerrar el año ${anio}? Un año cerrado no vuelve a abrirse ni se puede editar.`,
+      `¿Cerrar el año ${anio}? El año no volverá a abrirse, sus registros se conservarán y las correcciones posteriores requerirán un motivo`,
   },
 };
 
@@ -42,28 +43,25 @@ export function BotonEstado({
   const textos = TEXTOS[destino];
 
   return (
-    <form
-      action={accion}
-      onSubmit={(evento) => {
-        if (!window.confirm(textos.confirmar(anio))) evento.preventDefault();
-      }}
-    >
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="estado" value={destino} />
-      <button
-        type="submit"
-        disabled={pendiente}
-        className={
-          destino === "ACTIVO" ? claseBotonPrimario : claseBotonSecundario
-        }
-      >
-        {pendiente ? textos.pendiente : textos.boton}
-      </button>
-      {estado.mensaje && (
-        <p role="alert" className="mt-2 max-w-xs text-sm text-destructive">
-          {estado.mensaje}
-        </p>
-      )}
-    </form>
+    <ConfirmarEnvio mensaje={textos.confirmar(anio)}>
+      <form action={accion}>
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="estado" value={destino} />
+        <button
+          type="submit"
+          disabled={pendiente}
+          className={
+            destino === "ACTIVO" ? claseBotonPrimario : claseBotonSecundario
+          }
+        >
+          {pendiente ? textos.pendiente : textos.boton}
+        </button>
+        {estado.mensaje && (
+          <p role="alert" className="mt-2 max-w-xs text-sm text-destructive">
+            {estado.mensaje}
+          </p>
+        )}
+      </form>
+    </ConfirmarEnvio>
   );
 }

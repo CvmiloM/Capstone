@@ -2,11 +2,7 @@
 
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
-import {
-  crearAnio,
-  editarAnio,
-  type EstadoFormularioAnio,
-} from "./acciones";
+import { crearAnio, editarAnio, type EstadoFormularioAnio } from "./acciones";
 import type { AnioAcademico } from "./datos";
 
 const estadoInicial: EstadoFormularioAnio = {};
@@ -40,7 +36,8 @@ export function FormularioAnio({ anio }: { anio?: AnioAcademico }) {
           role="status"
           className="rounded-lg border border-verde/30 bg-verde/10 px-3 py-2.5 text-sm"
         >
-          Creaste el año {estado.creado}. Quedó Planificado hasta que lo actives.
+          Creaste el año {estado.creado}. Quedó Planificado hasta que lo
+          actives.
         </div>
       )}
       {anio && <input type="hidden" name="id" value={anio.id} />}
@@ -58,7 +55,7 @@ export function FormularioAnio({ anio }: { anio?: AnioAcademico }) {
         ayuda={
           numeroFijo
             ? "El año solo se puede cambiar mientras esté Planificado y sin cursos."
-            : "Entre 2000 y 2200. No puede repetirse en tu escuela."
+            : "No puede repetirse en tu escuela"
         }
         className={
           numeroFijo ? "[&_input]:bg-muted [&_input]:text-muted-foreground" : ""

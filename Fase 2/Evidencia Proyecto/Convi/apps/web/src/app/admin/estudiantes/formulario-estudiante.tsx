@@ -56,15 +56,10 @@ export function FormularioEstudiante({
       )}
       {ficha && <input type="hidden" name="id" value={ficha.id} />}
 
-      <Campo
+      <input
+        type="hidden"
         name="codigo_estudiante"
-        etiqueta="Código del estudiante"
-        required
-        maxLength={LARGO_MAXIMO.codigo_estudiante}
-        placeholder="2028-015"
-        ayuda="El que usa la escuela. Sin espacios y no se repite."
-        defaultValue={valores.codigo_estudiante}
-        error={errores.codigo_estudiante}
+        value={ficha?.codigo_estudiante ?? ""}
       />
       <div className="grid gap-5 sm:grid-cols-2">
         <Campo
@@ -89,10 +84,11 @@ export function FormularioEstudiante({
       <div className="grid gap-5 sm:grid-cols-2">
         <Campo
           name="rut"
-          etiqueta="RUT (opcional)"
+          etiqueta="RUT"
+          required
           placeholder="12.345.678-5"
           autoComplete="off"
-          ayuda="Con o sin puntos."
+          ayuda="Con o sin puntos, incluye el dígito verificador"
           defaultValue={valores.rut}
           error={errores.rut}
         />

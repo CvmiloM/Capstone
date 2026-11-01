@@ -65,21 +65,12 @@ export function FormularioCurso({
       )}
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Campo
-          name="codigo"
-          etiqueta="Código"
-          required
-          maxLength={LARGO_MAXIMO.codigo}
-          placeholder="1A"
-          ayuda="Sin espacios. No se repite en el año."
-          defaultValue={valores.codigo}
-          error={errores.codigo}
-        />
+        <input type="hidden" name="codigo" value={curso?.codigo ?? ""} />
         <Campo
           name="seccion"
           etiqueta="Sección (opcional)"
           maxLength={LARGO_MAXIMO.seccion}
-          placeholder="A"
+          placeholder="Ejemplo: A, B o C"
           defaultValue={valores.seccion}
           error={errores.seccion}
         />
@@ -95,7 +86,7 @@ export function FormularioCurso({
       />
       <Selector
         name="nivel_id"
-        etiqueta="Nivel"
+        etiqueta="Nivel educativo"
         defaultValue={valores.nivel_id ?? ""}
         fijo={nivelFijo}
         ayuda={
@@ -129,8 +120,12 @@ export function FormularioCurso({
         pendiente={pendiente}
         textoPendiente={curso ? "Guardando…" : "Creando curso…"}
       >
-        {correccion ? "Guardar corrección" : curso ? "Guardar cambios" : "Crear curso"}
+        {correccion
+          ? "Guardar corrección"
+          : curso
+            ? "Guardar cambios"
+            : "Crear curso"}
       </BotonEnviar>
     </form>
   );
-}
+}

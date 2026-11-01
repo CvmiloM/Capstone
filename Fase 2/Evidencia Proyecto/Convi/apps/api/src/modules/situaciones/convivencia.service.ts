@@ -1,4 +1,8 @@
 import {
+  leerBusquedaEstudiantes,
+  buscarEstudiantesRegistro,
+} from './estudiantes-registro.js';
+import {
   BadRequestException,
   ConflictException,
   Inject,
@@ -835,11 +839,21 @@ export class ConvivenciaService {
   }
 
   // PB-043 (HU-036): datos para el formulario de registro de Convivencia.
-  opcionesRegistro(sesion: Sesion): Promise<OpcionesRegistro> {
+  buscarEstudiantes(sesion: Sesion, consulta: Record<string, unknown>) {
+    const filtro = leerBusquedaEstudiantes(consulta);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      (db) => buscarEstudiantesRegistro(db, filtro),
+    );
+  }
+
+  opcionesRegistro(sesion: Sesion, liviano = false): Promise<OpcionesRegistro> {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
+        if (liviano) await db.query('SET LOCAL jit = off');
         const categorias = await db.query<
           OpcionesRegistro['categorias'][number]
         >(
@@ -849,7 +863,20 @@ export class ConvivenciaService {
         const estudiantes = await db.query<
           EstudianteOpcion & { curso_id: string; curso: string }
         >(
-          `SELECT e.id, e.persona_id, p.nombres, p.apellidos, e.codigo_estudiante,
+          liviano
+            ? `SELECT NULL::uuid AS id, NULL::uuid AS persona_id, ''::text AS nombres, ''::text AS apellidos,
+            ''::text AS codigo_estudiante, c.id AS curso_id, c.nombre AS curso
+            FROM convi.cursos c
+            JOIN LATERAL (
+              SELECT 1 FROM convi.matriculas m
+              JOIN convi.estudiantes e ON e.id = m.estudiante_id AND e.establecimiento_id = $1
+              WHERE m.establecimiento_id = $1 AND m.curso_id = c.id
+                AND m.estado = 'ACTIVO' AND e.estado = 'ACTIVO'
+              LIMIT 1 OFFSET 0
+            ) vigente ON true
+            WHERE c.establecimiento_id = $1
+            ORDER BY c.nombre`
+            : `SELECT e.id, e.persona_id, p.nombres, p.apellidos, e.codigo_estudiante,
                   c.id AS curso_id, c.nombre AS curso
            FROM convi.matriculas m
            JOIN convi.estudiantes e ON e.id = m.estudiante_id
@@ -858,6 +885,7 @@ export class ConvivenciaService {
            JOIN convi.niveles_educativos n ON n.id = c.nivel_id
            WHERE m.estado = 'ACTIVO'
            ORDER BY n.orden, c.seccion NULLS FIRST, c.nombre, p.apellidos, p.nombres`,
+          liviano ? [sesion.establecimiento_id] : [],
         );
         const cursos = new Map<string, OpcionesRegistro['cursos'][number]>();
         for (const { curso_id, curso, ...estudiante } of estudiantes.rows) {
@@ -866,13 +894,15 @@ export class ConvivenciaService {
             nombre: curso,
             estudiantes: [],
           };
-          grupo.estudiantes.push(estudiante);
+          if (!liviano) grupo.estudiantes.push(estudiante);
           cursos.set(curso_id, grupo);
         }
         // PB-076 (HU-066): un hecho anterior puede involucrar a un estudiante
         // que hoy no tiene matrícula activa.
-        const sinMatricula = await db.query<EstudianteOpcion>(
-          `SELECT e.id, e.persona_id, p.nombres, p.apellidos, e.codigo_estudiante
+        const sinMatricula = liviano
+          ? { rows: [] }
+          : await db.query<EstudianteOpcion>(
+              `SELECT e.id, e.persona_id, p.nombres, p.apellidos, e.codigo_estudiante
            FROM convi.estudiantes e
            JOIN convi.personas p ON p.id = e.persona_id
            WHERE NOT EXISTS (
@@ -880,7 +910,7 @@ export class ConvivenciaService {
              WHERE m.estudiante_id = e.id AND m.estado = 'ACTIVO'
            )
            ORDER BY p.apellidos, p.nombres`,
-        );
+            );
         const funcionarios = await db.query<
           OpcionesRegistro['funcionarios'][number]
         >(

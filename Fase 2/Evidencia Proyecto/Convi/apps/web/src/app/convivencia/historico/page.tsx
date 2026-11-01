@@ -23,7 +23,6 @@ export default async function PaginaRegistroHistorico({
   const { guardada } = await searchParams;
   const respuesta = await obtenerOpcionesRegistro();
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia" />;
-  const { cursos, sin_matricula } = respuesta.datos;
   const situacionGuardada =
     typeof guardada === "string" && UUID.test(guardada) ? guardada : null;
 
@@ -50,19 +49,14 @@ export default async function PaginaRegistroHistorico({
         </div>
       )}
 
-      {cursos.length === 0 && sin_matricula.length === 0 ? (
-        <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Todavía no hay estudiantes en la escuela, así que no se puede
-          registrar una situación.
-        </p>
-      ) : (
+      {
         // La clave vacía el formulario después de guardar, para registrar otra.
         <FormularioRegistro
           key={situacionGuardada ?? "nueva"}
           opciones={respuesta.datos}
           historico
         />
-      )}
+      }
     </>
   );
 }
