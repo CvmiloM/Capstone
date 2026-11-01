@@ -107,19 +107,6 @@ export default async function PaginaResumen() {
                 descripcion={`Lo que está configurado en ${escuela.nombre}. Cifras actualizadas el ${calculadoEn} h.`}
             />
 
-            {resumen.origen === "ejemplo" && (
-                <div
-                    role="note"
-                    className="mb-6 flex gap-2.5 rounded-lg border border-primary/15 bg-accent px-4 py-3 text-sm text-accent-foreground"
-                >
-                    <Icono nombre="info" className="mt-0.5 size-4 shrink-0" />
-                    <p>
-                        <strong className="font-semibold">Cifras de ejemplo.</strong> Esta
-                        pantalla todavía no está conectada con el backend.
-                    </p>
-                </div>
-            )}
-
             <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {cifras.map((cifra) => (
                     <TarjetaCifra key={cifra.titulo} {...cifra} />
