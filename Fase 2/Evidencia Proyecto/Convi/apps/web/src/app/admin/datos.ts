@@ -42,8 +42,7 @@ export async function pedirAdmin(ruta: string, espera = 10000) {
   return respuesta;
 }
 
-// Datos del portal de administración. El contexto ya viene de la API; el
-// resumen todavía devuelve datos de ejemplo (marcado con TODO).
+// Datos del portal de administración. El contexto y el resumen vienen de la API.
 // Los comentarios indican de qué tablas del modelo de datos sale cada campo.
 
 /** Lo que todas las pantallas del portal necesitan saber de la sesión. */
@@ -94,8 +93,6 @@ export const obtenerContextoAdmin = cache(async (): Promise<ContextoAdmin> => {
 
 /** Las ocho cifras de la HU-033, calculadas con datos de la escuela de la sesión. */
 export type ResumenEscuela = {
-  /** "ejemplo" mientras la pantalla no esté conectada con el backend. */
-  origen: "backend" | "ejemplo";
   /** Momento en que el backend calculó las cifras (ISO 8601). */
   calculadoEn: string;
   /** membresias_establecimiento en estado ACTIVO, de todos los perfiles. */
@@ -114,20 +111,31 @@ export type ResumenEscuela = {
   reglasActivas: number;
 };
 
+// PB-040: la API calcula las cifras con la escuela de la sesión y nunca lee
+// situaciones, casos ni expedientes (HU-123). Si falla, error.tsx muestra el
+// reintento (HU-033 CA4).
 export async function obtenerResumen(): Promise<ResumenEscuela> {
-  await comprobarAdministrador();
-  // TODO(HU-033): pedir las cifras al backend (por ejemplo GET /admin/resumen).
-  // El backend las calcula con la escuela de la sesión y nunca lee
-  // situaciones, casos ni expedientes (HU-123).
+  const respuesta = await pedirAdmin("/admin/resumen");
+  if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
+  // Misma forma que devuelve apps/api/src/modules/admin/resumen.ts.
+  const r = (await respuesta.json()) as {
+    calculado_en: string;
+    cuentas_activas: number;
+    profesores: { registrados: number; activos: number };
+    convivencia: { registrados: number; activos: number };
+    anio_activo: { anio: number; cursos: number; matriculas: number } | null;
+    accesos_apoderado: number;
+    protocolos_vigentes: number;
+    reglas_activas: number;
+  };
   return {
-    origen: "ejemplo",
-    calculadoEn: "2026-10-07T10:14:00-03:00",
-    cuentasActivas: 48,
-    profesores: { registrados: 39, activos: 38 },
-    convivencia: { registrados: 6, activos: 6 },
-    anioActivo: { anio: 2026, cursos: 24, matriculas: 842 },
-    accesosApoderado: 791,
-    protocolosVigentes: 8,
-    reglasActivas: 14,
+    calculadoEn: r.calculado_en,
+    cuentasActivas: r.cuentas_activas,
+    profesores: r.profesores,
+    convivencia: r.convivencia,
+    anioActivo: r.anio_activo,
+    accesosApoderado: r.accesos_apoderado,
+    protocolosVigentes: r.protocolos_vigentes,
+    reglasActivas: r.reglas_activas,
   };
 }
