@@ -3,7 +3,7 @@ import { pedirAdmin } from "../datos";
 import { enviarCambio } from "../estudiantes/datos";
 import type { ClavePaso } from "./opciones";
 
-// PB-032, PB-034, PB-036 y PB-038: datos de la guía inicial. Misma forma que devuelve
+// PB-032 a PB-034, PB-036 y PB-038: datos de la guía inicial. Misma forma que devuelve
 // apps/api/src/modules/admin/guia.service.ts.
 
 export type PasoGuia = {
@@ -57,6 +57,21 @@ export type Guia = {
     /** Filas de estudiantes confirmadas en todas las importaciones. */
     confirmados: number;
   };
+  /** PB-033: las cuentas de Convivencia y de profesores. */
+  equipo: {
+    /** Las 20 invitadas más recientes. */
+    cuentas: {
+      id: string;
+      nombre: string;
+      correo: string | null;
+      perfil: "CONVIVENCIA" | "PROFESOR";
+      estado: string;
+      /** Fecha y hora ISO; null en cuentas sin invitación registrada. */
+      invitado_en: string | null;
+    }[];
+    /** Cuentas Pendientes o Activas, las que cuentan para el paso. */
+    total: number;
+  };
 };
 
 export async function obtenerGuia(): Promise<Guia> {
@@ -85,7 +100,10 @@ export function enviarCursosGuia(cuerpo: unknown) {
   return enviarCambio("POST", "/admin/guia/cursos", cuerpo);
 }
 
-/** PB-036: deja Listo el paso Estudiantes. */
-export function enviarEstudiantesGuia(version: string) {
-  return enviarCambio("POST", "/admin/guia/estudiantes", { version });
+/** PB-033 y PB-036: deja Listo el paso Equipo o Estudiantes. */
+export function enviarPasoListo(
+  paso: "equipo" | "estudiantes",
+  version: string,
+) {
+  return enviarCambio("POST", `/admin/guia/${paso}`, { version });
 }

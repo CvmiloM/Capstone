@@ -2,7 +2,7 @@ import Link from "next/link";
 import { claseEnlace } from "@/app/components/formulario";
 import { FormularioCarga } from "../importaciones/formulario-carga";
 import { NOMBRE_ESTADO } from "../importaciones/opciones";
-import { BotonTerminarEstudiantes } from "./boton-estudiantes";
+import { BotonTerminarPaso } from "./boton-paso";
 import type { Guia } from "./datos";
 
 // PB-036 (HU-029): la nómina se carga desde la guía con la misma importación
@@ -148,7 +148,8 @@ export function PasoEstudiantes({
             : `Hay ${confirmados.toLocaleString("es-CL")} ${confirmados === 1 ? "estudiante confirmado" : "estudiantes confirmados"} por importación.`}
         </p>
         {!listo && (
-          <BotonTerminarEstudiantes
+          <BotonTerminarPaso
+            paso="estudiantes"
             version={guia.version}
             habilitado={confirmados > 0}
           />

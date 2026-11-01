@@ -2,21 +2,24 @@
 
 import { useActionState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
-import { type EstadoGuia, terminarEstudiantes } from "./acciones";
+import { type EstadoGuia, terminarPaso } from "./acciones";
 
 const estadoInicial: EstadoGuia = {};
 
-// PB-036 (HU-029): deja Listo el paso cuando ya hay estudiantes confirmados
-// por importación; la API lo vuelve a comprobar.
-export function BotonTerminarEstudiantes({
+// PB-033 y PB-036: deja Listo un paso que se hace con una operación del
+// portal (invitar al equipo o importar la nómina) cuando ya hay algo hecho;
+// la API lo vuelve a comprobar.
+export function BotonTerminarPaso({
+  paso,
   version,
   habilitado,
 }: {
+  paso: "equipo" | "estudiantes";
   version: string;
   habilitado: boolean;
 }) {
   const [estado, accion, pendiente] = useActionState(
-    terminarEstudiantes,
+    terminarPaso.bind(null, paso),
     estadoInicial,
   );
   return (

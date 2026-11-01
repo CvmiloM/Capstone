@@ -23,11 +23,11 @@ import {
   type AvanceGuia,
 } from './guia.js';
 
-// PB-032 (HU-025), PB-034 (HU-027), PB-036 (HU-029) y PB-038 (HU-031): guía
-// inicial del administrador. Solo
-// entra una cuenta ADMIN activa con segundo factor (HU-025 CA1). Cualquier
-// administrador de la escuela la avanza; la base audita cada cambio de la
-// escuela y conserva la fecha de término de la guía.
+// PB-032 (HU-025), PB-033 (HU-026), PB-034 (HU-027), PB-036 (HU-029) y PB-038
+// (HU-031): guía inicial del administrador. Solo entra una cuenta ADMIN activa
+// con segundo factor (HU-025 CA1). Cualquier administrador de la escuela la
+// avanza; la base audita cada cambio de la escuela y conserva la fecha de
+// término de la guía.
 const ACCESO = { tipo: 'establecimiento', perfiles: ['ADMIN'] } as const;
 
 const TERMINADA =
@@ -46,6 +46,11 @@ const PASOS_GUARDADOS = `CASE WHEN jsonb_typeof(e.contexto_onboarding->'pasos') 
 const ESTUDIANTES_CONFIRMADOS = `(SELECT count(*) FROM convi.filas_importacion f
   JOIN convi.procesos_importacion p ON p.id = f.proceso_importacion_id
   WHERE p.tipo_importacion = 'ESTUDIANTES' AND f.estado = 'CONFIRMADO')::int`;
+
+/** PB-033: cuentas de Convivencia y de profesores invitadas o activas. */
+const EQUIPO_INVITADO = `(SELECT count(*) FROM convi.membresias_establecimiento m
+  WHERE m.codigo_perfil IN ('CONVIVENCIA', 'PROFESOR')
+    AND m.estado IN ('PENDIENTE', 'ACTIVO'))::int`;
 
 /** Avance con el paso marcado; $2 = paso y $3 = LISTO u OMITIDO. */
 const AVANCE_CON_PASO = `e.contexto_onboarding || jsonb_build_object(
@@ -95,6 +100,21 @@ export type Guia = Omit<AvanceGuia, 'pasos'> & {
     /** Filas de estudiantes confirmadas en todas las importaciones. */
     confirmados: number;
   };
+  /** PB-033 (HU-026): las cuentas de Convivencia y de profesores. */
+  equipo: {
+    /** Las 20 invitadas más recientes. */
+    cuentas: {
+      id: string;
+      nombre: string;
+      correo: string | null;
+      perfil: 'CONVIVENCIA' | 'PROFESOR';
+      estado: string;
+      /** Fecha y hora ISO; null en cuentas sin invitación registrada. */
+      invitado_en: string | null;
+    }[];
+    /** Cuentas Pendientes o Activas, las que cuentan para el paso. */
+    total: number;
+  };
 };
 
 export type CursosCreados = {
@@ -125,6 +145,7 @@ export class GuiaAdminService {
         nombres: Record<string, string>;
         academico: Guia['academico'];
         estudiantes: Guia['estudiantes'];
+        equipo: Guia['equipo'];
       }>(
         `SELECT e.onboarding_completado_en AS terminada_en, e.metodo_registro_actual,
            e.contexto_onboarding, ${HUELLA} AS version,
@@ -162,7 +183,18 @@ export class GuiaAdminService {
                      WHERE p.tipo_importacion = 'ESTUDIANTES'
                      ORDER BY p.creado_en DESC LIMIT 5) i),
              'confirmados', ${ESTUDIANTES_CONFIRMADOS}
-           ) AS estudiantes
+           ) AS estudiantes,
+           jsonb_build_object(
+             'cuentas', (SELECT coalesce(jsonb_agg(to_jsonb(c) ORDER BY c.invitado_en DESC NULLS LAST), '[]'::jsonb)
+               FROM (SELECT m.id, p.nombres || ' ' || p.apellidos AS nombre,
+                       coalesce(m.correo_invitacion, p.correo) AS correo,
+                       m.codigo_perfil AS perfil, m.estado, m.invitado_en
+                     FROM convi.membresias_establecimiento m
+                     JOIN convi.personas p ON p.id = m.persona_id
+                     WHERE m.codigo_perfil IN ('CONVIVENCIA', 'PROFESOR')
+                     ORDER BY m.invitado_en DESC NULLS LAST LIMIT 20) c),
+             'total', ${EQUIPO_INVITADO}
+           ) AS equipo
          FROM convi.establecimientos e WHERE e.id = $1`,
         [sesion.establecimiento_id],
       );
@@ -181,6 +213,7 @@ export class GuiaAdminService {
         zona_horaria: fila.zona_horaria,
         academico: fila.academico,
         estudiantes: fila.estudiantes,
+        equipo: fila.equipo,
       };
     });
   }
@@ -278,6 +311,19 @@ export class GuiaAdminService {
     );
   }
 
+  // PB-033 (HU-026): las invitaciones se envían con la misma operación del
+  // portal (CA2); el paso queda Listo cuando hay al menos una cuenta de
+  // Convivencia o de profesor, invitada o activa (por defecto).
+  terminarEquipo(sesion: Sesion, cuerpo: unknown): Promise<{ id: string }> {
+    return this.terminarPaso(
+      sesion,
+      'equipo',
+      cuerpo,
+      EQUIPO_INVITADO,
+      'Todavía no hay cuentas de Convivencia ni de profesores. Invita al menos a una persona, u omite el paso por ahora.',
+    );
+  }
+
   // PB-036 (HU-029): la nómina se carga, revisa y confirma en la misma
   // importación del portal; el paso queda Listo cuando hay al menos un
   // estudiante confirmado por importación (por defecto).
@@ -285,20 +331,38 @@ export class GuiaAdminService {
     sesion: Sesion,
     cuerpo: unknown,
   ): Promise<{ id: string }> {
+    return this.terminarPaso(
+      sesion,
+      'estudiantes',
+      cuerpo,
+      ESTUDIANTES_CONFIRMADOS,
+      'Todavía no hay estudiantes confirmados en una importación. Carga la nómina y confirma sus filas, o omite el paso por ahora.',
+    );
+  }
+
+  /**
+   * Deja Listo un paso que se hace con una operación del portal, si esa
+   * operación ya dejó algo: la consulta (una constante de este archivo)
+   * cuenta lo hecho.
+   */
+  private terminarPaso(
+    sesion: Sesion,
+    paso: 'equipo' | 'estudiantes',
+    cuerpo: unknown,
+    hecho: string,
+    faltante: string,
+  ): Promise<{ id: string }> {
     const version = validarVersion(cuerpo);
     return this.cuentas.operar(sesion, ACCESO, async (db) => {
-      const confirmados = await db.query<{ cantidad: number }>(
-        `SELECT ${ESTUDIANTES_CONFIRMADOS} AS cantidad`,
+      const cantidad = await db.query<{ cantidad: number }>(
+        `SELECT ${hecho} AS cantidad`,
       );
-      if (!confirmados.rows[0]?.cantidad)
-        throw new ConflictException(
-          'Todavía no hay estudiantes confirmados en una importación. Carga la nómina y confirma sus filas, o omite el paso por ahora.',
-        );
+      if (!cantidad.rows[0]?.cantidad) throw new ConflictException(faltante);
       const cambio = await db.query<{ id: string }>(
         `UPDATE convi.establecimientos e SET contexto_onboarding = ${AVANCE_CON_PASO}
          WHERE e.id = $1 AND e.onboarding_completado_en IS NULL AND ${HUELLA} = $4
          RETURNING e.id`,
-        [sesion.establecimiento_id, 'estudiantes', 'LISTO', version],
+        [sesion.establecimiento_id, paso, 'LISTO', version],
       );
       if (cambio.rows[0]) return cambio.rows[0];
       return rechazarCambio(db, sesion.establecimiento_id);
