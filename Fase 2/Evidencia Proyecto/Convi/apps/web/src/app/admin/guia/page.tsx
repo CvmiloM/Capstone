@@ -7,6 +7,7 @@ import {
 } from "@/app/components/formulario";
 import { irAlPortal, omitirPaso } from "./acciones";
 import { obtenerGuia } from "./datos";
+import { DemoPaso } from "./demo/demo-paso";
 import { FormularioBienvenida } from "./formulario-bienvenida";
 import { FormularioCursos } from "./formulario-cursos";
 import {
@@ -161,6 +162,11 @@ export default async function GuiaInicial({
                 " Omitir no cuenta como configurado."}
             </p>
           )}
+
+          {/* Cómo se hace este paso, animado con datos de ejemplo. */}
+          <div className="mt-6">
+            <DemoPaso key={actual} paso={actual} />
+          </div>
 
           <div className="mt-6">
             {actual === "bienvenida" && (
