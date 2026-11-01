@@ -11,9 +11,9 @@ import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 import { GuiaAdminService } from './guia.service.js';
 
-// PB-032 (HU-025), PB-034 (HU-027), PB-036 (HU-029) y PB-038 (HU-031): guía
-// inicial del administrador. Solo entra una cuenta ADMIN activa con el segundo
-// factor completo.
+// PB-032 (HU-025), PB-033 (HU-026), PB-034 (HU-027), PB-036 (HU-029) y PB-038
+// (HU-031): guía inicial del administrador. Solo entra una cuenta ADMIN activa
+// con el segundo factor completo.
 @Controller('admin/guia')
 @PerfilesPermitidos('ADMIN')
 export class GuiaAdminController {
@@ -46,6 +46,13 @@ export class GuiaAdminController {
   @Post('cursos')
   guardarCursos(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
     return this.guia.guardarCursos(peticion.sesion, cuerpo);
+  }
+
+  // PB-033: deja Listo el paso Equipo si ya hay cuentas de Convivencia o de
+  // profesores. Cuerpo: version.
+  @Post('equipo')
+  terminarEquipo(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
+    return this.guia.terminarEquipo(peticion.sesion, cuerpo);
   }
 
   // PB-036: deja Listo el paso Estudiantes si ya hay estudiantes confirmados

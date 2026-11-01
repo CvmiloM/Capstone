@@ -42,7 +42,6 @@ export const PASOS: {
       "Las cuentas del equipo de Convivencia y de los profesores, con su nombre, apellido, correo y perfil.",
     alConfirmar:
       "CONVI envía una invitación por correo a cada persona. Su cuenta queda pendiente hasta que la acepte.",
-    enlaces: [{ href: "/admin/usuarios", texto: "Invitar desde Usuarios" }],
   },
   {
     clave: "cursos",

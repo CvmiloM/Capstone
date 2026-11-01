@@ -5,13 +5,13 @@ import { redirect } from "next/navigation";
 import {
   enviarBienvenida,
   enviarCursosGuia,
-  enviarEstudiantesGuia,
   enviarInicioGuia,
   enviarOmision,
+  enviarPasoListo,
 } from "./datos";
 import type { ClavePaso } from "./opciones";
 
-// PB-032, PB-034, PB-036 y PB-038: acciones de la guía inicial. Cada formulario envía
+// PB-032 a PB-034, PB-036 y PB-038: acciones de la guía inicial. Cada formulario envía
 // la huella de la guía que se veía, para que la API rechace el cambio si otro
 // administrador la avanzó entretanto (PB-139).
 
@@ -112,14 +112,17 @@ export async function guardarCursos(
   irAPaso("cursos", "cursos-creados");
 }
 
-// PB-036 (HU-029): la nómina ya se confirmó en la importación; el paso queda
-// Listo si hay al menos un estudiante confirmado (la API lo comprueba).
-export async function terminarEstudiantes(
+// PB-033 (HU-026) y PB-036 (HU-029): las invitaciones y la nómina se hacen
+// con las operaciones del portal; el paso queda Listo si ya hay al menos una
+// cuenta del equipo o un estudiante confirmado (la API lo comprueba).
+export async function terminarPaso(
+  paso: "equipo" | "estudiantes",
   _anterior: EstadoGuia,
   formData: FormData,
 ): Promise<EstadoGuia> {
-  const resultado = await enviarEstudiantesGuia(leerTexto(formData, "version"));
+  const resultado = await enviarPasoListo(paso, leerTexto(formData, "version"));
   if (!resultado.ok) return { mensaje: resultado.mensaje };
   revalidatePath("/admin", "layout");
+  if (paso === "equipo") irAPaso("cursos", "equipo-listo");
   irAPaso("reglas", "estudiantes-listo");
 }
