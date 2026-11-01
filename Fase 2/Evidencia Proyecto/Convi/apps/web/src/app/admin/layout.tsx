@@ -10,11 +10,14 @@ import { Navegacion } from "./navegacion";
 
 // Portal del perfil ADMIN. En pantallas grandes el menú queda fijo a la
 // izquierda; en pantallas chicas pasa a una franja de enlaces sobre el contenido.
+// Mientras la guía inicial está en curso, su página trae la marca
+// data-modo-guia: el menú se oculta y el logo pasa a la barra de arriba, para
+// que la guía ocupe toda la pantalla.
 export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
   // PB-009 comprueba el acceso en proxy y al leer datos del portal.
   return (
-    <div className="flex flex-1 flex-col lg:flex-row">
-      <aside className="border-b border-border material-menu lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-b-0">
+    <div className="group/admin flex flex-1 flex-col lg:flex-row">
+      <aside className="group-has-[[data-modo-guia]]/admin:hidden border-b border-border material-menu lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-b-0">
         <div className="flex items-center gap-0.5 px-4 pt-4 pb-3">
           <Link
             href="/admin"
@@ -48,10 +51,26 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-end border-b border-border material-menu px-4 [view-transition-name:barra-superior] sm:px-8">
-          <Suspense fallback={<Esqueleto className="h-8 w-44" />}>
-            <UsuarioSesion />
-          </Suspense>
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-end border-b border-border material-menu px-4 [view-transition-name:barra-superior] group-has-[[data-modo-guia]]/admin:justify-between sm:px-8">
+          {/* Solo en la guía inicial, cuando el menú no se ve. */}
+          <div className="hidden items-center gap-0.5 group-has-[[data-modo-guia]]/admin:flex">
+            <Image
+              src={logo}
+              alt="Convi"
+              className="-my-3 -ml-2 block h-12 w-auto"
+            />
+            <span className="translate-y-2 rounded bg-accent px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-accent-foreground">
+              Admin
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Suspense fallback={<Esqueleto className="h-8 w-44" />}>
+              <UsuarioSesion />
+            </Suspense>
+            <div className="hidden group-has-[[data-modo-guia]]/admin:block">
+              <BotonCerrarSesion />
+            </div>
+          </div>
         </header>
         <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8">{children}</main>
       </div>
