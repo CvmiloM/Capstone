@@ -8,6 +8,10 @@ import {
 } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
+import {
+  agruparConsultas,
+  todasLasLecturas,
+} from '../../database/consultas-agrupadas.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { crearAvisos, TEXTO_AVISO } from '../alertas/crear-avisos.js';
 import {
@@ -293,7 +297,9 @@ export class CasosService {
   }
 
   // Con sección, solo se consulta lo que muestra esa pestaña de la ficha y el
-  // resto va vacío (seccion-caso.ts); sin sección se devuelve todo.
+  // resto va vacío (seccion-caso.ts); sin sección se devuelve todo. Todas las
+  // lecturas de la pestaña se piden a la vez y viajan juntas a la base
+  // (agruparConsultas): son las mismas consultas, en menos viajes.
   detalle(
     sesion: Sesion,
     id: string,
@@ -303,23 +309,25 @@ export class CasosService {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
-      async (db) => {
-        const base = await db.query<
-          Pick<DetalleCaso, keyof CasoLista> &
-            Pick<
-              DetalleCaso,
-              | 'responsable_id'
-              | 'version_responsable'
-              | 'resumen'
-              | 'abierto_por'
-              | 'abierto_en'
-              | 'plazo_cierre_dias_aplicado'
-              | 'justificacion_independiente'
-              | 'registro_historico'
-              | 'cerrado_en'
-            >
-        >(
-          `SELECT ${COLUMNAS_LISTA}, c.asignado_a_membresia_id AS responsable_id,
+      async (cliente) => {
+        const db = agruparConsultas(cliente);
+        const base = db
+          .query<
+            Pick<DetalleCaso, keyof CasoLista> &
+              Pick<
+                DetalleCaso,
+                | 'responsable_id'
+                | 'version_responsable'
+                | 'resumen'
+                | 'abierto_por'
+                | 'abierto_en'
+                | 'plazo_cierre_dias_aplicado'
+                | 'justificacion_independiente'
+                | 'registro_historico'
+                | 'cerrado_en'
+              >
+          >(
+            `SELECT ${COLUMNAS_LISTA}, c.asignado_a_membresia_id AS responsable_id,
                   md5(to_jsonb(c)::text || c.xmin::text) AS version_responsable, c.resumen, c.abierto_en,
                   pa.nombres || ' ' || pa.apellidos AS abierto_por,
                   c.plazo_cierre_dias_aplicado, c.justificacion_independiente,
@@ -328,14 +336,14 @@ export class CasosService {
            JOIN convi.membresias_establecimiento ma ON ma.id = c.abierto_por
            JOIN convi.personas pa ON pa.id = ma.persona_id
            WHERE c.id = $1`,
-          [id],
-        );
-        const caso = base.rows[0];
-        if (!caso) throw new NotFoundException(NO_EXISTE);
-        const participantes = await db.query<
-          DetalleCaso['participantes'][number]
-        >(
-          `SELECT e.id AS estudiante_id, p.nombres, p.apellidos,
+            [id],
+          )
+          .then((resultado) => resultado.rows[0]);
+        const datos = await todasLasLecturas({
+          caso: base,
+          participantes: db
+            .query<DetalleCaso['participantes'][number]>(
+              `SELECT e.id AS estudiante_id, p.nombres, p.apellidos,
                   e.codigo_estudiante, p.rut, pa.rol_contextual AS rol,
                   (SELECT ca.nombre || ' (' || aa.anio || ')' FROM convi.matriculas actual
                    JOIN convi.cursos ca ON ca.id = actual.curso_id
@@ -352,14 +360,15 @@ export class CasosService {
            LEFT JOIN convi.anios_academicos am ON am.id = cm.anio_academico_id
            WHERE pa.caso_id = $1 AND pa.activo_hasta IS NULL
            ORDER BY p.apellidos, p.nombres`,
-          [id],
-        );
-        const situaciones = await cargar(
-          'situaciones_vinculadas',
-          async () =>
-            (
-              await db.query<DetalleCaso['situaciones_vinculadas'][number]>(
-                `SELECT s.id, s.codigo, cat.nombre AS categoria, s.ocurrido_en,
+              [id],
+            )
+            .then((resultado) => resultado.rows),
+          situaciones_vinculadas: cargar(
+            'situaciones_vinculadas',
+            async () =>
+              (
+                await db.query<DetalleCaso['situaciones_vinculadas'][number]>(
+                  `SELECT s.id, s.codigo, cat.nombre AS categoria, s.ocurrido_en,
                         s.vinculado_a_caso_en,
                         pv.nombres || ' ' || pv.apellidos AS vinculado_por,
                         (SELECT r.fundamento FROM convi.revisiones_convivencia r
@@ -372,110 +381,95 @@ export class CasosService {
                  JOIN convi.personas pv ON pv.id = mv.persona_id
                  WHERE s.caso_id = $1
                  ORDER BY s.ocurrido_en, s.codigo`,
-                [id],
-              )
-            ).rows,
-          [],
-        );
-        const permitidos = await cargar(
-          'estado',
-          () => estadosPermitidos(db, caso.estado_actual),
-          { intermedios: [], cierre: false },
-        );
-        const fechas = await cargar(
-          'fechas',
-          async () =>
-            (
-              await db.query<{ hoy: string; ahora: string }>(
-                `SELECT ${HOY_ESCUELA}::text AS hoy,
+                  [id],
+                )
+              ).rows,
+            [],
+          ),
+          // Necesita el estado actual: viaja después de la consulta base.
+          permitidos: cargar(
+            'estado',
+            async () => {
+              const caso = await base;
+              return caso
+                ? estadosPermitidos(db, caso.estado_actual)
+                : { intermedios: [], cierre: false };
+            },
+            { intermedios: [], cierre: false },
+          ),
+          fechas: cargar(
+            'fechas',
+            async () =>
+              (
+                await db.query<{ hoy: string; ahora: string }>(
+                  `SELECT ${HOY_ESCUELA}::text AS hoy,
                         to_char(now() AT TIME ZONE (SELECT zona_horaria FROM convi.establecimientos
                           WHERE id = convi.establecimiento_actual()), 'YYYY-MM-DD"T"HH24:MI') AS ahora`,
-              )
-            ).rows[0],
-          { hoy: '', ahora: '' },
-        );
-        return {
-          ...caso,
-          responsables_disponibles: await cargar(
+                )
+              ).rows[0],
+            { hoy: '', ahora: '' },
+          ),
+          responsables_disponibles: cargar(
             'estado',
             () => responsablesDeEncuentro(db),
             [],
           ),
-          participantes: participantes.rows,
-          situaciones_vinculadas: situaciones,
-          movimientos: await cargar(
-            'estado',
-            () => movimientosDelCaso(db, id),
-            [],
-          ),
-          ultimo_movimiento_id: await cargar(
+          movimientos: cargar('estado', () => movimientosDelCaso(db, id), []),
+          ultimo_movimiento_id: cargar(
             'estado',
             () => ultimoMovimiento(db, id),
             null,
           ),
-          estados_permitidos: permitidos.intermedios,
-          puede_cerrar: permitidos.cierre,
-          pendientes: await cargar('estado', () => pendientesDelCaso(db, id), {
+          pendientes: cargar('estado', () => pendientesDelCaso(db, id), {
             actuaciones: 0,
             compromisos: 0,
             acciones_plan: 0,
             pasos_protocolo: 0,
           }),
-          actas_cierre: await cargar('estado', () => actasDelCaso(db, id), []),
-          evidencias: await cargar(
-            'evidencias',
-            () => evidenciasDelCaso(db, id),
-            [],
-          ),
-          protocolos_aplicados: await cargar(
+          actas_cierre: cargar('estado', () => actasDelCaso(db, id), []),
+          evidencias: cargar('evidencias', () => evidenciasDelCaso(db, id), []),
+          protocolos_aplicados: cargar(
             'protocolos_aplicados',
             () => protocolosDelCaso(db, id),
             [],
           ),
           // Las mismas cuentas que pueden ser responsables de un encuentro.
-          responsables_paso: await cargar(
+          responsables_paso: cargar(
             'responsables_paso',
             () => responsablesDeEncuentro(db),
             [],
           ),
-          protocolos_aplicables: await cargar(
+          protocolos_aplicables: cargar(
             'normativa',
             () => protocolosAplicables(db),
             [],
           ),
-          revisiones_normativas: await cargar(
+          revisiones_normativas: cargar(
             'normativa',
             () => revisionesNormativasDelCaso(db, id),
             [],
           ),
-          opciones_normativa: await cargar(
-            'normativa',
-            () => opcionesNormativa(db),
-            { protocolos: [], documentos: [] },
-          ),
-          planes_intervencion: await cargar(
-            'plan',
-            () => planesDelCaso(db, id),
-            [],
-          ),
-          responsables_accion: await cargar(
+          opciones_normativa: cargar('normativa', () => opcionesNormativa(db), {
+            protocolos: [],
+            documentos: [],
+          }),
+          planes_intervencion: cargar('plan', () => planesDelCaso(db, id), []),
+          responsables_accion: cargar(
             'plan',
             () => responsablesDeAccion(db),
             [],
           ),
-          hoy: fechas.hoy,
-          ahora: fechas.ahora,
-          compromisos: await cargar(
+          compromisos: cargar(
             'compromisos_seguimientos',
             () => compromisosDelCaso(db, id),
             [],
           ),
-          seguimientos: await cargar(
+          seguimientos: cargar(
             'compromisos_seguimientos',
             () => seguimientosDelCaso(db, id),
             [],
           ),
-          actuaciones_origen: await cargar(
+          actuaciones_origen: cargar(
             'actuaciones_origen',
             async () =>
               (
@@ -486,48 +480,61 @@ export class CasosService {
               ).rows,
             [],
           ),
-          encuentros: await cargar(
-            'encuentros',
-            () => encuentrosDelCaso(db, id),
+          encuentros: cargar('encuentros', () => encuentrosDelCaso(db, id), []),
+          responsables_encuentro: cargar(
+            'personas_encuentro',
+            () => responsablesDeEncuentro(db),
             [],
           ),
-          opciones_encuentro: {
-            responsables: await cargar(
-              'personas_encuentro',
-              () => responsablesDeEncuentro(db),
-              [],
-            ),
-            asistentes: await cargar(
-              'personas_encuentro',
-              () => asistentesPosibles(db, id),
-              [],
-            ),
-            acciones_plan: await cargar(
-              'acciones_encuentro',
-              () => accionesParaEncuentro(db, id),
-              [],
-            ),
-          },
-          comunicaciones: await cargar(
+          asistentes_encuentro: cargar(
+            'personas_encuentro',
+            () => asistentesPosibles(db, id),
+            [],
+          ),
+          acciones_encuentro: cargar(
+            'acciones_encuentro',
+            () => accionesParaEncuentro(db, id),
+            [],
+          ),
+          comunicaciones: cargar(
             'comunicaciones',
             () => comunicacionesDelCaso(db, id),
             [],
           ),
-          destinatarios_comunicacion: await cargar(
+          destinatarios_comunicacion: cargar(
             'comunicaciones',
             () => destinatariosDeComunicacion(db, id),
             [],
           ),
-          correos: await cargar(
-            'comunicaciones',
-            () => correosDelCaso(db, id),
-            [],
-          ),
-          destinatarios_correo: await cargar(
+          correos: cargar('comunicaciones', () => correosDelCaso(db, id), []),
+          destinatarios_correo: cargar(
             'comunicaciones',
             () => destinatariosDeCorreo(db, id),
             [],
           ),
+        });
+        const {
+          caso,
+          permitidos,
+          fechas,
+          responsables_encuentro,
+          asistentes_encuentro,
+          acciones_encuentro,
+          ...resto
+        } = datos;
+        if (!caso) throw new NotFoundException(NO_EXISTE);
+        return {
+          ...caso,
+          ...resto,
+          estados_permitidos: permitidos.intermedios,
+          puede_cerrar: permitidos.cierre,
+          hoy: fechas.hoy,
+          ahora: fechas.ahora,
+          opciones_encuentro: {
+            responsables: responsables_encuentro,
+            asistentes: asistentes_encuentro,
+            acciones_plan: acciones_encuentro,
+          },
         };
       },
     );
