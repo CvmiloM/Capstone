@@ -18,10 +18,19 @@ export type ContextoAdmin = {
   /** El año en estado ACTIVO más reciente, o null si no hay. */
   anio_activo: number | null;
   usuario: { nombres: string; apellidos: string };
+  /**
+   * PB-032 y PB-038: si la escuela terminó la guía inicial y si ya la empezó;
+   * mientras no la empiece ni la termine, el portal la abre solo.
+   */
+  guia: { terminada: boolean; iniciada: boolean };
 };
 
 type Fila = ContextoAdmin['escuela'] &
-  ContextoAdmin['usuario'] & { anio_activo: number | null };
+  ContextoAdmin['usuario'] & {
+    anio_activo: number | null;
+    guia_terminada: boolean;
+    guia_iniciada: boolean;
+  };
 
 @Injectable()
 export class ContextoAdminService {
@@ -35,6 +44,8 @@ export class ContextoAdminService {
         const resultado = await db.query<Fila>(
           `SELECT e.nombre, e.codigo, e.comuna, e.zona_horaria,
                   p.nombres, p.apellidos,
+                  e.onboarding_completado_en IS NOT NULL AS guia_terminada,
+                  e.contexto_onboarding->'iniciada_en' IS NOT NULL AS guia_iniciada,
                   (SELECT a.anio FROM convi.anios_academicos a
                     WHERE a.estado = 'ACTIVO'
                     ORDER BY a.anio DESC LIMIT 1) AS anio_activo
@@ -56,6 +67,10 @@ export class ContextoAdminService {
           },
           anio_activo: fila.anio_activo,
           usuario: { nombres: fila.nombres, apellidos: fila.apellidos },
+          guia: {
+            terminada: fila.guia_terminada,
+            iniciada: fila.guia_iniciada,
+          },
         };
       },
     );

@@ -59,6 +59,11 @@ export type ContextoAdmin = {
   anioActivo: { anio: number } | null;
   /** personas: la persona de la membresía que inició sesión. */
   usuario: { nombres: string; apellidos: string };
+  /**
+   * PB-032 y PB-038: establecimientos.onboarding_completado_en y si la guía
+   * ya se empezó (contexto_onboarding). Sin empezar ni terminar, se abre sola.
+   */
+  guia: { terminada: boolean; iniciada: boolean };
 };
 
 // cache() hace que el layout y la página compartan la misma respuesta cuando
@@ -77,6 +82,7 @@ export const obtenerContextoAdmin = cache(async (): Promise<ContextoAdmin> => {
     };
     anio_activo: number | null;
     usuario: { nombres: string; apellidos: string };
+    guia: { terminada: boolean; iniciada: boolean };
   };
   return {
     escuela: {
@@ -88,6 +94,7 @@ export const obtenerContextoAdmin = cache(async (): Promise<ContextoAdmin> => {
     anioActivo:
       contexto.anio_activo === null ? null : { anio: contexto.anio_activo },
     usuario: contexto.usuario,
+    guia: contexto.guia,
   };
 });
 
