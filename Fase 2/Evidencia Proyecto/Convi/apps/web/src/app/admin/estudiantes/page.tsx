@@ -1,3 +1,4 @@
+import { DesactivacionEstudiantes } from "./desactivacion";
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
@@ -33,6 +34,7 @@ export default async function PaginaEstudiantes({
     curso?: string;
     pagina?: string;
     estado?: string;
+    desactivacion?: string;
   }>;
 }) {
   const parametros = await searchParams;
@@ -159,6 +161,22 @@ export default async function PaginaEstudiantes({
             </div>
           </Form>
 
+          {parametros.desactivacion === "realizada" && (
+            <p
+              role="status"
+              className="mb-4 rounded-xl bg-primary/5 p-4 text-sm"
+            >
+              Estudiantes desactivados, sus fichas y antecedentes se conservan
+            </p>
+          )}
+          {(!estado || estado === "ACTIVO") && (
+            <DesactivacionEstudiantes
+              buscar={buscar}
+              curso={curso}
+              total={nomina.total}
+              hoy={hoy}
+            />
+          )}
           {nomina.estudiantes.length === 0 ? (
             <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
               {filtrando
@@ -196,7 +214,7 @@ export default async function PaginaEstudiantes({
                             href={`/admin/estudiantes/${estudiante.id}`}
                             className={`font-medium ${claseEnlace}`}
                           >
-                            {estudiante.apellidos}, {estudiante.nombres}
+                            {estudiante.nombres} {estudiante.apellidos}
                           </Link>
                           <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                             {estudiante.codigo_estudiante}

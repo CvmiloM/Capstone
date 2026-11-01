@@ -126,20 +126,21 @@ export type PersonaApoderada = {
   telefono: string | null;
 };
 
-export type VinculoApoderado = PersonaApoderada & ResumenAccesoPortal & {
-  persona_apoderado_id: string;
-  direccion: string | null;
-  tipo_relacion: string | null;
-  es_principal: boolean;
-  puede_ser_contactado: boolean;
-  activo_desde: string | null;
-  activo_hasta: string | null;
-  vigencia: "VIGENTE" | "FUTURO" | "TERMINADO";
-  /** PB-021: otros estudiantes con los que está vinculada la misma persona. */
-  otros_estudiantes: number;
-  /** PB-021: tiene cuenta o invitación en CONVI. */
-  tiene_cuenta: boolean;
-};
+export type VinculoApoderado = PersonaApoderada &
+  ResumenAccesoPortal & {
+    persona_apoderado_id: string;
+    direccion: string | null;
+    tipo_relacion: string | null;
+    es_principal: boolean;
+    puede_ser_contactado: boolean;
+    activo_desde: string | null;
+    activo_hasta: string | null;
+    vigencia: "VIGENTE" | "FUTURO" | "TERMINADO";
+    /** PB-021: otros estudiantes con los que está vinculada la misma persona. */
+    otros_estudiantes: number;
+    /** PB-021: tiene cuenta o invitación en CONVI. */
+    tiene_cuenta: boolean;
+  };
 
 export function obtenerApoderados(id: string, buscar: string) {
   return pedir<{ vinculos: VinculoApoderado[]; personas: PersonaApoderada[] }>(
@@ -195,4 +196,41 @@ export async function enviarCambio(
     return { ok: false, mensaje: datos.message };
   }
   return { ok: false, mensaje: SIN_CONEXION };
+}
+
+export async function enviarDesactivacion(cuerpo: unknown) {
+  const token = await tokenDeSesion();
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(
+      `${URL_API}/admin/estudiantes/desactivacion`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(cuerpo),
+        cache: "no-store",
+        signal: AbortSignal.timeout(60000),
+      },
+    );
+    if (respuesta.status === 401) return { ok: false as const, mensaje: "Tu sesión terminó, vuelve a iniciar sesión antes de continuar" };
+    const datos = await respuesta.json();
+    return respuesta.ok
+      ? { ok: true as const }
+      : {
+          ok: false as const,
+          mensaje:
+            datos.message ||
+            datos.mensaje ||
+            "No se pudo completar la desactivación",
+        };
+  } catch {
+    return {
+      ok: false as const,
+      mensaje:
+        "No pudimos confirmar el resultado, recarga la nómina antes de intentar nuevamente",
+    };
+  }
 }

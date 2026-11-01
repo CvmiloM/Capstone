@@ -149,7 +149,9 @@ export default async function PaginaCurso({
                   <tbody className="divide-y divide-border">
                     {curso.asignaciones.map((asignacion) => {
                       const nombre = `${asignacion.nombres} ${asignacion.apellidos}`;
-                      const situacion = SITUACION[asignacion.situacion];
+                      const situacion = asignacion.situacion === "VIGENTE" && asignacion.fecha_fin === hoy
+                        ? { ...SITUACION.VIGENTE, texto: "Finaliza hoy" }
+                        : SITUACION[asignacion.situacion];
                       return (
                         <tr key={asignacion.id}>
                           <td className="px-4 py-3">
@@ -263,7 +265,31 @@ export default async function PaginaCurso({
             Datos del curso
           </h2>
           {editable ? (
-            <FormularioCurso curso={curso} niveles={opcionesNivel} />
+            <>
+              <dl className="space-y-3 text-sm">
+                {[
+                  ["Nombre", curso.nombre],
+                  ["Nivel educativo", curso.nivel_nombre],
+                  ["Sección", curso.seccion],
+                  ["Año académico", String(curso.anio)],
+                ].map(([etiqueta, valor]) => (
+                  <div key={etiqueta}>
+                    <dt className="text-muted-foreground">{etiqueta}</dt>
+                    <dd className="mt-0.5 font-medium">
+                      {valor || "Sin registrar"}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <details className="mt-5 border-t border-border pt-4">
+                <summary className="cursor-pointer rounded-lg py-2 font-medium text-primary focus-visible:outline-2 focus-visible:outline-ring">
+                  Editar datos del curso
+                </summary>
+                <div className="mt-4">
+                  <FormularioCurso curso={curso} niveles={opcionesNivel} />
+                </div>
+              </details>
+            </>
           ) : (
             <>
               <dl className="space-y-2 text-sm">
@@ -294,4 +320,4 @@ export default async function PaginaCurso({
       </div>
     </>
   );
-}
+}

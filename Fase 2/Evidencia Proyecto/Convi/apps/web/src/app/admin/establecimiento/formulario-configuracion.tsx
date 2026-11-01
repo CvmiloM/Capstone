@@ -127,7 +127,7 @@ export function FormularioConfiguracion({
         </div>
         <Campo
           name="plazo_cierre_dias"
-          etiqueta="Plazo sugerido de cierre, en días"
+          etiqueta="Plazo sugerido de cierre de casos, en días"
           type="number"
           min="1"
           max="2147483647"

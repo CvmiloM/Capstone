@@ -50,7 +50,9 @@ export async function registrarSituacion(
     tipo_origen: valores.tipo_origen,
     // Con origen Otro no se envía informante, aunque el campo tenga algo.
     informante_persona_id:
-      valores.tipo_origen === "OTRO" ? null : valores.informante_persona_id || null,
+      valores.tipo_origen === "OTRO"
+        ? null
+        : valores.informante_persona_id || null,
     curso_id: valores.curso_id || null,
     ocurrido_en: valores.ocurrido_en,
     lugar: valores.lugar || null,

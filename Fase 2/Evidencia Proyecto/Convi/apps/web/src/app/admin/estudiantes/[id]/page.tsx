@@ -231,12 +231,19 @@ export default async function PaginaEstudiante({
                   estudiante tiene una sola matrícula vigente: para cambiarla,
                   regístralo aquí y las anteriores se conservan.
                 </p>
-                <FormularioCambio
-                  estudianteId={ficha.id}
-                  vigente={vigente}
-                  opciones={opciones}
-                  hoy={hoy}
-                />
+                <details className="group">
+                  <summary className="cursor-pointer rounded-lg py-2 font-medium text-primary focus-visible:outline-2 focus-visible:outline-ring">
+                    Cambiar matrícula
+                  </summary>
+                  <div className="mt-4">
+                    <FormularioCambio
+                      estudianteId={ficha.id}
+                      vigente={vigente}
+                      opciones={opciones}
+                      hoy={hoy}
+                    />
+                  </div>
+                </details>
               </>
             ) : opciones.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -262,7 +269,37 @@ export default async function PaginaEstudiante({
           <h2 id="titulo-datos" className="mb-4 text-lg font-semibold">
             Datos del estudiante
           </h2>
-          <FormularioEstudiante ficha={ficha} hoy={hoy} />
+          <dl className="space-y-3 text-sm">
+            {[
+              ["Nombre", `${ficha.nombres} ${ficha.apellidos}`],
+              ["RUT", ficha.rut],
+              [
+                "Fecha de nacimiento",
+                ficha.fecha_nacimiento
+                  ? formatearFecha(ficha.fecha_nacimiento)
+                  : null,
+              ],
+              ["Correo", ficha.correo],
+              ["Teléfono", ficha.telefono],
+              ["Dirección", ficha.direccion],
+              ["Estado", nombreEstado],
+            ].map(([etiqueta, valor]) => (
+              <div key={etiqueta}>
+                <dt className="text-muted-foreground">{etiqueta}</dt>
+                <dd className="mt-0.5 break-words font-medium">
+                  {valor || "Sin registrar"}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <details className="mt-5 border-t border-border pt-4">
+            <summary className="cursor-pointer rounded-lg py-2 font-medium text-primary focus-visible:outline-2 focus-visible:outline-ring">
+              Editar datos del estudiante
+            </summary>
+            <div className="mt-4">
+              <FormularioEstudiante ficha={ficha} hoy={hoy} />
+            </div>
+          </details>
         </section>
       </div>
     </>

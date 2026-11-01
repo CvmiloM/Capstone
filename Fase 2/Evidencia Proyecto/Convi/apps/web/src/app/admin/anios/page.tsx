@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  claseBotonSecundario,
-  Encabezado,
-} from "@/app/components/formulario";
+import { claseBotonSecundario, Encabezado } from "@/app/components/formulario";
 import { BotonEstado } from "./boton-estado";
 import { type EstadoAnio, NOMBRE_ESTADO, obtenerAnios } from "./datos";
 import { FormularioAnio } from "./formulario-anio";
@@ -26,7 +23,9 @@ const formatoFecha = new Intl.DateTimeFormat("es-CL", {
 });
 
 function formatearFecha(fecha: string | null) {
-  return fecha ? formatoFecha.format(new Date(`${fecha}T00:00:00Z`)) : "sin fecha";
+  return fecha
+    ? formatoFecha.format(new Date(`${fecha}T00:00:00Z`))
+    : "sin fecha";
 }
 
 // PB-013 (HU-011): años académicos de la escuela. Los cursos y las matrículas
@@ -39,7 +38,7 @@ export default async function PaginaAnios() {
     <>
       <Encabezado
         titulo="Años académicos"
-        descripcion="Los períodos con que se organizan los cursos y las matrículas. Un año nuevo queda Planificado hasta que lo actives, y solo puede haber un año Activo a la vez."
+        descripcion="Los períodos que organizan los cursos y las matrículas, un año nuevo queda «Planificado» hasta que lo actives, solo puede haber un año «Activo» a la vez"
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -49,8 +48,7 @@ export default async function PaginaAnios() {
           </h2>
           {anios.length === 0 ? (
             <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-              Todavía no hay años académicos. Crea el primero con el
-              formulario.
+              Todavía no hay años académicos. Crea el primero con el formulario.
             </p>
           ) : (
             <ul className="space-y-3">
@@ -85,15 +83,23 @@ export default async function PaginaAnios() {
                       </Link>
                     )}
                     {anio.estado === "ACTIVO" && (
-                      <BotonEstado id={anio.id} anio={anio.anio} destino="CERRADO" />
+                      <BotonEstado
+                        id={anio.id}
+                        anio={anio.anio}
+                        destino="CERRADO"
+                      />
                     )}
                     {anio.estado === "PLANIFICADO" &&
                       (activo ? (
-                        <p className="max-w-48 text-xs text-muted-foreground">
+                        <p className="max-w-48 self-center text-center text-xs text-muted-foreground">
                           Para activarlo, primero cierra el año {activo.anio}.
                         </p>
                       ) : (
-                        <BotonEstado id={anio.id} anio={anio.anio} destino="ACTIVO" />
+                        <BotonEstado
+                          id={anio.id}
+                          anio={anio.anio}
+                          destino="ACTIVO"
+                        />
                       ))}
                   </div>
                 </li>

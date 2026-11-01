@@ -148,6 +148,27 @@ export class ProtocolosService {
     });
   }
 
+  // shortcut: catálogo de hasta 200 protocolos, paginar si una escuela supera ese tamaño.
+  catalogoAdministrativo(sesion: Sesion) {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: ['ADMIN'] },
+      async (db) => {
+        const r = await db.query(`SELECT pr.id, pr.codigo, pr.nombre, pr.estado,
+        v.numero_version, v.estado AS estado_version,
+        coalesce((SELECT jsonb_agg(jsonb_build_object('orden', p.orden_paso, 'nombre', p.nombre, 'descripcion', p.descripcion) ORDER BY p.orden_paso)
+          FROM convi.pasos_protocolo p WHERE p.version_protocolo_id = v.id), '[]'::jsonb) AS pasos
+        FROM convi.protocolos pr LEFT JOIN LATERAL (
+          SELECT id, numero_version, estado FROM convi.versiones_protocolo
+          WHERE protocolo_id = pr.id ORDER BY (estado = 'PUBLICADO') DESC, numero_version DESC LIMIT 1
+        ) v ON true
+        WHERE pr.establecimiento_id = convi.establecimiento_actual() AND pr.naturaleza = 'OFICIAL'
+        ORDER BY pr.nombre LIMIT 200`);
+        return r.rows;
+      },
+    );
+  }
+
   // HU-070 CA1: el protocolo nace con su versión 1 en Borrador, con quién la creó.
   crear(
     sesion: Sesion,

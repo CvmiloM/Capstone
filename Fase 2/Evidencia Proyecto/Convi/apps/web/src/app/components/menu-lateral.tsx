@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { Icono, type NombreIcono } from "@/app/components/icono";
 
 export type EnlaceMenu = {
@@ -39,8 +39,7 @@ function direccionPorRuta(desde: string, hacia: string) {
 /**
  * Menú lateral común de los portales, al estilo de Apple:
  * - El resaltado azul es un solo elemento que se desliza con un resorte
- *   (--resorte, en globals.css) hasta la sección elegida apenas se hace
- *   clic, sin esperar a que cargue la página.
+ *   (--resorte, en globals.css) hasta la sección que corresponde a la ruta actual.
  * - Marca en <html data-navegacion> hacia dónde va cada navegación, para que
  *   el contenido entre desde ese lado (components/transicion-pagina.tsx).
  */
@@ -56,16 +55,7 @@ export function MenuLateral({
   const ruta = usePathname();
   const enlaces = secciones.flatMap((s) => s.enlaces);
   const indiceRuta = enlaces.findIndex((e) => estaActivo(ruta, e, raiz));
-  // El clic manda solo mientras siga la ruta de cuando se hizo.
-  const [pulsado, setPulsado] = useState<{
-    href: string;
-    desde: string;
-  } | null>(null);
-  const indicePulsado =
-    pulsado?.desde === ruta
-      ? enlaces.findIndex((e) => e.href === pulsado.href)
-      : -1;
-  const resaltado = indicePulsado >= 0 ? indicePulsado : indiceRuta;
+  const resaltado = indiceRuta;
 
   const menu = useRef<HTMLElement>(null);
   const marca = useRef<HTMLSpanElement>(null);
@@ -166,16 +156,6 @@ export function MenuLateral({
                           : undefined
                     }
                     aria-current={indice === indiceRuta ? "page" : undefined}
-                    onClick={(evento) => {
-                      const nuevaPestana =
-                        evento.button !== 0 ||
-                        evento.metaKey ||
-                        evento.ctrlKey ||
-                        evento.shiftKey ||
-                        evento.altKey;
-                      if (!nuevaPestana)
-                        setPulsado({ href: enlace.href, desde: ruta });
-                    }}
                     className={`presion relative flex items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring ${
                       marcado
                         ? "bg-primary text-primary-foreground group-data-[resaltado=listo]:bg-transparent"

@@ -3,14 +3,14 @@ import Link from "next/link";
 import { claseEnlace, Encabezado } from "@/app/components/formulario";
 import { FormularioRegistro } from "./formulario-registro";
 
-export const metadata: Metadata = { title: "Registrar establecimiento" };
+export const metadata: Metadata = { title: "Crear cuenta de administrador" };
 
 export default function PaginaRegistro() {
   return (
     <>
       <Encabezado
-        titulo="Registra tu establecimiento"
-        descripcion="Primero crea tu cuenta de administrador. Cuando verifiques tu correo podrás ingresar los datos de tu establecimiento."
+        titulo="Crea tu cuenta de administrador"
+        descripcion="Cuando verifiques tu correo, continuaremos con los datos de tu establecimiento"
       />
       <FormularioRegistro />
 
@@ -23,8 +23,9 @@ export default function PaginaRegistro() {
         </p>
         <p>
           Si tu establecimiento ya usa CONVI, no te registres aquí: pide al
-          administrador que te envíe una invitación.
+          administrador que te envíe una invitación
         </p>
+        <p>Cada correo puede pertenecer a un establecimiento a la vez</p>
       </div>
     </>
   );

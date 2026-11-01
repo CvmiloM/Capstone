@@ -1,3 +1,5 @@
+import { codigoAutomatico } from './codigo-automatico.js';
+import { objeto, texto } from './curso.js';
 import {
   ConflictException,
   Inject,
@@ -62,17 +64,34 @@ export class NivelesService {
 
   // Un nivel nuevo queda activo y se puede usar de inmediato en cursos nuevos.
   crear(sesion: Sesion, cuerpo: unknown): Promise<NivelEducativo> {
-    const datos = validarDatosNivel(cuerpo);
-    return this.operar(sesion, async (db) => {
-      const resultado = await db.query<NivelEducativo>(
-        `INSERT INTO convi.niveles_educativos AS n
+    return this.operar(
+      sesion,
+      async (db) => {
+        const entrada = objeto(cuerpo);
+        const codigo =
+          texto(entrada.codigo) || (await codigoAutomatico(db, 'nivel'));
+        const orden =
+          entrada.orden === undefined ||
+          entrada.orden === null ||
+          entrada.orden === ''
+            ? (
+                await db.query<{ orden: number }>(
+                  'SELECT coalesce(max(orden),0)+1 AS orden FROM convi.niveles_educativos',
+                )
+              ).rows[0].orden
+            : entrada.orden;
+        const datos = validarDatosNivel({ ...entrada, codigo, orden });
+        const resultado = await db.query<NivelEducativo>(
+          `INSERT INTO convi.niveles_educativos AS n
            (establecimiento_id, codigo, nombre, orden, ciclo, tramo)
          VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5)
          RETURNING ${COLUMNAS}`,
-        [datos.codigo, datos.nombre, datos.orden, datos.ciclo, datos.tramo],
-      );
-      return resultado.rows[0];
-    });
+          [datos.codigo, datos.nombre, datos.orden, datos.ciclo, datos.tramo],
+        );
+        return resultado.rows[0];
+      },
+      'READ COMMITTED',
+    );
   }
 
   editar(sesion: Sesion, id: string, cuerpo: unknown): Promise<NivelEducativo> {
@@ -123,7 +142,11 @@ export class NivelesService {
   }
 
   // Todas las rutas son del administrador y traducen igual los errores del modelo.
-  private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
+  private operar<T>(
+    sesion: Sesion,
+    trabajo: (db: PoolClient) => Promise<T>,
+    aislamiento: 'REPEATABLE READ' | 'READ COMMITTED' = 'REPEATABLE READ',
+  ) {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
@@ -134,6 +157,7 @@ export class NivelesService {
           throw traducirError(error);
         }
       },
+      aislamiento,
     );
   }
 }

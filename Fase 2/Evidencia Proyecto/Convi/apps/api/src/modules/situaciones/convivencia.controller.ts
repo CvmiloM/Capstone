@@ -28,8 +28,19 @@ export class ConvivenciaController {
   // PB-043: categorías, cursos con sus estudiantes, funcionarios y apoderados
   // para el formulario de registro.
   @Get('registro/opciones')
-  opcionesRegistro(@Req() peticion: PeticionConSesion) {
-    return this.convivencia.opcionesRegistro(peticion.sesion);
+  opcionesRegistro(
+    @Req() peticion: PeticionConSesion,
+    @Query('liviano') liviano?: string,
+  ) {
+    return this.convivencia.opcionesRegistro(peticion.sesion, liviano === '1');
+  }
+
+  @Get('registro/estudiantes')
+  buscarEstudiantes(
+    @Req() peticion: PeticionConSesion,
+    @Query() consulta: Record<string, unknown>,
+  ) {
+    return this.convivencia.buscarEstudiantes(peticion.sesion, consulta);
   }
 
   // PB-043: el cuerpo se valida en el servicio; responde 201 con el código.

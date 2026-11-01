@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { enviarCambio, obtenerApoderados } from "./datos";
+import { enviarDesactivacion, enviarCambio, obtenerApoderados } from "./datos";
 
 export type EstadoFormulario = {
   /** Error general del formulario. */
@@ -168,7 +168,11 @@ export async function vincularApoderado(
     },
   );
   if (!resultado.ok)
-    return { valores, mensaje: resultado.errores?.correo ?? resultado.mensaje, errores: resultado.errores };
+    return {
+      valores,
+      mensaje: resultado.errores?.correo ?? resultado.mensaje,
+      errores: resultado.errores,
+    };
   revalidatePath(`/admin/estudiantes/${estudianteId}`, "layout");
   redirect(
     `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados?vinculo=creado`,
@@ -245,4 +249,21 @@ export async function corregirContacto(
   redirect(
     `/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados?vinculo=corregido`,
   );
+}
+
+export async function desactivarEstudiantes(
+  _anterior: { mensaje?: string },
+  formData: FormData,
+): Promise<{ mensaje?: string }> {
+  const resultado = await enviarDesactivacion({
+    buscar: leerTexto(formData, "buscar"),
+    curso: leerTexto(formData, "curso"),
+    total_esperado: Number(leerTexto(formData, "total_esperado")),
+    fecha: leerTexto(formData, "fecha"),
+    motivo: leerTexto(formData, "motivo"),
+    confirmado: formData.get("confirmado") === "on",
+  });
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  revalidatePath("/admin/estudiantes", "layout");
+  redirect("/admin/estudiantes?desactivacion=realizada");
 }

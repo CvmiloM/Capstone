@@ -54,6 +54,11 @@ export class EstudiantesController {
     return this.estudiantes.crear(peticion.sesion, cuerpo);
   }
 
+  @Post('desactivacion')
+  desactivar(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
+    return this.estudiantes.desactivar(peticion.sesion, cuerpo);
+  }
+
   // La ficha con sus matrículas, sin datos de convivencia (CA4).
   @Get(':id')
   obtener(

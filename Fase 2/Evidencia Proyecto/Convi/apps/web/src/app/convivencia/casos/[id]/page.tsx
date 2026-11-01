@@ -348,6 +348,22 @@ export default async function PaginaCaso({
 
           {seccion === "situaciones" && (
             <Seccion titulo="Situaciones vinculadas" className="lg:col-span-3">
+              {caso.estado_actual !== "CERRADO" && (
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/50 p-4">
+                  <p className="max-w-2xl text-sm text-muted-foreground">
+                    Para sumar antecedentes, abre una situación en revisión y
+                    elige «Vincular o abrir caso», allí podrás confirmar este
+                    caso si comparte estudiantes con la situación
+                  </p>
+                  <Link
+                    href="/convivencia?estado=EN_REVISION"
+                    className={claseBotonSecundario}
+                  >
+                    Vincular otra situación
+                  </Link>
+                </div>
+              )}
+
               {caso.situaciones_vinculadas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   El caso no tiene situaciones vinculadas.

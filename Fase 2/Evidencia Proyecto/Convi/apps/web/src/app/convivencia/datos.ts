@@ -396,7 +396,7 @@ export type OpcionesRegistro = {
 };
 
 export function obtenerOpcionesRegistro() {
-  return pedir<OpcionesRegistro>("/convivencia/registro/opciones");
+  return pedir<OpcionesRegistro>("/convivencia/registro/opciones?liviano=1");
 }
 
 /** HU-036: la API valida todo de nuevo y responde con el id de la situación. */

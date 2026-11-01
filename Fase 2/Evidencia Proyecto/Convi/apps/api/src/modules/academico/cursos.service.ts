@@ -1,3 +1,5 @@
+import { codigoAutomatico } from './codigo-automatico.js';
+import { objeto, texto } from './curso.js';
 import {
   ConflictException,
   Inject,
@@ -147,85 +149,120 @@ export class CursosService {
   // CA1: el curso pertenece a un año y a un nivel de la escuela. Decisión del
   // PO: solo se crean cursos en años Planificados o Activos.
   crear(sesion: Sesion, cuerpo: unknown): Promise<Curso> {
-    const datos = validarNuevoCurso(cuerpo);
-    return this.operar(sesion, async (db) => {
-      // FOR SHARE impide que el año se cierre mientras se crea el curso.
-      const anio = await db.query<{ anio: number; estado: string }>(
-        `SELECT anio, estado FROM convi.anios_academicos
+    const entrada = objeto(cuerpo);
+    const datos = validarNuevoCurso({
+      ...entrada,
+      codigo: texto(entrada.codigo) || 'AUTO',
+    });
+    return this.operar(
+      sesion,
+      async (db) => {
+        // FOR SHARE impide que el año se cierre mientras se crea el curso.
+        const anio = await db.query<{ anio: number; estado: string }>(
+          `SELECT anio, estado FROM convi.anios_academicos
          WHERE id = $1 FOR SHARE`,
-        [datos.anio_academico_id],
-      );
-      if (anio.rows.length === 0)
-        throw errorDeCampos({
-          anio_academico_id: 'Elige un año académico de tu escuela.',
-        });
-      if (!ANIOS_EDITABLES.includes(anio.rows[0].estado))
-        throw errorDeCampos({
-          anio_academico_id: `El año ${anio.rows[0].anio} está cerrado: ya no se le agregan cursos.`,
-        });
-      await revisarNivel(db, datos.nivel_id);
-      const creado = await db.query<{ id: string }>(
-        `INSERT INTO convi.cursos
+          [datos.anio_academico_id],
+        );
+        if (anio.rows.length === 0)
+          throw errorDeCampos({
+            anio_academico_id: 'Elige un año académico de tu escuela.',
+          });
+        if (!ANIOS_EDITABLES.includes(anio.rows[0].estado))
+          throw errorDeCampos({
+            anio_academico_id: `El año ${anio.rows[0].anio} está cerrado: ya no se le agregan cursos.`,
+          });
+        await revisarNivel(db, datos.nivel_id);
+        if (!texto(entrada.codigo))
+          datos.codigo = await codigoAutomatico(
+            db,
+            'curso',
+            datos.anio_academico_id,
+          );
+        await revisarSeccion(
+          db,
+          datos.anio_academico_id,
+          datos.nivel_id,
+          datos.seccion,
+        );
+        const creado = await db.query<{ id: string }>(
+          `INSERT INTO convi.cursos
            (establecimiento_id, anio_academico_id, nivel_id, codigo, nombre, seccion)
          VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5)
          RETURNING id`,
-        [
-          datos.anio_academico_id,
-          datos.nivel_id,
-          datos.codigo,
-          datos.nombre,
-          datos.seccion,
-        ],
-      );
-      return buscar(db, creado.rows[0].id);
-    });
+          [
+            datos.anio_academico_id,
+            datos.nivel_id,
+            datos.codigo,
+            datos.nombre,
+            datos.seccion,
+          ],
+        );
+        return buscar(db, creado.rows[0].id);
+      },
+      'READ COMMITTED',
+    );
   }
 
   // Decisión del PO: el código, el nombre y la sección cambian siempre; el
   // nivel, solo si el curso no tiene estudiantes; el año, nunca.
   editar(sesion: Sesion, id: string, cuerpo: unknown): Promise<Curso> {
     const datos = validarCurso(cuerpo);
-    return this.operar(sesion, async (db) => {
-      const actual = await db.query<Curso>(
-        `SELECT ${COLUMNAS} ${DESDE}
+    return this.operar(
+      sesion,
+      async (db) => {
+        const actual = await db.query<Curso>(
+          `SELECT ${COLUMNAS} ${DESDE}
          WHERE c.id = $1
          FOR UPDATE OF c FOR SHARE OF an`,
-        [id],
-      );
-      if (actual.rows.length === 0)
-        throw new NotFoundException('No encontramos ese curso.');
-      const curso = actual.rows[0];
-      // PB-023 (HU-018 CA1): en un año Cerrado solo como corrección con motivo.
-      const motivo = motivoDeCorreccion(
-        cuerpo,
-        curso.anio,
-        curso.anio_estado,
-        'Revisa los datos marcados. No se guardó el curso.',
-      );
-      if (motivo)
-        await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
-          motivo,
-        ]);
-      if (datos.nivel_id !== curso.nivel_id) {
-        if (curso.matriculas > 0)
-          throw errorDeCampos({
-            nivel_id:
-              'No se puede cambiar porque el curso ya tiene estudiantes.',
-          });
-        await revisarNivel(db, datos.nivel_id);
-      }
-      await db.query(
-        `UPDATE convi.cursos
+          [id],
+        );
+        if (actual.rows.length === 0)
+          throw new NotFoundException('No encontramos ese curso.');
+        const curso = actual.rows[0];
+        // PB-023 (HU-018 CA1): en un año Cerrado solo como corrección con motivo.
+        const motivo = motivoDeCorreccion(
+          cuerpo,
+          curso.anio,
+          curso.anio_estado,
+          'Revisa los datos marcados. No se guardó el curso.',
+        );
+        if (motivo)
+          await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
+            motivo,
+          ]);
+        if (datos.nivel_id !== curso.nivel_id) {
+          if (curso.matriculas > 0)
+            throw errorDeCampos({
+              nivel_id:
+                'No se puede cambiar porque el curso ya tiene estudiantes.',
+            });
+          await revisarNivel(db, datos.nivel_id);
+        }
+        await revisarSeccion(
+          db,
+          curso.anio_academico_id,
+          datos.nivel_id,
+          datos.seccion,
+          id,
+        );
+        await db.query(
+          `UPDATE convi.cursos
          SET codigo = $2, nombre = $3, seccion = $4, nivel_id = $5
          WHERE id = $1`,
-        [id, datos.codigo, datos.nombre, datos.seccion, datos.nivel_id],
-      );
-      return buscar(db, id);
-    });
+          [id, datos.codigo, datos.nombre, datos.seccion, datos.nivel_id],
+        );
+        return buscar(db, id);
+      },
+      'READ COMMITTED',
+    );
   }
 
   // Todas las rutas son del administrador y traducen igual los errores del modelo.
-  private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
+  private operar<T>(
+    sesion: Sesion,
+    trabajo: (db: PoolClient) => Promise<T>,
+    aislamiento: 'REPEATABLE READ' | 'READ COMMITTED' = 'REPEATABLE READ',
+  ) {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
@@ -236,6 +273,7 @@ export class CursosService {
           throw traducirError(error);
         }
       },
+      aislamiento,
     );
   }
 }
@@ -288,4 +326,29 @@ function traducirError(error: unknown) {
       'El curso cambió mientras guardabas. Recarga la página e inténtalo de nuevo.',
     );
   return error;
+}
+
+async function revisarSeccion(
+  db: PoolClient,
+  anio: string,
+  nivel: string,
+  seccion: string | null,
+  id: string | null = null,
+) {
+  await db.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended('curso-seccion:' || convi.establecimiento_actual()::text || ':' || $1, 0))",
+    [anio],
+  );
+  const repetido = await db.query(
+    `SELECT 1 FROM convi.cursos
+    WHERE establecimiento_id = convi.establecimiento_actual() AND anio_academico_id = $1 AND nivel_id = $2
+      AND upper(coalesce(seccion, '')) = upper(coalesce($3::text, ''))
+      AND ($4::uuid IS NULL OR id <> $4) LIMIT 1`,
+    [anio, nivel, seccion, id],
+  );
+  if (repetido.rowCount)
+    throw errorDeCampos({
+      seccion:
+        'Ya existe un curso de ese nivel y sección en este año, revisa el curso registrado',
+    });
 }
