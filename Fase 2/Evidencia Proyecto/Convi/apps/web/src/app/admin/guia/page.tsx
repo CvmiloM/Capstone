@@ -10,6 +10,7 @@ import { obtenerGuia } from "./datos";
 import { DemoPaso } from "./demo/demo-paso";
 import { FormularioBienvenida } from "./formulario-bienvenida";
 import { FormularioCursos } from "./formulario-cursos";
+import { PasoEstudiantes } from "./paso-estudiantes";
 import {
   CLASE_ESTADO_PASO,
   formatoFecha,
@@ -29,6 +30,9 @@ const AVISOS: Record<string, { texto: string; error?: boolean }> = {
   "cursos-creados": {
     texto: "El año, los niveles y los cursos quedaron creados.",
   },
+  "estudiantes-listo": {
+    texto: "El paso Estudiantes quedó listo.",
+  },
   desactualizada: {
     texto:
       "Otra persona avanzó la guía mientras la mirabas. Revisa su avance e inténtalo nuevamente.",
@@ -37,8 +41,8 @@ const AVISOS: Record<string, { texto: string; error?: boolean }> = {
   error: { texto: "Recarga la página e inténtalo nuevamente.", error: true },
 };
 
-// PB-032 (HU-025), PB-034 (HU-027) y PB-038 (HU-031): guía inicial del
-// administrador. Al volver se retoma en el primer paso pendiente (CA2) y se
+// PB-032 (HU-025), PB-034 (HU-027), PB-036 (HU-029) y PB-038 (HU-031): guía
+// inicial del administrador. Al volver se retoma en el primer paso pendiente (CA2) y se
 // puede abrir cualquier paso desde la lista.
 export default async function GuiaInicial({
   searchParams,
@@ -184,6 +188,13 @@ export default async function GuiaInicial({
                 version={guia.version}
                 academico={guia.academico}
                 anioPorDefecto={anioPorDefecto}
+              />
+            )}
+            {actual === "estudiantes" && (
+              <PasoEstudiantes
+                guia={guia}
+                fecha={fecha}
+                listo={estadoPaso.estado === "LISTO"}
               />
             )}
             {paso.enlaces && (

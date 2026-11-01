@@ -5,12 +5,13 @@ import { redirect } from "next/navigation";
 import {
   enviarBienvenida,
   enviarCursosGuia,
+  enviarEstudiantesGuia,
   enviarInicioGuia,
   enviarOmision,
 } from "./datos";
 import type { ClavePaso } from "./opciones";
 
-// PB-032, PB-034 y PB-038: acciones de la guía inicial. Cada formulario envía
+// PB-032, PB-034, PB-036 y PB-038: acciones de la guía inicial. Cada formulario envía
 // la huella de la guía que se veía, para que la API rechace el cambio si otro
 // administrador la avanzó entretanto (PB-139).
 
@@ -109,4 +110,16 @@ export async function guardarCursos(
   // El año activo también se muestra en la tarjeta lateral del portal.
   revalidatePath("/admin", "layout");
   irAPaso("cursos", "cursos-creados");
+}
+
+// PB-036 (HU-029): la nómina ya se confirmó en la importación; el paso queda
+// Listo si hay al menos un estudiante confirmado (la API lo comprueba).
+export async function terminarEstudiantes(
+  _anterior: EstadoGuia,
+  formData: FormData,
+): Promise<EstadoGuia> {
+  const resultado = await enviarEstudiantesGuia(leerTexto(formData, "version"));
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  revalidatePath("/admin", "layout");
+  irAPaso("reglas", "estudiantes-listo");
 }

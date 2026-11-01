@@ -12,6 +12,7 @@ import type { Correccion } from './correccion.js';
 import type { TipoImportacion } from './importacion.js';
 import { type Revision, valoresDeFila } from './mapeo.js';
 import {
+  claveDeCurso,
   claveDeNombre,
   leerFecha,
   leerRol,
@@ -421,16 +422,26 @@ function buscarEstudiante(f: Fila) {
   return persona ?? null;
 }
 
-/** El curso por su código en el año elegido; no puede estar cerrado. */
+/**
+ * El curso por su código en el año elegido; no puede estar cerrado. PB-036
+ * (HU-029 CA2): si no hay un código así, por su nombre, como «1° básico A»,
+ * para usar los cursos que creó la guía con códigos automáticos.
+ */
 function buscarCurso(f: Fila): CursoExistente | null {
-  const valor = f.valor('curso').toUpperCase();
+  const escrito = f.valor('curso');
+  const valor = escrito.toUpperCase();
   const anio = f.contexto.anio;
   if (!valor || !anio) return null;
-  const curso = f.contexto.cursos.get(valor);
+  const conNombre = f.contexto.cursosPorNombre.get(claveDeCurso(escrito)) ?? [];
+  const curso =
+    f.contexto.cursos.get(valor) ??
+    (conNombre.length === 1 ? conNombre[0] : undefined);
   if (!curso) {
     f.error(
       'curso',
-      `No hay un curso con código ${valor} en ${anio.anio}. Créalo primero o revisa el año elegido.`,
+      conNombre.length > 1
+        ? `Hay ${conNombre.length} cursos llamados ${escrito} en ${anio.anio}: escribe su código (${conNombre.map((c) => c.codigo).join(', ')}).`
+        : `No hay un curso con código o nombre ${escrito} en ${anio.anio}. Créalo primero o revisa el año elegido.`,
     );
     return null;
   }

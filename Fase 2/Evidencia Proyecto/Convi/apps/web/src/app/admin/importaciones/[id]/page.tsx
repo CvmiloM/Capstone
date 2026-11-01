@@ -53,7 +53,7 @@ export default async function PaginaImportacion({
       : null,
     pagina: Math.max(1, Number.parseInt(leer(parametros.pagina), 10) || 1),
   };
-  const [importacion, { escuela }] = await Promise.all([
+  const [importacion, { escuela, guia }] = await Promise.all([
     obtenerImportacion(id, filtro),
     obtenerContextoAdmin(),
   ]);
@@ -173,6 +173,25 @@ export default async function PaginaImportacion({
           descripcion={`${tipo} · ${importacion.filas.toLocaleString("es-CL")} ${importacion.filas === 1 ? "fila" : "filas"} · ${tamano(importacion.archivo_bytes)} · ${nombreEstado} · Cargada por ${importacion.creado_por} el ${creado}`}
         />
       </div>
+
+      {/* PB-036 (HU-029): la nómina cargada desde la guía inicial. */}
+      {importacion.tipo_importacion === "ESTUDIANTES" && !guia.terminada && (
+        <p
+          role="note"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/15 bg-accent px-4 py-3 text-sm text-accent-foreground"
+        >
+          <span>
+            Tu escuela está en la guía inicial. Cuando confirmes la nómina,
+            vuelve a la guía para terminar el paso Estudiantes.
+          </span>
+          <Link
+            href="/admin/guia?paso=estudiantes"
+            className={`font-medium ${claseEnlace}`}
+          >
+            Volver a la guía
+          </Link>
+        </p>
+      )}
 
       {mensajeAviso && (
         <p
