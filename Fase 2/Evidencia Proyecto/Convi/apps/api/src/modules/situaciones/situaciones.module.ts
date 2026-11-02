@@ -29,6 +29,8 @@ import { PlanesController } from './planes.controller.js';
 import { PlanesService } from './planes.service.js';
 import { ApoderadoController } from './apoderado.controller.js';
 import { ApoderadoService } from './apoderado.service.js';
+import { IndicadoresController } from './indicadores.controller.js';
+import { IndicadoresService } from './indicadores.service.js';
 import { ProfesorController } from './profesor.controller.js';
 import { ProfesorService } from './profesor.service.js';
 
@@ -49,6 +51,7 @@ import { ProfesorService } from './profesor.service.js';
 @Module({
   imports: [AuthModule, AlertasModule],
   controllers: [
+    IndicadoresController,
     SeguimientosController,
     ApoderadoController,
     ProfesorController,
@@ -65,6 +68,7 @@ import { ProfesorService } from './profesor.service.js';
     EvidenciasProfesorController,
   ],
   providers: [
+    IndicadoresService,
     SeguimientosService,
     ApoderadoService,
     ProfesorService,
