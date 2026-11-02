@@ -16,7 +16,8 @@ const PESADO = "El archivo pesa más de 5 MB.";
 
 // PB-019 (HU-015 CA1): elegir el tipo de datos y el archivo. El peso se revisa
 // también aquí, para avisar antes de subirlo; la API vuelve a validar todo.
-export function FormularioCarga() {
+// PB-036: la guía lo usa con el tipo ya elegido (Estudiantes).
+export function FormularioCarga({ tipo }: { tipo?: TipoImportacion } = {}) {
   const [estado, accion, pendiente] = useActionState(
     cargarImportacion,
     estadoInicial,
@@ -37,21 +38,25 @@ export function FormularioCarga() {
     >
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
 
-      <Selector
-        name="tipo"
-        etiqueta="¿Qué datos trae el archivo?"
-        defaultValue={estado.valores?.tipo ?? ""}
-        error={errores.tipo}
-      >
-        <option value="" disabled>
-          Elige el tipo de datos
-        </option>
-        {(Object.keys(NOMBRE_TIPO) as TipoImportacion[]).map((tipo) => (
-          <option key={tipo} value={tipo}>
-            {NOMBRE_TIPO[tipo]}
+      {tipo ? (
+        <input type="hidden" name="tipo" value={tipo} />
+      ) : (
+        <Selector
+          name="tipo"
+          etiqueta="¿Qué datos trae el archivo?"
+          defaultValue={estado.valores?.tipo ?? ""}
+          error={errores.tipo}
+        >
+          <option value="" disabled>
+            Elige el tipo de datos
           </option>
-        ))}
-      </Selector>
+          {(Object.keys(NOMBRE_TIPO) as TipoImportacion[]).map((opcion) => (
+            <option key={opcion} value={opcion}>
+              {NOMBRE_TIPO[opcion]}
+            </option>
+          ))}
+        </Selector>
+      )}
 
       <div>
         <label htmlFor="archivo" className="block text-sm font-medium">

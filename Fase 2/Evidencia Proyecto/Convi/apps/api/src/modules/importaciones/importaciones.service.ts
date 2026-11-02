@@ -37,6 +37,12 @@ import {
 import { confirmacionRepetida } from './confirmacion-repetida.js';
 import { cargarContexto } from './contexto.js';
 import {
+  CLAVE_CORRECCION,
+  leerCorreccion,
+  validarCorreccion,
+  validarMotivo,
+} from './correccion.js';
+import {
   type ArchivoSubido,
   errorDeCampos,
   FORMATOS,
@@ -45,7 +51,7 @@ import {
   validarCarga,
 } from './importacion.js';
 import { ArchivoNoValido, LecturaNoDisponible, leerArchivo } from './lector.js';
-import { validarRevision } from './mapeo.js';
+import { validarRevision, valoresDeFila } from './mapeo.js';
 import { crearPlantilla, nombreDePlantilla } from './plantilla.js';
 import { type FilaRevisada, type Problema, revisarFilas } from './revision.js';
 import type { FormatoFecha, TratamientoDuplicado } from './valores.js';
@@ -55,7 +61,8 @@ import type { FormatoFecha, TratamientoDuplicado } from './valores.js';
 // cada fila, sin cambios, en convi.filas_importacion; revisar relaciona las
 // columnas con los campos de CONVI y deja cada fila Válida, Con advertencia o
 // Con error; recién confirmar guarda en las fichas las filas que se pueden
-// confirmar, en segundo plano.
+// confirmar, en segundo plano. PB-024 y PB-025 (HU-019): corregir una fila sin
+// tocar sus datos originales, y cancelar o restaurar la importación.
 const PERFILES: Perfil[] = ['ADMIN'];
 const ESPACIO = 'convi-privado';
 const FILAS_POR_PAGINA = 50;
@@ -104,6 +111,24 @@ export type FilaImportacion = {
   problemas: Problema[] | null;
   /** Lo que creó o reutilizó la fila al confirmarla (HU-020 CA1). */
   entidades_confirmadas: Entidades;
+  /** PB-024 (HU-019 CA2): lo corregido por campo, quién y cuándo; null si no se corrigió. */
+  correccion: {
+    valores: Record<string, string>;
+    /** Nombre de quien corrigió. */
+    por: string;
+    /** Fecha y hora ISO. */
+    en: string;
+  } | null;
+};
+
+/** PB-025 (HU-019 CA4): la última cancelación, leída de la auditoría. */
+export type Cancelacion = {
+  motivo: string;
+  por: string;
+  /** Fecha y hora ISO. */
+  en: string;
+  /** El estado al que vuelve si se restaura. */
+  estado_anterior: string;
 };
 
 export type DetalleImportacion = Importacion & {
@@ -139,6 +164,8 @@ export type DetalleImportacion = Importacion & {
   muestra: FilaImportacion[];
   /** La confirmación en curso o la última; null si nunca se confirmó. */
   confirmacion: EstadoConfirmacion | null;
+  /** PB-025: quién la canceló, cuándo y por qué; null si no está Cancelada. */
+  cancelacion: Cancelacion | null;
 };
 
 export type FiltroFilas = { estado: EstadoFila | null; pagina: number };
@@ -385,7 +412,8 @@ export class ImportacionesService {
 
   // PB-020 (CA3 y CA4): guarda qué campo trae cada columna y las opciones, y
   // revisa todas las filas. La importación queda En revisión; se puede volver
-  // a revisar con otro mapeo mientras ninguna fila esté confirmada.
+  // a revisar con otro mapeo mientras ninguna fila esté confirmada. PB-024
+  // (HU-019 CA1): una Fallida se retoma igual, y las correcciones se conservan.
   revisar(
     sesion: Sesion,
     id: string,
@@ -413,7 +441,7 @@ export class ImportacionesService {
         throw new ConflictException(
           'La importación se está confirmando: espera a que termine.',
         );
-      if (estado !== 'CARGADO' && estado !== 'REVISION')
+      if (!['CARGADO', 'REVISION', 'FALLIDO'].includes(estado))
         throw new ConflictException(
           `La importación está ${NOMBRE_ESTADO[estado] ?? estado.toLowerCase()}: ya no se puede revisar.`,
         );
@@ -434,23 +462,8 @@ export class ImportacionesService {
         tipo,
         revision.anio_academico_id,
       );
-      const filas = await db.query<{
-        numero_fila: number;
-        datos_originales: Record<string, string>;
-      }>(
-        `SELECT numero_fila, datos_originales
-         FROM convi.filas_importacion
-         WHERE proceso_importacion_id = $1
-         ORDER BY numero_fila`,
-        [id],
-      );
-      const revisadas = revisarFilas(
-        tipo,
-        filas.rows,
-        columnas,
-        revision,
-        contexto,
-      );
+      const filas = await leerFilas(db, id);
+      const revisadas = revisarFilas(tipo, filas, columnas, revision, contexto);
 
       await actualizarFilas(db, id, revisadas);
       // El cambio queda en la auditoría (convi.auditar_cambio).
@@ -498,46 +511,7 @@ export class ImportacionesService {
           detalle: await buscar(db, id, { estado: null, pagina: 1 }),
         };
       exigirRevision(proceso.estado, 'confirmar');
-      const tipo = proceso.tipo_importacion;
-      // Las mismas opciones de la última revisión.
-      const revision = validarRevision(
-        {
-          mapeo: proceso.mapeo,
-          anio_academico_id: proceso.opciones.anio_academico_id,
-          formato_fecha: proceso.opciones.formato_fecha,
-          duplicados: proceso.opciones.duplicados,
-        },
-        tipo,
-        proceso.columnas,
-      );
-      const contexto = await cargarContexto(
-        db,
-        tipo,
-        revision.anio_academico_id,
-      );
-      const filas = await db.query<{
-        numero_fila: number;
-        datos_originales: Record<string, string>;
-        estado: EstadoFila;
-      }>(
-        `SELECT numero_fila, datos_originales, estado
-         FROM convi.filas_importacion
-         WHERE proceso_importacion_id = $1
-         ORDER BY numero_fila`,
-        [id],
-      );
-      const antes = new Map(filas.rows.map((f) => [f.numero_fila, f.estado]));
-      // Las confirmadas y las omitidas ya no cambian.
-      const abiertas = revisarFilas(
-        tipo,
-        filas.rows,
-        proceso.columnas,
-        revision,
-        contexto,
-      ).filter(
-        (f) => !['CONFIRMADO', 'OMITIDO'].includes(antes.get(f.numero) ?? ''),
-      );
-      await actualizarFilas(db, id, abiertas);
+      const { abiertas, antes } = await revisarAbiertas(db, id, proceso);
 
       const resumen = await contarFilas(db, id);
       const ahora = new Date().toISOString();
@@ -708,6 +682,145 @@ export class ImportacionesService {
     });
   }
 
+  // PB-024 (HU-019 CA2 y CA3): guarda en los datos normalizados de una fila lo
+  // corregido, con quién y cuándo, y revisa de nuevo las filas abiertas. Los
+  // datos originales no cambian (la base también lo exige). Sin nada distinto
+  // del archivo, la fila vuelve a sus valores originales.
+  corregir(
+    sesion: Sesion,
+    id: string,
+    numero: number,
+    cuerpo: unknown,
+  ): Promise<DetalleImportacion> {
+    return this.operar(sesion, async (db) => {
+      const proceso = await bloquear(db, id);
+      exigirRetomable(proceso.estado, 'corregir filas');
+      const fila = await db.query<{
+        estado: EstadoFila;
+        datos_originales: Record<string, string>;
+      }>(
+        `SELECT estado, datos_originales
+         FROM convi.filas_importacion
+         WHERE proceso_importacion_id = $1 AND numero_fila = $2
+         FOR UPDATE`,
+        [id, numero],
+      );
+      if (fila.rows.length === 0)
+        throw new NotFoundException(
+          'No encontramos esa fila en la importación.',
+        );
+      const { estado, datos_originales } = fila.rows[0];
+      if (estado === 'CONFIRMADO' || estado === 'OMITIDO')
+        throw new ConflictException(
+          `La fila ${numero} ya está ${estado === 'CONFIRMADO' ? 'confirmada' : 'omitida'}: no se corrige.`,
+        );
+      const valores = validarCorreccion(
+        cuerpo,
+        [...new Set(Object.values(proceso.mapeo))],
+        valoresDeFila(datos_originales, proceso.mapeo, proceso.columnas),
+      );
+      await db.query(
+        `UPDATE convi.filas_importacion
+         SET datos_normalizados =
+               (coalesce(datos_normalizados, '{}'::jsonb) - $3::text)
+               || CASE WHEN $4::jsonb = '{}'::jsonb THEN '{}'::jsonb
+                  ELSE jsonb_build_object($3::text, jsonb_build_object(
+                         'valores', $4::jsonb,
+                         'por', convi.membresia_actual(),
+                         'en', now())) END
+         WHERE proceso_importacion_id = $1 AND numero_fila = $2`,
+        [id, numero, CLAVE_CORRECCION, JSON.stringify(valores)],
+      );
+      await revisarAbiertas(db, id, proceso);
+      return buscar(db, id, { estado: null, pagina: 1 });
+    });
+  }
+
+  // PB-024 (HU-019 CA3): revisa de nuevo las filas abiertas con el mapeo y las
+  // opciones guardadas y con lo que hay hoy en la escuela (por ejemplo, un
+  // curso que se creó después). Las confirmadas y las omitidas no cambian.
+  revalidar(sesion: Sesion, id: string): Promise<DetalleImportacion> {
+    return this.operar(sesion, async (db) => {
+      const proceso = await bloquear(db, id);
+      exigirRetomable(proceso.estado, 'revisar las filas');
+      await revisarAbiertas(db, id, proceso);
+      return buscar(db, id, { estado: null, pagina: 1 });
+    });
+  }
+
+  // PB-025 (HU-019 CA4 y CA6): la importación queda Cancelada y ya no se
+  // revisa, corrige ni confirma. La base exige el motivo y que no haya filas
+  // confirmadas, y la auditoría guarda el motivo, quién, cuándo y el estado
+  // anterior. El archivo y las filas se conservan para poder restaurarla.
+  async cancelar(
+    sesion: Sesion,
+    id: string,
+    cuerpo: unknown,
+  ): Promise<DetalleImportacion> {
+    const motivo = validarMotivo(cuerpo, 'cancelar');
+    return this.operar(sesion, async (db) => {
+      const { estado } = await bloquear(db, id);
+      if (estado === 'PROCESANDO')
+        throw new ConflictException(
+          'La importación se está confirmando: no se puede cancelar.',
+        );
+      if (!['CARGADO', 'REVISION', 'FALLIDO'].includes(estado))
+        throw new ConflictException(
+          `La importación está ${NOMBRE_ESTADO[estado] ?? estado.toLowerCase()}: no se puede cancelar.`,
+        );
+      const confirmadas = await db.query(
+        `SELECT 1 FROM convi.filas_importacion
+         WHERE proceso_importacion_id = $1 AND estado = 'CONFIRMADO'
+         LIMIT 1`,
+        [id],
+      );
+      if (confirmadas.rows.length > 0)
+        throw new ConflictException(
+          'La importación ya tiene filas confirmadas en las fichas: no se puede cancelar.',
+        );
+      await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
+        motivo,
+      ]);
+      await db.query(
+        `UPDATE convi.procesos_importacion SET estado = 'CANCELADO'
+         WHERE id = $1`,
+        [id],
+      );
+      return buscar(db, id, { estado: null, pagina: 1 });
+    });
+  }
+
+  // PB-025 (HU-019 CA5): vuelve al estado anterior registrado en la auditoría,
+  // con su mapeo, sus opciones y sus correcciones. La base exige el motivo y
+  // que sea ese estado.
+  async restaurar(
+    sesion: Sesion,
+    id: string,
+    cuerpo: unknown,
+  ): Promise<DetalleImportacion> {
+    const motivo = validarMotivo(cuerpo, 'restaurar');
+    return this.operar(sesion, async (db) => {
+      const { estado } = await bloquear(db, id);
+      if (estado !== 'CANCELADO')
+        throw new ConflictException(
+          'La importación no está cancelada: no hay nada que restaurar.',
+        );
+      const cancelacion = await ultimaCancelacion(db, id);
+      if (!cancelacion)
+        throw new ConflictException(
+          'No encontramos en la auditoría el estado anterior de la importación: no se puede restaurar.',
+        );
+      await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [
+        motivo,
+      ]);
+      await db.query(
+        `UPDATE convi.procesos_importacion SET estado = $2 WHERE id = $1`,
+        [id, cancelacion.estado_anterior],
+      );
+      return buscar(db, id, { estado: null, pagina: 1 });
+    });
+  }
+
   private exigirCola(accion: 'iniciar' | 'reanudar') {
     if (!this.cola)
       throw new ServiceUnavailableException(
@@ -804,16 +917,30 @@ async function buscar(
   const filas = filtro.estado ? resumen[filtro.estado] : total;
   const paginas = Math.max(1, Math.ceil(filas / FILAS_POR_PAGINA));
   const numero = Math.min(filtro.pagina, paginas);
-  const muestra = await db.query<FilaImportacion>(
-    `SELECT numero_fila, estado, datos_originales, datos_normalizados,
-            problemas, entidades_confirmadas
-     FROM convi.filas_importacion
-     WHERE proceso_importacion_id = $1
-       AND ($2::text IS NULL OR estado = $2)
-     ORDER BY numero_fila
+  // PB-024: la corrección va aparte, con el nombre de quien la hizo.
+  const muestra = await db.query<
+    Omit<FilaImportacion, 'correccion'> & {
+      correccion: unknown;
+      corregida_por: string | null;
+    }
+  >(
+    `SELECT f.numero_fila, f.estado, f.datos_originales,
+            f.datos_normalizados - $4::text AS datos_normalizados,
+            f.problemas, f.entidades_confirmadas,
+            f.datos_normalizados->$4::text AS correccion,
+            pe.nombres || ' ' || pe.apellidos AS corregida_por
+     FROM convi.filas_importacion f
+     LEFT JOIN convi.membresias_establecimiento me
+       ON me.id::text = f.datos_normalizados->$4::text->>'por'
+     LEFT JOIN convi.personas pe ON pe.id = me.persona_id
+     WHERE f.proceso_importacion_id = $1
+       AND ($2::text IS NULL OR f.estado = $2)
+     ORDER BY f.numero_fila
      LIMIT ${FILAS_POR_PAGINA} OFFSET $3`,
-    [id, filtro.estado, (numero - 1) * FILAS_POR_PAGINA],
+    [id, filtro.estado, (numero - 1) * FILAS_POR_PAGINA, CLAVE_CORRECCION],
   );
+  const cancelacion =
+    importacion.estado === 'CANCELADO' ? await ultimaCancelacion(db, id) : null;
 
   // Antes de revisar no hay mapeo guardado: se sugiere por los títulos. El
   // año por omisión es el Activo.
@@ -844,12 +971,121 @@ async function buscar(
     anios,
     resumen,
     pagina: { estado: filtro.estado, numero, filas, paginas },
-    muestra: muestra.rows,
+    muestra: muestra.rows.map(({ correccion, corregida_por, ...fila }) => {
+      const guardada = leerCorreccion(correccion);
+      return {
+        ...fila,
+        correccion: guardada && {
+          valores: guardada.valores,
+          por: corregida_por ?? 'Sin registro',
+          en: guardada.en,
+        },
+      };
+    }),
     confirmacion: estadoConfirmacion(importacion.estado, opciones, resumen),
+    cancelacion,
   };
 }
 
-/** Solo cambia las filas distintas, en lotes de la misma transacción. */
+/**
+ * Las filas con sus datos originales y su corrección, en el orden del
+ * archivo, para revisarlas.
+ */
+async function leerFilas(db: PoolClient, id: string) {
+  const filas = await db.query<{
+    numero_fila: number;
+    datos_originales: Record<string, string>;
+    estado: EstadoFila;
+    correccion: unknown;
+  }>(
+    `SELECT numero_fila, datos_originales, estado,
+            datos_normalizados->$2::text AS correccion
+     FROM convi.filas_importacion
+     WHERE proceso_importacion_id = $1
+     ORDER BY numero_fila`,
+    [id, CLAVE_CORRECCION],
+  );
+  return filas.rows.map((fila) => ({
+    ...fila,
+    correccion: leerCorreccion(fila.correccion),
+  }));
+}
+
+/**
+ * PB-024 (HU-019 CA3) y HU-020 CA4: revisa de nuevo las filas con las
+ * opciones de la última revisión y lo que hay hoy en la escuela. Las
+ * confirmadas y las omitidas ya no cambian. Una importación Fallida queda En
+ * revisión (HU-019 CA1).
+ */
+async function revisarAbiertas(
+  db: PoolClient,
+  id: string,
+  proceso: Awaited<ReturnType<typeof bloquear>>,
+) {
+  const tipo = proceso.tipo_importacion;
+  // Las mismas opciones de la última revisión.
+  const revision = validarRevision(
+    {
+      mapeo: proceso.mapeo,
+      anio_academico_id: proceso.opciones.anio_academico_id,
+      formato_fecha: proceso.opciones.formato_fecha,
+      duplicados: proceso.opciones.duplicados,
+    },
+    tipo,
+    proceso.columnas,
+  );
+  const contexto = await cargarContexto(db, tipo, revision.anio_academico_id);
+  const filas = await leerFilas(db, id);
+  const antes = new Map(filas.map((f) => [f.numero_fila, f.estado]));
+  const abiertas = revisarFilas(
+    tipo,
+    filas,
+    proceso.columnas,
+    revision,
+    contexto,
+  ).filter(
+    (f) => !['CONFIRMADO', 'OMITIDO'].includes(antes.get(f.numero) ?? ''),
+  );
+  await actualizarFilas(db, id, abiertas);
+  if (proceso.estado === 'FALLIDO')
+    await db.query(
+      `UPDATE convi.procesos_importacion SET estado = 'REVISION'
+       WHERE id = $1`,
+      [id],
+    );
+  return { abiertas, antes };
+}
+
+/**
+ * PB-025 (HU-019 CA4 y CA5): la última cancelación según la auditoría, con
+ * el estado al que vuelve si se restaura (la base busca el mismo evento).
+ */
+async function ultimaCancelacion(
+  db: PoolClient,
+  id: string,
+): Promise<Cancelacion | null> {
+  const evento = await db.query<Cancelacion>(
+    `SELECT coalesce(e.metadatos->>'motivo', '') AS motivo,
+            coalesce(pe.nombres || ' ' || pe.apellidos, 'Sin registro') AS por,
+            e.ocurrido_en AS en,
+            e.metadatos->'antes'->>'estado' AS estado_anterior
+     FROM convi.eventos_auditoria e
+     LEFT JOIN convi.membresias_establecimiento me ON me.id = e.membresia_actor_id
+     LEFT JOIN convi.personas pe ON pe.id = me.persona_id
+     WHERE e.tipo_recurso = 'procesos_importacion' AND e.recurso_id = $1
+       AND e.metadatos->'despues'->>'estado' = 'CANCELADO'
+     ORDER BY e.ocurrido_en DESC, e.id DESC
+     LIMIT 1`,
+    [id],
+  );
+  const cancelacion = evento.rows[0];
+  return cancelacion?.estado_anterior ? cancelacion : null;
+}
+
+/**
+ * Solo cambia las filas distintas, en lotes de la misma transacción. PB-024:
+ * la corrección de la fila queda dentro de sus datos normalizados.
+ */
 async function actualizarFilas(
   db: PoolClient,
   id: string,
@@ -860,14 +1096,28 @@ async function actualizarFilas(
       `UPDATE convi.filas_importacion f
      SET estado = r.estado, datos_normalizados = r.datos,
          problemas = r.problemas
-     FROM jsonb_to_recordset($2::jsonb)
-          AS r(numero int, estado text, datos jsonb, problemas jsonb)
+     FROM (SELECT numero, estado, problemas,
+                  CASE WHEN correccion IS NULL THEN datos
+                       ELSE datos || jsonb_build_object($3::text, correccion)
+                  END AS datos
+           FROM jsonb_to_recordset($2::jsonb)
+                AS x(numero int, estado text, datos jsonb, problemas jsonb,
+                     correccion jsonb)) r
      WHERE f.proceso_importacion_id = $1 AND f.numero_fila = r.numero
        AND (f.estado, f.datos_normalizados, f.problemas)
            IS DISTINCT FROM (r.estado, r.datos, r.problemas)`,
-      [id, JSON.stringify(revisadas.slice(inicio, inicio + FILAS_POR_LOTE))],
+      [
+        id,
+        JSON.stringify(revisadas.slice(inicio, inicio + FILAS_POR_LOTE)),
+        CLAVE_CORRECCION,
+      ],
     );
   }
+}
+
+/** PB-024 (HU-019 CA1): una importación Fallida se retoma como En revisión. */
+function exigirRetomable(estado: string, accion: string) {
+  if (estado !== 'FALLIDO') exigirRevision(estado, accion);
 }
 
 /**

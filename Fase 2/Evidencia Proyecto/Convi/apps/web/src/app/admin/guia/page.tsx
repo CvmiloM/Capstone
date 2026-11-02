@@ -7,8 +7,11 @@ import {
 } from "@/app/components/formulario";
 import { irAlPortal, omitirPaso } from "./acciones";
 import { obtenerGuia } from "./datos";
+import { DemoPaso } from "./demo/demo-paso";
 import { FormularioBienvenida } from "./formulario-bienvenida";
 import { FormularioCursos } from "./formulario-cursos";
+import { PasoEquipo } from "./paso-equipo";
+import { PasoEstudiantes } from "./paso-estudiantes";
 import {
   CLASE_ESTADO_PASO,
   formatoFecha,
@@ -28,6 +31,12 @@ const AVISOS: Record<string, { texto: string; error?: boolean }> = {
   "cursos-creados": {
     texto: "El año, los niveles y los cursos quedaron creados.",
   },
+  "equipo-listo": {
+    texto: "El paso Equipo quedó listo.",
+  },
+  "estudiantes-listo": {
+    texto: "El paso Estudiantes quedó listo.",
+  },
   desactualizada: {
     texto:
       "Otra persona avanzó la guía mientras la mirabas. Revisa su avance e inténtalo nuevamente.",
@@ -36,8 +45,8 @@ const AVISOS: Record<string, { texto: string; error?: boolean }> = {
   error: { texto: "Recarga la página e inténtalo nuevamente.", error: true },
 };
 
-// PB-032 (HU-025), PB-034 (HU-027) y PB-038 (HU-031): guía inicial del
-// administrador. Al volver se retoma en el primer paso pendiente (CA2) y se
+// PB-032 (HU-025), PB-033 (HU-026), PB-034 (HU-027), PB-036 (HU-029) y PB-038
+// (HU-031): guía inicial del administrador. Al volver se retoma en el primer paso pendiente (CA2) y se
 // puede abrir cualquier paso desde la lista.
 export default async function GuiaInicial({
   searchParams,
@@ -75,6 +84,8 @@ export default async function GuiaInicial({
 
   return (
     <>
+      {/* Mientras la guía está en curso, el layout oculta el menú del portal. */}
+      <span data-modo-guia="" hidden />
       <Encabezado
         titulo="Guía inicial"
         descripcion="Configura tu escuela paso a paso. Puedes omitir pasos y volver más tarde: lo avanzado queda guardado."
@@ -162,6 +173,11 @@ export default async function GuiaInicial({
             </p>
           )}
 
+          {/* Cómo se hace este paso, animado con datos de ejemplo. */}
+          <div className="mt-6">
+            <DemoPaso key={actual} paso={actual} />
+          </div>
+
           <div className="mt-6">
             {actual === "bienvenida" && (
               <FormularioBienvenida
@@ -176,6 +192,20 @@ export default async function GuiaInicial({
                 version={guia.version}
                 academico={guia.academico}
                 anioPorDefecto={anioPorDefecto}
+              />
+            )}
+            {actual === "equipo" && (
+              <PasoEquipo
+                guia={guia}
+                fecha={fecha}
+                listo={estadoPaso.estado === "LISTO"}
+              />
+            )}
+            {actual === "estudiantes" && (
+              <PasoEstudiantes
+                guia={guia}
+                fecha={fecha}
+                listo={estadoPaso.estado === "LISTO"}
               />
             )}
             {paso.enlaces && (

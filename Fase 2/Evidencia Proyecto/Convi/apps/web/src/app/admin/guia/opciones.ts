@@ -42,7 +42,6 @@ export const PASOS: {
       "Las cuentas del equipo de Convivencia y de los profesores, con su nombre, apellido, correo y perfil.",
     alConfirmar:
       "CONVI envía una invitación por correo a cada persona. Su cuenta queda pendiente hasta que la acepte.",
-    enlaces: [{ href: "/admin/usuarios", texto: "Invitar desde Usuarios" }],
   },
   {
     clave: "cursos",
@@ -67,10 +66,7 @@ export const PASOS: {
     prepara:
       "La nómina de estudiantes desde un archivo CSV o Excel, usando los cursos ya creados.",
     alConfirmar:
-      "Revisas una vista previa fila por fila y solo se guardan las filas que confirmes.",
-    enlaces: [
-      { href: "/admin/importaciones", texto: "Importar desde Importaciones" },
-    ],
+      "Revisas una vista previa fila por fila y solo se guardan las filas válidas que confirmes. Quedan matriculados en el curso que indique la nómina.",
   },
   {
     clave: "reglas",

@@ -68,6 +68,29 @@ export function claveDeNombre(nombres: string, apellidos: string) {
   return claveDeTitulo(`${nombres} ${apellidos}`);
 }
 
+const ROMANOS: Record<string, string> = {
+  i: '1',
+  ii: '2',
+  iii: '3',
+  iv: '4',
+  v: '5',
+  vi: '6',
+  vii: '7',
+  viii: '8',
+};
+
+/**
+ * PB-036 (HU-029 CA2): nombre de un curso o nivel para compararlo sin tildes,
+ * mayúsculas, «°» ni puntos, y con el número romano del inicio en cifras:
+ * «I° Medio A» y «1 medio a» son el mismo curso.
+ */
+export function claveDeCurso(nombre: string) {
+  return claveDeTitulo(nombre).replace(
+    /^(viii|vii|vi|iv|v|iii|ii|i)\b/,
+    (romano) => ROMANOS[romano],
+  );
+}
+
 /** Dos períodos AAAA-MM-DD que se cruzan; null es sin límite. */
 export function seCruzan(
   desde1: string | null,

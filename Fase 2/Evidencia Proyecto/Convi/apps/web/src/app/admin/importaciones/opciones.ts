@@ -1,6 +1,6 @@
-// PB-019 y PB-020: textos y límites de las importaciones que usan tanto las
-// páginas como los formularios del navegador (datos.ts solo corre en el
-// servidor).
+// PB-019, PB-020, PB-024 y PB-025: textos y límites de las importaciones que
+// usan tanto las páginas como los formularios del navegador (datos.ts solo
+// corre en el servidor).
 
 export type TipoImportacion =
   | "ESTUDIANTES"
@@ -65,6 +65,32 @@ export const NOMBRE_ROL: Record<string, string> = {
   PROFESOR_JEFE: "Profesor jefe",
   PROFESOR: "Profesor",
 };
+
+// PB-025 (HU-019 CA4 y CA5): motivo de cancelar o restaurar. La API lo exige igual.
+export const LARGO_MOTIVO = { minimo: 10, maximo: 500 };
+
+// PB-024 (HU-019 CA2): largo máximo de un valor corregido, como en la API.
+export const LARGO_MAXIMO_VALOR = 1000;
+
+/**
+ * PB-024: el valor de cada campo según el archivo, como lo arma la API
+ * (valoresDeFila en mapeo.ts): las columnas en orden y, si un campo trae
+ * varias, juntas con un espacio.
+ */
+export function valoresDelArchivo(
+  datos: Record<string, string>,
+  mapeo: Record<string, string>,
+  columnas: string[],
+) {
+  const valores: Record<string, string> = {};
+  for (const columna of columnas) {
+    const clave = mapeo[columna];
+    const valor = (datos[columna] ?? "").trim();
+    if (!clave || !valor) continue;
+    valores[clave] = valores[clave] ? `${valores[clave]} ${valor}` : valor;
+  }
+  return valores;
+}
 
 /** "1 fila", "1.200 filas". */
 export function filas(cantidad: number) {

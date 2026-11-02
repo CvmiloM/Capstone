@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { claseBotonSecundario, claseEnlace } from "@/app/components/formulario";
 import type { DetalleImportacion } from "../datos";
-import { type EstadoFila, NOMBRE_ESTADO_FILA, NOMBRE_ROL } from "../opciones";
+import { FormularioCorreccion } from "../formulario-correccion";
+import {
+  type EstadoFila,
+  NOMBRE_ESTADO_FILA,
+  NOMBRE_ROL,
+  valoresDelArchivo,
+} from "../opciones";
 
 // PB-020 y PB-026 (HU-015 CA4 y HU-020 CA1): la vista previa de una
 // importación. Antes de revisar muestra las filas tal como venían; después,
 // cada fila con su estado, sus datos ya normalizados y cada problema junto a su
 // campo; una fila confirmada muestra qué creó o reutilizó, con su enlace.
+// PB-024 (HU-019 CA2): cada fila abierta se puede corregir, y la corregida
+// muestra quién y cuándo.
 
 // Igual que FILAS_POR_PAGINA de la API.
 const POR_PAGINA = 50;
@@ -56,8 +64,14 @@ function mostrar(campo: string, valor: string | boolean | null | undefined) {
 
 export function VistaPrevia({
   importacion,
+  puedeCorregir,
+  fecha,
 }: {
   importacion: DetalleImportacion;
+  /** PB-024: la importación está En revisión o Fallida. */
+  puedeCorregir: boolean;
+  /** Fecha y hora legibles en la zona horaria de la escuela. */
+  fecha: (iso: string) => string | null;
 }) {
   const { id, pagina, resumen, muestra } = importacion;
   const revisada = importacion.estado !== "CARGADO";
@@ -75,6 +89,11 @@ export function VistaPrevia({
     const texto = consulta.toString();
     return `/admin/importaciones/${id}${texto ? `?${texto}` : ""}`;
   }
+
+  // PB-024: después de corregir se vuelve al mismo filtro y la misma página.
+  const volver = new URLSearchParams();
+  if (pagina.estado) volver.set("estado", pagina.estado);
+  if (pagina.numero > 1) volver.set("pagina", String(pagina.numero));
 
   const total = Object.values(resumen).reduce((suma, n) => suma + n, 0);
   const desde = (pagina.numero - 1) * POR_PAGINA + 1;
@@ -175,6 +194,11 @@ export function VistaPrevia({
                       >
                         {NOMBRE_ESTADO_FILA[fila.estado] ?? fila.estado}
                       </span>
+                      {fila.correccion && (
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          Corregida
+                        </span>
+                      )}
                     </td>
                   )}
                   {revisada
@@ -198,6 +222,15 @@ export function VistaPrevia({
                       ))}
                   {revisada && (
                     <td className="min-w-72 px-4 py-3">
+                      {fila.correccion && (
+                        <p className="mb-1 text-xs text-muted-foreground">
+                          {/* Sin punto final: la hora ya puede terminar en "p. m." */}
+                          Corregida por {fila.correccion.por}
+                          {fecha(fila.correccion.en)
+                            ? ` el ${fecha(fila.correccion.en)}`
+                            : ""}
+                        </p>
+                      )}
                       {fila.problemas && fila.problemas.length > 0 ? (
                         <ul className="space-y-1">
                           {fila.problemas.map((problema) => (
@@ -254,6 +287,23 @@ export function VistaPrevia({
                           )}
                         </ul>
                       )}
+                      {puedeCorregir &&
+                        fila.estado !== "CONFIRMADO" &&
+                        fila.estado !== "OMITIDO" && (
+                          <FormularioCorreccion
+                            id={id}
+                            numero={fila.numero_fila}
+                            campos={campos}
+                            delArchivo={valoresDelArchivo(
+                              fila.datos_originales,
+                              importacion.mapeo,
+                              importacion.columnas,
+                            )}
+                            corregidos={fila.correccion?.valores ?? null}
+                            formatoFecha={importacion.opciones.formato_fecha}
+                            volver={volver.toString()}
+                          />
+                        )}
                     </td>
                   )}
                 </tr>
