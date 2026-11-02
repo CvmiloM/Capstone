@@ -18,6 +18,7 @@ const SECCIONES: SeccionMenu[] = [
       },
 
       { href: "/convivencia/seguimientos", texto: "Agenda de seguimientos", icono: "anios" },
+      { href: "/convivencia/indicadores", texto: "Indicadores", icono: "categorias" },
       // PB-093 (HU-080): alertas del motor de reglas (/convivencia/alertas/...)
       { href: "/convivencia/alertas", texto: "Alertas", icono: "alerta" },
       // PB-095 (HU-082): avisos propios de cada profesional de Convivencia
