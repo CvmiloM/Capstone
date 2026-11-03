@@ -110,6 +110,14 @@ export function errorDeCampos(errores: Record<string, string>) {
 }
 
 /**
+ * PB-037 (HU-030 CA2): la guía inicial pide crear la regla ya activa. Solo
+ * cuenta el valor true; cualquier otro deja la regla en Borrador.
+ */
+export function pideActivacion(cuerpo: unknown) {
+  return objeto(cuerpo).activar === true;
+}
+
+/**
  * CA1 a CA5 y CA7: valida una regla para crearla o editar su borrador. Una
  * regla incompleta no se guarda, ni siquiera como borrador (CA3), salvo las
  * de tipo Otro, que no tienen cálculo.

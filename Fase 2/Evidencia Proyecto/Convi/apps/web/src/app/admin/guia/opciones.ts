@@ -15,6 +15,9 @@ export type ClavePaso =
   | "reglas"
   | "fin";
 
+/** PB-033 y PB-035 a PB-037: pasos que se hacen con operaciones del portal. */
+export type PasoDelPortal = "equipo" | "reglamento" | "estudiantes" | "reglas";
+
 /**
  * HU-031 CA1: cada paso explica qué se prepara y qué ocurrirá al confirmar.
  * Los pasos que todavía no funcionan dentro de la guía llevan a la sección
@@ -71,13 +74,9 @@ export const PASOS: {
     clave: "reglas",
     titulo: "Categorías y reglas",
     prepara:
-      "Las categorías de las situaciones y las reglas que avisan cuando se juntan varias situaciones en pocos días.",
+      "Las categorías de las situaciones y las reglas que avisan cuando se juntan varias situaciones de un estudiante, un curso o toda la escuela en pocos días.",
     alConfirmar:
-      "Las categorías se usan al registrar situaciones y las reglas activas empiezan a generar alertas.",
-    enlaces: [
-      { href: "/admin/categorias", texto: "Ir a Categorías" },
-      { href: "/admin/reglas", texto: "Ir a Reglas" },
-    ],
+      "Las categorías se usan al registrar situaciones. Cada regla queda como versión 1, en Borrador o Activa según elijas, y guardarla no genera ni envía alertas.",
   },
   {
     clave: "fin",

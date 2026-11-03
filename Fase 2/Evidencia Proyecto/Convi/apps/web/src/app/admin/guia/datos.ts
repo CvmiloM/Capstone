@@ -1,7 +1,7 @@
 import "server-only";
 import { pedirAdmin } from "../datos";
 import { enviarCambio } from "../estudiantes/datos";
-import type { ClavePaso } from "./opciones";
+import type { ClavePaso, PasoDelPortal } from "./opciones";
 
 // PB-032 a PB-034, PB-036 y PB-038: datos de la guía inicial. Misma forma que devuelve
 // apps/api/src/modules/admin/guia.service.ts.
@@ -100,10 +100,7 @@ export function enviarCursosGuia(cuerpo: unknown) {
   return enviarCambio("POST", "/admin/guia/cursos", cuerpo);
 }
 
-/** PB-033, PB-035 y PB-036: deja Listo un paso hecho en el portal. */
-export function enviarPasoListo(
-  paso: "equipo" | "reglamento" | "estudiantes",
-  version: string,
-) {
+/** PB-033 y PB-035 a PB-037: deja Listo un paso hecho en el portal. */
+export function enviarPasoListo(paso: PasoDelPortal, version: string) {
   return enviarCambio("POST", `/admin/guia/${paso}`, { version });
 }

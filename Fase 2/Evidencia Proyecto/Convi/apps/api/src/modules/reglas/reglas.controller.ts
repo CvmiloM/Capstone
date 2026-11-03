@@ -38,7 +38,8 @@ export class ReglasController {
 
   // Cuerpo: { nombre, tipo_regla, codigo_ambito, codigo_operador, valor_umbral,
   // ventana_dias, categoria_id, codigo_accion, codigo_prioridad, vigente_desde,
-  // vigente_hasta }. Responde 201 con el id y el código de la regla nueva.
+  // vigente_hasta } y, desde la guía inicial (PB-037), activar: true para
+  // dejarla Activa. Responde 201 con el id y el código de la regla nueva.
   @Post()
   crear(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
     return this.reglas.crear(peticion.sesion, cuerpo);

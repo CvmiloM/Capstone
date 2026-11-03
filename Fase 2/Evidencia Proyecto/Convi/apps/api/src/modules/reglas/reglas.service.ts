@@ -7,7 +7,12 @@ import {
 import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
-import { errorDeCampos, validarRegla, type DatosRegla } from './regla.js';
+import {
+  errorDeCampos,
+  pideActivacion,
+  validarRegla,
+  type DatosRegla,
+} from './regla.js';
 
 // PB-089 (HU-078): reglas de aviso de la escuela de la sesión. Las manejan el
 // administrador y Convivencia (CA8: profesores y apoderados no entran). Cada
@@ -88,12 +93,15 @@ export class ReglasService {
   }
 
   // CA6: la regla nueva queda en Borrador, versión 1. La base le pone el
-  // código correlativo de la escuela (REGLA-001).
+  // código correlativo de la escuela (REGLA-001). PB-037 (HU-030 CA2): con
+  // activar, la guía inicial la deja Activa en la misma transacción y con las
+  // mismas revisiones que al activar un borrador; si una falla, no se guarda.
   crear(
     sesion: Sesion,
     cuerpo: unknown,
   ): Promise<{ id: string; codigo_regla: string }> {
     const datos = validarRegla(cuerpo);
+    const activar = pideActivacion(cuerpo);
     return this.operar(sesion, async (db) => {
       await revisarCategoria(db, datos.categoria_id);
       const creada = await db.query<{ id: string; codigo_regla: string }>(
@@ -107,6 +115,8 @@ export class ReglasService {
          RETURNING id, codigo_regla`,
         valores(datos),
       );
+      if (activar)
+        await activarVersion(db, await leer(db, creada.rows[0].id, true));
       return creada.rows[0];
     });
   }
@@ -178,48 +188,10 @@ export class ReglasService {
     });
   }
 
-  /**
-   * CA6 y CA7: activa un borrador. Una regla de tipo Otro no se activa porque
-   * no tiene cálculo. La versión activa anterior de la misma regla se archiva
-   * en la misma transacción, así hay una sola versión activa por regla.
-   */
+  // CA6 y CA7: activa un borrador (activarVersion).
   activar(sesion: Sesion, id: string): Promise<{ id: string }> {
     return this.operar(sesion, async (db) => {
-      const regla = await leer(db, id, true);
-      if (regla.estado === 'ACTIVO')
-        throw new ConflictException('Esta versión de la regla ya está activa.');
-      if (regla.estado === 'ARCHIVADO')
-        throw new ConflictException(
-          'Una regla archivada no se vuelve a activar, crea una versión nueva a partir de ella.',
-        );
-      if (regla.tipo_regla === 'OTRO')
-        throw new ConflictException(
-          'Una regla de tipo Otro se guarda como borrador pero no se activa, porque no tiene un cálculo definido.',
-        );
-      if (regla.categoria_id && !regla.categoria_activa)
-        throw new ConflictException(
-          `La categoría ${regla.categoria ?? ''} ya no está activa, elige otra antes de activar la regla.`,
-        );
-      const vencida = await db.query<{ vencida: boolean }>(
-        `SELECT $1::date < current_date AS vencida`,
-        [regla.vigente_hasta],
-      );
-      if (vencida.rows[0]?.vencida)
-        throw new ConflictException(
-          'La vigencia de este borrador ya terminó, cambia la fecha de término antes de activarlo.',
-        );
-      await db.query(
-        `UPDATE convi.reglas
-         SET estado = 'ARCHIVADO', vigente_hasta = ${TERMINO_AL_ARCHIVAR}
-         WHERE codigo_regla = $1 AND estado = 'ACTIVO' AND id <> $2`,
-        [regla.codigo_regla, id],
-      );
-      await db.query(
-        `UPDATE convi.reglas
-         SET estado = 'ACTIVO', vigente_desde = coalesce(vigente_desde, current_date)
-         WHERE id = $1`,
-        [id],
-      );
+      await activarVersion(db, await leer(db, id, true));
       return { id };
     });
   }
@@ -291,6 +263,48 @@ async function leer(
   );
   if (!resultado.rows[0]) throw new NotFoundException(NO_EXISTE);
   return resultado.rows[0];
+}
+
+/**
+ * CA6 y CA7: activa un borrador. Una regla de tipo Otro no se activa porque
+ * no tiene cálculo. La versión activa anterior de la misma regla se archiva
+ * en la misma transacción, así hay una sola versión activa por regla.
+ */
+async function activarVersion(db: PoolClient, regla: Regla) {
+  if (regla.estado === 'ACTIVO')
+    throw new ConflictException('Esta versión de la regla ya está activa.');
+  if (regla.estado === 'ARCHIVADO')
+    throw new ConflictException(
+      'Una regla archivada no se vuelve a activar, crea una versión nueva a partir de ella.',
+    );
+  if (regla.tipo_regla === 'OTRO')
+    throw new ConflictException(
+      'Una regla de tipo Otro se guarda como borrador pero no se activa, porque no tiene un cálculo definido.',
+    );
+  if (regla.categoria_id && !regla.categoria_activa)
+    throw new ConflictException(
+      `La categoría ${regla.categoria ?? ''} ya no está activa, elige otra antes de activar la regla.`,
+    );
+  const vencida = await db.query<{ vencida: boolean }>(
+    `SELECT $1::date < current_date AS vencida`,
+    [regla.vigente_hasta],
+  );
+  if (vencida.rows[0]?.vencida)
+    throw new ConflictException(
+      'La vigencia de este borrador ya terminó, cambia la fecha de término antes de activarlo.',
+    );
+  await db.query(
+    `UPDATE convi.reglas
+     SET estado = 'ARCHIVADO', vigente_hasta = ${TERMINO_AL_ARCHIVAR}
+     WHERE codigo_regla = $1 AND estado = 'ACTIVO' AND id <> $2`,
+    [regla.codigo_regla, regla.id],
+  );
+  await db.query(
+    `UPDATE convi.reglas
+     SET estado = 'ACTIVO', vigente_desde = coalesce(vigente_desde, current_date)
+     WHERE id = $1`,
+    [regla.id],
+  );
 }
 
 // CA5: solo una categoría activa de la escuela. La seguridad por fila oculta

@@ -41,20 +41,28 @@ function leerRegla(formData: FormData) {
   return Object.fromEntries(CAMPOS.map((c) => [c, leerTexto(formData, c)]));
 }
 
-// Un cambio se ve en los dos portales.
+// Un cambio se ve en los dos portales y en el paso de la guía inicial (PB-037).
 function revalidarPortales() {
   revalidatePath("/admin/reglas", "layout");
   revalidatePath("/convivencia/reglas", "layout");
+  revalidatePath("/admin/guia");
 }
 
-// PB-089 (HU-078 CA6): la regla nueva queda en Borrador.
+// PB-089 (HU-078 CA6): la regla nueva queda en Borrador. PB-037 (HU-030 CA2):
+// desde la guía inicial se elige si queda Activa, y se vuelve a la guía.
 export async function crearRegla(
   _anterior: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
-  const resultado = await enviarCambio("POST", "", leerRegla(formData));
+  const activar = leerTexto(formData, "activar") === "si";
+  const resultado = await enviarCambio("POST", "", {
+    ...leerRegla(formData),
+    ...(activar ? { activar: true } : {}),
+  });
   if (!resultado.ok) return { mensaje: resultado.mensaje, errores: resultado.errores };
   revalidarPortales();
+  if (leerTexto(formData, "volver") === "guia")
+    redirect(`/admin/guia?paso=reglas&aviso=${activar ? "regla-activa" : "regla-borrador"}`);
   redirect(`${rutaDelPortal(formData)}/${encodeURIComponent(resultado.id)}?guardada=1`);
 }
 

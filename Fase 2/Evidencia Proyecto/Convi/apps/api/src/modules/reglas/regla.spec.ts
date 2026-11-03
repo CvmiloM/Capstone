@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { validarRegla } from './regla.js';
+import { pideActivacion, validarRegla } from './regla.js';
 
 // PB-089 (HU-078 CA1 a CA5 y CA7): validación de una regla de aviso. Los
 // estados, las versiones y la base se prueban contra la base local.
@@ -221,5 +221,15 @@ describe('validarRegla', () => {
       valor_umbral: 4,
       ventana_dias: 14,
     });
+  });
+});
+
+describe('Regla activa desde la guía inicial (PB-037, HU-030 CA2)', () => {
+  it('solo activa al crear con activar en true', () => {
+    expect(pideActivacion({ ...recurrencia, activar: true })).toBe(true);
+    expect(pideActivacion(recurrencia)).toBe(false);
+    for (const activar of ['true', 'si', 1, false, null])
+      expect(pideActivacion({ ...recurrencia, activar })).toBe(false);
+    expect(pideActivacion(null)).toBe(false);
   });
 });

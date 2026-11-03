@@ -9,7 +9,7 @@ import {
   enviarOmision,
   enviarPasoListo,
 } from "./datos";
-import type { ClavePaso } from "./opciones";
+import type { ClavePaso, PasoDelPortal } from "./opciones";
 
 // PB-032 a PB-034, PB-036 y PB-038: acciones de la guía inicial. Cada formulario envía
 // la huella de la guía que se veía, para que la API rechace el cambio si otro
@@ -112,11 +112,12 @@ export async function guardarCursos(
   irAPaso("cursos", "cursos-creados");
 }
 
-// PB-033 (HU-026), PB-035 (HU-028) y PB-036 (HU-029): las invitaciones, el
-// reglamento y la nómina se hacen con las operaciones del portal; el paso
-// queda Listo si ya hay algo hecho (la API lo comprueba).
+// PB-033 (HU-026), PB-035 (HU-028), PB-036 (HU-029) y PB-037 (HU-030): las
+// invitaciones, el reglamento, la nómina y las reglas se hacen con las
+// operaciones del portal; el paso queda Listo si ya hay algo hecho (la API lo
+// comprueba).
 export async function terminarPaso(
-  paso: "equipo" | "reglamento" | "estudiantes",
+  paso: PasoDelPortal,
   _anterior: EstadoGuia,
   formData: FormData,
 ): Promise<EstadoGuia> {
@@ -125,5 +126,6 @@ export async function terminarPaso(
   revalidatePath("/admin", "layout");
   if (paso === "equipo") irAPaso("cursos", "equipo-listo");
   if (paso === "reglamento") irAPaso("estudiantes", "reglamento-listo");
+  if (paso === "reglas") irAPaso("fin", "reglas-listo");
   irAPaso("reglas", "estudiantes-listo");
 }
