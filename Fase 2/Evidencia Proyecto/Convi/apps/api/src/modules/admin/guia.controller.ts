@@ -11,7 +11,7 @@ import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 import { GuiaAdminService } from './guia.service.js';
 
-// PB-032 a PB-038 (HU-025 a HU-031): guía inicial del administrador. Solo
+// PB-032 a PB-039 (HU-025 a HU-032): guía inicial del administrador. Solo
 // entra una cuenta ADMIN activa con el segundo factor completo.
 @Controller('admin/guia')
 @PerfilesPermitidos('ADMIN')
@@ -23,6 +23,19 @@ export class GuiaAdminController {
   @Get()
   consultar(@Req() peticion: PeticionConSesion) {
     return this.guia.consultar(peticion.sesion);
+  }
+
+  // PB-039: cifras del paso Resumen y fin.
+  @Get('resumen')
+  resumen(@Req() peticion: PeticionConSesion) {
+    return this.guia.resumen(peticion.sesion);
+  }
+
+  // PB-039: termina la guía y guarda la fecha; repetirlo no la cambia.
+  // Cuerpo: version.
+  @Post('fin')
+  terminar(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
+    return this.guia.terminar(peticion.sesion, cuerpo);
   }
 
   // Cuerpo: version.

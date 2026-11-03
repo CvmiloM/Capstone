@@ -24,10 +24,15 @@ type Cifra = {
 const formatoNumero = new Intl.NumberFormat("es-CL");
 
 // HU-033: resumen de la escuela para el administrador.
-export default async function PaginaResumen() {
-    const [resumen, { escuela, guia }] = await Promise.all([
+export default async function PaginaResumen({
+    searchParams,
+}: {
+    searchParams: Promise<{ guia?: string }>;
+}) {
+    const [resumen, { escuela, guia }, parametros] = await Promise.all([
         obtenerResumen(),
         obtenerContextoAdmin(),
+        searchParams,
     ]);
     // PB-032 y PB-038: la guía inicial se abre sola hasta que se empieza o
     // se elige ir al portal por ahora; después, este aviso la recuerda.
@@ -114,6 +119,17 @@ export default async function PaginaResumen() {
                 titulo="Resumen de la escuela"
                 descripcion={`Lo que está configurado en ${escuela.nombre}. Cifras actualizadas el ${calculadoEn} h.`}
             />
+
+            {/* PB-039 (HU-032 CA2): se llega aquí al terminar la guía. */}
+            {parametros.guia === "terminada" && guia.terminada && (
+                <div
+                    role="status"
+                    className="mb-6 rounded-lg border border-verde/30 bg-verde/10 px-4 py-3 text-sm"
+                >
+                    La guía inicial quedó terminada. Lo configurado se sigue
+                    editando desde las secciones del portal.
+                </div>
+            )}
 
             {!guia.terminada && (
                 <div

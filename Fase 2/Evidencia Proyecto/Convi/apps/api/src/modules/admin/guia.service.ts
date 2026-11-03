@@ -23,7 +23,7 @@ import {
   type AvanceGuia,
 } from './guia.js';
 
-// PB-032 a PB-038 (HU-025 a HU-031): guía inicial del administrador. Solo
+// PB-032 a PB-039 (HU-025 a HU-032): guía inicial del administrador. Solo
 // entra una cuenta ADMIN activa con segundo factor (HU-025 CA1). Cualquier
 // administrador de la escuela la avanza; la base audita cada cambio de la
 // escuela y conserva la fecha de término de la guía.
@@ -59,6 +59,52 @@ const REGLAMENTO_CARGADO = `(SELECT count(*) FROM convi.versiones_documento v
 /** PB-037: reglas de aviso en Borrador o Activas, de cualquier tipo. */
 const REGLAS_GUARDADAS = `(SELECT count(*) FROM convi.reglas r
   WHERE r.estado <> 'ARCHIVADO')::int`;
+
+/**
+ * PB-039 (HU-032 CA1): cifras del resumen de la guía en una consulta. Separa
+ * las invitaciones enviadas que esperan aceptación de las cuentas activas, y
+ * las versiones del reglamento cargadas de las publicadas y de su preparación.
+ * El año es el activo más reciente o, si no hay, el planificado más reciente.
+ */
+const RESUMEN_GUIA = `
+  WITH anio AS (
+    SELECT a.id, a.anio, a.estado FROM convi.anios_academicos a
+    WHERE a.estado IN ('ACTIVO', 'PLANIFICADO')
+    ORDER BY a.estado = 'ACTIVO' DESC, a.anio DESC LIMIT 1
+  ), reglamento AS (
+    SELECT v.* FROM convi.versiones_documento v
+    JOIN convi.documentos_institucionales d ON d.id = v.documento_id
+    WHERE d.tipo_documento = 'RICE' AND v.estado <> 'ARCHIVADO'
+  )
+  SELECT now() AS calculado_en,
+    (SELECT jsonb_build_object(
+       'CONVIVENCIA', jsonb_build_object(
+         'pendientes', count(*) FILTER (WHERE m.codigo_perfil = 'CONVIVENCIA' AND m.estado = 'PENDIENTE'),
+         'activas', count(*) FILTER (WHERE m.codigo_perfil = 'CONVIVENCIA' AND m.estado = 'ACTIVO')),
+       'PROFESOR', jsonb_build_object(
+         'pendientes', count(*) FILTER (WHERE m.codigo_perfil = 'PROFESOR' AND m.estado = 'PENDIENTE'),
+         'activas', count(*) FILTER (WHERE m.codigo_perfil = 'PROFESOR' AND m.estado = 'ACTIVO')))
+     FROM convi.membresias_establecimiento m) AS equipo,
+    (SELECT jsonb_build_object('anio', a.anio, 'estado', a.estado,
+       'cursos', (SELECT count(*) FROM convi.cursos c WHERE c.anio_academico_id = a.id))
+     FROM anio a) AS anio,
+    (SELECT count(*) FROM convi.niveles_educativos n WHERE n.activo)::int AS niveles_activos,
+    (SELECT jsonb_build_object(
+       'cargadas', count(*),
+       'publicadas_vigentes', count(*) FILTER (WHERE r.estado = 'PUBLICADO'
+         AND r.vigente_desde <= current_date
+         AND (r.vigente_hasta IS NULL OR r.vigente_hasta >= current_date)),
+       'lista', count(*) FILTER (WHERE r.estado_procesamiento = 'LISTO'),
+       'en_proceso', count(*) FILTER (WHERE r.estado_procesamiento IN ('PENDIENTE', 'PROCESANDO')),
+       'fallida', count(*) FILTER (WHERE r.estado_procesamiento = 'FALLIDO'))
+     FROM reglamento r) AS reglamento,
+    ${ESTUDIANTES_CONFIRMADOS} AS estudiantes_confirmados,
+    (SELECT count(*) FROM convi.categorias_convivencia c
+     WHERE c.estado = 'ACTIVO')::int AS categorias_activas,
+    (SELECT jsonb_build_object(
+       'activas', count(*) FILTER (WHERE r.estado = 'ACTIVO'),
+       'borradores', count(*) FILTER (WHERE r.estado = 'BORRADOR'))
+     FROM convi.reglas r) AS reglas`;
 
 /** Avance con el paso marcado; $2 = paso y $3 = LISTO u OMITIDO. */
 const AVANCE_CON_PASO = `e.contexto_onboarding || jsonb_build_object(
@@ -123,6 +169,31 @@ export type Guia = Omit<AvanceGuia, 'pasos'> & {
     /** Cuentas Pendientes o Activas, las que cuentan para el paso. */
     total: number;
   };
+};
+
+/** PB-039 (HU-032 CA1): lo que muestra el paso Resumen y fin. */
+export type ResumenGuia = {
+  calculado_en: Date;
+  /** Invitaciones enviadas que esperan aceptación y cuentas que ya aceptaron. */
+  equipo: Record<
+    'CONVIVENCIA' | 'PROFESOR',
+    { pendientes: number; activas: number }
+  >;
+  /** null si la escuela no tiene un año activo ni planificado. */
+  anio: { anio: number; estado: string; cursos: number } | null;
+  niveles_activos: number;
+  /** Versiones no archivadas del reglamento (RICE). */
+  reglamento: {
+    cargadas: number;
+    publicadas_vigentes: number;
+    lista: number;
+    en_proceso: number;
+    fallida: number;
+  };
+  estudiantes_confirmados: number;
+  categorias_activas: number;
+  /** Reglas guardadas, no alertas generadas. */
+  reglas: { activas: number; borradores: number };
 };
 
 export type CursosCreados = {
@@ -401,6 +472,54 @@ export class GuiaAdminService {
       if (cambio.rows[0]) return cambio.rows[0];
       return rechazarCambio(db, sesion.establecimiento_id);
     });
+  }
+
+  // PB-039 (HU-032 CA1): cifras reales de la escuela para el resumen.
+  resumen(sesion: Sesion): Promise<ResumenGuia> {
+    return this.cuentas.operar(sesion, ACCESO, async (db) => {
+      const resultado = await db.query<ResumenGuia>(RESUMEN_GUIA);
+      return resultado.rows[0];
+    });
+  }
+
+  /**
+   * PB-039 (HU-032 CA2 a CA4): termina la guía con la fecha real, aunque
+   * queden pasos pendientes u omitidos. Si ya terminó (otro administrador o
+   * una confirmación repetida) responde lo mismo sin tocar la fecha, que la
+   * base también conserva. La fecha solo se escribe aquí: no se deduce del
+   * avance ni se rellena para guías antiguas. READ COMMITTED: una segunda
+   * confirmación simultánea espera a la primera y ve su fecha.
+   */
+  terminar(
+    sesion: Sesion,
+    cuerpo: unknown,
+  ): Promise<{ id: string; terminada_en: Date }> {
+    const version = validarVersion(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      ACCESO,
+      async (db) => {
+        const cambio = await db.query<{ id: string; terminada_en: Date }>(
+          `UPDATE convi.establecimientos e SET onboarding_completado_en = now()
+           WHERE e.id = $1 AND e.onboarding_completado_en IS NULL AND ${HUELLA} = $2
+           RETURNING e.id, e.onboarding_completado_en AS terminada_en`,
+          [sesion.establecimiento_id, version],
+        );
+        if (cambio.rows[0]) return cambio.rows[0];
+        const actual = await db.query<{ terminada_en: Date | null }>(
+          `SELECT e.onboarding_completado_en AS terminada_en
+           FROM convi.establecimientos e WHERE e.id = $1`,
+          [sesion.establecimiento_id],
+        );
+        if (!actual.rows[0])
+          throw new NotFoundException('Escuela no disponible');
+        const { terminada_en } = actual.rows[0];
+        if (terminada_en)
+          return { id: sesion.establecimiento_id, terminada_en };
+        throw new ConflictException(DESACTUALIZADA);
+      },
+      'READ COMMITTED',
+    );
   }
 
   // La guía se abre sola hasta que se empieza o se elige ir al portal por

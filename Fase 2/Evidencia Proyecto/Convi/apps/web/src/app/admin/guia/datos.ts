@@ -3,7 +3,7 @@ import { pedirAdmin } from "../datos";
 import { enviarCambio } from "../estudiantes/datos";
 import type { ClavePaso, PasoDelPortal } from "./opciones";
 
-// PB-032 a PB-034, PB-036 y PB-038: datos de la guía inicial. Misma forma que devuelve
+// PB-032 a PB-039: datos de la guía inicial. Misma forma que devuelve
 // apps/api/src/modules/admin/guia.service.ts.
 
 export type PasoGuia = {
@@ -74,10 +74,47 @@ export type Guia = {
   };
 };
 
+/** PB-039 (HU-032 CA1): las cifras del paso Resumen y fin. */
+export type ResumenGuia = {
+  /** Fecha y hora ISO en que se calcularon. */
+  calculado_en: string;
+  /** Invitaciones enviadas que esperan aceptación y cuentas que ya aceptaron. */
+  equipo: Record<
+    "CONVIVENCIA" | "PROFESOR",
+    { pendientes: number; activas: number }
+  >;
+  /** El año activo o, si no hay, el planificado más reciente. */
+  anio: { anio: number; estado: string; cursos: number } | null;
+  niveles_activos: number;
+  /** Versiones no archivadas del reglamento (RICE). */
+  reglamento: {
+    cargadas: number;
+    publicadas_vigentes: number;
+    lista: number;
+    en_proceso: number;
+    fallida: number;
+  };
+  estudiantes_confirmados: number;
+  categorias_activas: number;
+  /** Reglas guardadas, no alertas generadas. */
+  reglas: { activas: number; borradores: number };
+};
+
 export async function obtenerGuia(): Promise<Guia> {
   const respuesta = await pedirAdmin("/admin/guia");
   if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
   return respuesta.json();
+}
+
+export async function obtenerResumenGuia(): Promise<ResumenGuia> {
+  const respuesta = await pedirAdmin("/admin/guia/resumen");
+  if (!respuesta.ok) throw new Error(`La API respondió ${respuesta.status}.`);
+  return respuesta.json();
+}
+
+/** PB-039: termina la guía; si ya terminó, la API responde igual. */
+export function enviarTermino(version: string) {
+  return enviarCambio("POST", "/admin/guia/fin", { version });
 }
 
 export function enviarInicioGuia(version: string) {
