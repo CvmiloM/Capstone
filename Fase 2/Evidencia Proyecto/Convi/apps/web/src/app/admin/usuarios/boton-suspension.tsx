@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, claseBotonSecundario } from "@/app/components/formulario";
 import { suspenderUsuario, type EstadoSuspension } from "./acciones";
@@ -25,7 +27,7 @@ export function BotonSuspension({
       <summary className="w-fit cursor-pointer text-xs font-medium text-destructive">
         Suspender cuenta
       </summary>
-      <form action={accion} className="mt-3 space-y-3">
+      <FormularioConCarga action={accion} className="mt-3 space-y-3">
         <input type="hidden" name="perfil" value={filtros.perfil} />
         <input
           type="hidden"
@@ -54,7 +56,7 @@ export function BotonSuspension({
           {pendiente ? "Suspendiendo…" : "Confirmar suspensión"}
         </button>
         {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
-      </form>
+      </FormularioConCarga>
     </details>
   );
 }

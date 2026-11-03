@@ -1,7 +1,7 @@
 import { DesactivacionEstudiantes } from "./desactivacion";
 import type { Metadata } from "next";
-import Form from "next/form";
-import Link from "next/link";
+import { FormularioBusqueda as Form } from "@/app/components/actividad";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import {
   claseBotonSecundario,
   claseEnlace,

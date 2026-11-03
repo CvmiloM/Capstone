@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import type { EstadoAccion } from "./acciones";
@@ -54,7 +56,7 @@ export function FormularioNuevoPlan({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <ErrorGeneral estado={estado} />
 
@@ -110,7 +112,7 @@ export function FormularioNuevoPlan({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Creando…" : "Crear plan"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -141,7 +143,7 @@ export function FormularioEstadoPlan({
   const sufijo = planId.slice(0, 8);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="plan_id" value={planId} />
       <input type="hidden" name="version" value={version} />
@@ -189,7 +191,7 @@ export function FormularioEstadoPlan({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Cambiar estado del plan"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -215,7 +217,7 @@ export function FormularioNuevaAccion({
   const sufijo = planId.slice(0, 8);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="plan_id" value={planId} />
       <ErrorGeneral estado={estado} />
@@ -231,7 +233,7 @@ export function FormularioNuevaAccion({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Agregando…" : "Agregar acción"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -390,7 +392,7 @@ export function FormularioAvanceAccion({
   ];
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="accion_id" value={accionId} />
       <input type="hidden" name="version" value={version} />
@@ -449,7 +451,7 @@ export function FormularioAvanceAccion({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Guardar avance"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -499,7 +501,7 @@ export function FormularioCorreccionAccion({
       ];
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="accion_id" value={actual.id} />
       <input type="hidden" name="version" value={actual.version} />
@@ -538,6 +540,6 @@ export function FormularioCorreccionAccion({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Guardar corrección"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

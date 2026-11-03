@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { Selector } from "../cursos/selector";
@@ -61,7 +63,7 @@ export function FormularioCambio({
       : hoy;
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       <input type="hidden" name="estudiante_id" value={estudianteId} />
       <input type="hidden" name="matricula_id" value={vigente.id} />
@@ -153,6 +155,6 @@ export function FormularioCambio({
           {movimiento.boton}
         </BotonEnviar>
       )}
-    </form>
+    </FormularioConCarga>
   );
 }

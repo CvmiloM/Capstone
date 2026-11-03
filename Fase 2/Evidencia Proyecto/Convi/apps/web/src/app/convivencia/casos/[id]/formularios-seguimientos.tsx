@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useId, useState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import { SelectorFiltro } from "@/app/components/selector-filtro";
@@ -120,7 +122,7 @@ export function FormularioSeguimiento({
     </>
   );
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={caso.id} />
       <input type="hidden" name="modo" value={modo} />
       {seguimiento && (
@@ -293,6 +295,6 @@ export function FormularioSeguimiento({
                   ? "Guardar nueva fecha"
                   : "Guardar revisión"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

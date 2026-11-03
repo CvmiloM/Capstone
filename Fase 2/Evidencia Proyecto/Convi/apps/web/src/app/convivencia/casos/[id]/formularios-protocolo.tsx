@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import type { PasoProtocolo } from "../datos";
@@ -49,7 +51,7 @@ export function FormularioAvancePaso({
   const sufijo = paso.id.slice(0, 8);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="paso_id" value={paso.id} />
       <input type="hidden" name="version" value={paso.version} />
@@ -102,7 +104,7 @@ export function FormularioAvancePaso({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Registrar avance"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -128,7 +130,7 @@ export function FormularioAsignacionPaso({
   const sufijo = paso.id.slice(0, 8);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="paso_id" value={paso.id} />
       <input type="hidden" name="version" value={paso.version} />
@@ -176,7 +178,7 @@ export function FormularioAsignacionPaso({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Guardar responsable y plazo"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -209,7 +211,7 @@ export function FormularioEstadoProtocolo({
   const sufijo = protocoloId.slice(0, 8);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="protocolo_id" value={protocoloId} />
       <input type="hidden" name="version" value={version} />
@@ -261,6 +263,6 @@ export function FormularioEstadoProtocolo({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Cambiar estado del protocolo"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

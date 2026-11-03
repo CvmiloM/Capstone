@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useRef, useState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { Icono } from "@/app/components/icono";
@@ -20,7 +22,7 @@ export function FormularioFicha({ ficha }: { ficha: FichaInstitucional }) {
   const valores = estado.valores ?? ficha;
   const errores = estado.errores ?? {};
   return (
-    <form
+    <FormularioConCarga
       action={accion}
       noValidate
       onReset={(evento) => evento.preventDefault()}
@@ -184,6 +186,6 @@ export function FormularioFicha({ ficha }: { ficha: FichaInstitucional }) {
           </BotonEnviar>
         </div>
       </div>
-    </form>
+    </FormularioConCarga>
   );
 }

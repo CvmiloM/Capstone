@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Icono, type NombreIcono } from "@/app/components/icono";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { Encabezado, claseEnlace, AvisoError } from "@/app/components/formulario";
 import { formatearTamano } from "@/app/components/evidencias/opciones";
 import { numeroPagina, obtenerDetalle } from "../../../../datos";

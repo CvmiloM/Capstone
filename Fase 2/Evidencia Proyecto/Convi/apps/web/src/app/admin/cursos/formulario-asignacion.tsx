@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { asignarProfesor, type EstadoFormulario } from "./acciones";
@@ -33,7 +35,7 @@ export function FormularioAsignacion({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.listo && (
         <div
@@ -105,6 +107,6 @@ export function FormularioAsignacion({
       <BotonEnviar pendiente={pendiente} textoPendiente="Asignando…">
         {anioCerrado !== undefined ? "Agregar como corrección" : "Asignar profesor"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
-}
+}

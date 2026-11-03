@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { cerrarSesion } from "./cerrar-sesion";
 import { AvisoError, claseBotonSecundario } from "./formulario";
@@ -11,7 +13,7 @@ export function BotonCerrarSesion() {
   );
 
   return (
-    <form action={accion} className="flex flex-col items-start gap-2">
+    <FormularioConCarga action={accion} className="flex flex-col items-start gap-2">
       <button
         type="submit"
         disabled={pendiente}
@@ -20,6 +22,6 @@ export function BotonCerrarSesion() {
         {pendiente ? "Cerrando sesión…" : "Cerrar sesión"}
       </button>
       {error && <AvisoError>{error}</AvisoError>}
-    </form>
+    </FormularioConCarga>
   );
 }

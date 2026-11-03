@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, type ReactNode } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import type { Categoria, EstudianteDelCurso } from "../../../datos";
@@ -40,7 +42,7 @@ export function FormularioSituacion({
   const urgencia = valores.urgencia || "NORMAL";
 
   return (
-    <form action={accion} noValidate className="max-w-3xl space-y-6">
+    <FormularioConCarga action={accion} noValidate className="max-w-3xl space-y-6">
       <input type="hidden" name="curso_id" value={cursoId} />
       {(estado.mensaje || errores.curso_id) && (
         <AvisoError>{errores.curso_id ?? estado.mensaje}</AvisoError>
@@ -196,7 +198,7 @@ export function FormularioSituacion({
       <BotonEnviar pendiente={pendiente} textoPendiente="Registrando…">
         Registrar situación
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }
 

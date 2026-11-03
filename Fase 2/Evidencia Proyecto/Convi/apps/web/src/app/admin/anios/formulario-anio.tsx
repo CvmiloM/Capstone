@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { crearAnio, editarAnio, type EstadoFormularioAnio } from "./acciones";
@@ -29,7 +31,7 @@ export function FormularioAnio({ anio }: { anio?: AnioAcademico }) {
     anio !== undefined && (anio.estado !== "PLANIFICADO" || anio.cursos > 0);
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.creado && (
         <div
@@ -86,6 +88,6 @@ export function FormularioAnio({ anio }: { anio?: AnioAcademico }) {
       >
         {anio ? "Guardar cambios" : "Crear año académico"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { ConfirmarEnvio } from "@/app/components/confirmar-envio";
@@ -32,7 +34,7 @@ export function DesactivacionEstudiantes({
         <ConfirmarEnvio
           mensaje={`¿Desactivar ${total} estudiantes? Se aplicará a todos los que coinciden con esta búsqueda, no solo a la página visible, sus fichas y antecedentes se conservarán`}
         >
-          <form action={accion} className="space-y-4">
+          <FormularioConCarga action={accion} className="space-y-4">
             <input type="hidden" name="buscar" value={buscar} />
             <input type="hidden" name="curso" value={curso} />
             <input type="hidden" name="total_esperado" value={total} />
@@ -65,7 +67,7 @@ export function DesactivacionEstudiantes({
             <BotonEnviar pendiente={pendiente} textoPendiente="Desactivando…">
               Desactivar {total} estudiantes
             </BotonEnviar>
-          </form>
+          </FormularioConCarga>
         </ConfirmarEnvio>
       </div>
     </details>

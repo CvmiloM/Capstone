@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evidencia";
 import { NOMBRE_TIPO_EVIDENCIA } from "@/app/components/evidencias/opciones";
 import { claseEnlace } from "@/app/components/formulario";

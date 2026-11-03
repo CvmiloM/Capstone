@@ -1,5 +1,7 @@
 "use client";
 
+import { CargaActiva, FormularioConCarga } from "@/app/components/actividad";
+
 import {
   useActionState,
   useId,
@@ -79,6 +81,7 @@ export function AgregarApoderado({
 
   return (
     <div className="space-y-5">
+      <CargaActiva activa={buscando} />
       <fieldset className="space-y-2">
         <legend className="sr-only">Cómo agregar al apoderado</legend>
         {[
@@ -103,7 +106,7 @@ export function AgregarApoderado({
         ))}
       </fieldset>
       {modo === "existente" && (
-        <form
+        <FormularioConCarga
           onSubmit={enviarBusqueda}
           role="search"
           className="mb-5 space-y-3 rounded-xl bg-muted p-4"
@@ -136,9 +139,9 @@ export function AgregarApoderado({
               ? "Buscando apoderados, los vínculos registrados se mantienen"
               : mensaje}
           </p>
-        </form>
+        </FormularioConCarga>
       )}
-      <form
+      <FormularioConCarga
         id={formularioId}
         action={accion}
         noValidate
@@ -287,7 +290,7 @@ export function AgregarApoderado({
         <BotonEnviar pendiente={pendiente} textoPendiente="Guardando vínculo…">
           Guardar vínculo
         </BotonEnviar>
-      </form>
+      </FormularioConCarga>
     </div>
   );
 }
@@ -317,7 +320,7 @@ export function FormularioTermino({
       <summary className="w-fit cursor-pointer font-medium text-primary">
         Registrar término del vínculo
       </summary>
-      <form action={accion} noValidate className="mt-3 space-y-3">
+      <FormularioConCarga action={accion} noValidate className="mt-3 space-y-3">
         <p className="text-muted-foreground">
           El vínculo se conserva en la ficha, la fecha indicada será su último
           día de vigencia
@@ -338,7 +341,7 @@ export function FormularioTermino({
         <BotonEnviar pendiente={pendiente} textoPendiente="Guardando término…">
           Confirmar término
         </BotonEnviar>
-      </form>
+      </FormularioConCarga>
     </details>
   );
 }
@@ -375,7 +378,7 @@ export function FormularioContacto({
       <summary className="w-fit cursor-pointer font-medium text-primary">
         Corregir datos del contacto
       </summary>
-      <form action={accion} noValidate className="mt-3 space-y-4">
+      <FormularioConCarga action={accion} noValidate className="mt-3 space-y-4">
         <p className="text-muted-foreground">
           Corrige cómo está escrita su ficha, el cambio queda registrado con tu
           nombre y la fecha. Si es otra persona, agrégala como un apoderado
@@ -456,7 +459,7 @@ export function FormularioContacto({
         >
           Guardar corrección
         </BotonEnviar>
-      </form>
+      </FormularioConCarga>
     </details>
   );
 }

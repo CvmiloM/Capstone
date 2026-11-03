@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useId } from "react";
 import { AvisoError, claseBotonSecundario } from "@/app/components/formulario";
 import { reactivarUsuario, type EstadoSuspension } from "./acciones";
@@ -23,7 +25,7 @@ export function FormularioReactivacion({
       <summary className="w-fit cursor-pointer text-xs font-medium text-primary">
         Reactivar cuenta
       </summary>
-      <form action={accion} className="mt-3 space-y-3">
+      <FormularioConCarga action={accion} className="mt-3 space-y-3">
         <input type="hidden" name="perfil" value={filtros.perfil} />
         <input
           type="hidden"
@@ -56,7 +58,7 @@ export function FormularioReactivacion({
           {pendiente ? "Reactivando…" : "Confirmar reactivación"}
         </button>
         {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
-      </form>
+      </FormularioConCarga>
     </details>
   );
 }

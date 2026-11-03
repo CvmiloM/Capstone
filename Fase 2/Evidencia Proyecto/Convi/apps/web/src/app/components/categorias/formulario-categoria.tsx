@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import {
@@ -34,7 +36,7 @@ export function FormularioCategoria({ categoria }: { categoria?: Categoria }) {
     : `${idDescripcion}-ayuda`;
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.listo && (
         <div
@@ -88,6 +90,6 @@ export function FormularioCategoria({ categoria }: { categoria?: Categoria }) {
       >
         {categoria ? "Guardar cambios" : "Crear categoría"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

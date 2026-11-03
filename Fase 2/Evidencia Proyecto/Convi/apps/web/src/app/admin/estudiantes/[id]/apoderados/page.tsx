@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { notFound } from "next/navigation";
 import { Encabezado, claseEnlace } from "@/app/components/formulario";
 import { obtenerContextoAdmin } from "../../../datos";

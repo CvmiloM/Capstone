@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/servidor";

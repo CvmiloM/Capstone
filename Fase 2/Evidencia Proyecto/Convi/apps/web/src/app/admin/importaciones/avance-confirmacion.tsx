@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
@@ -106,7 +108,7 @@ export function AvanceConfirmacion({
       </p>
 
       {!avance.en_curso && (
-        <form
+        <FormularioConCarga
           action={reanudar}
           className="space-y-3 rounded-lg border border-amarillo/60 bg-amarillo/15 px-4 py-3"
         >
@@ -125,7 +127,7 @@ export function AvanceConfirmacion({
           >
             {reanudando ? "Reanudando…" : "Reanudar la confirmación"}
           </button>
-        </form>
+        </FormularioConCarga>
       )}
     </div>
   );

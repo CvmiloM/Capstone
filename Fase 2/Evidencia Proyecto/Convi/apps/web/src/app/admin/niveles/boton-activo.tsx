@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import {
   claseBotonPrimario,
@@ -18,7 +20,7 @@ export function BotonActivo({ id, activo }: { id: string; activo: boolean }) {
   );
 
   return (
-    <form action={accion}>
+    <FormularioConCarga action={accion}>
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="activo" value={activo ? "false" : "true"} />
       <button
@@ -33,6 +35,6 @@ export function BotonActivo({ id, activo }: { id: string; activo: boolean }) {
           {estado.mensaje}
         </p>
       )}
-    </form>
+    </FormularioConCarga>
   );
 }

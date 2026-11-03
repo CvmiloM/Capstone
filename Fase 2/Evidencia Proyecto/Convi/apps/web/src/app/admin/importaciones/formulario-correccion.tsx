@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import {
   AvisoError,
@@ -48,7 +50,7 @@ export function FormularioCorreccion({
       <summary className={`cursor-pointer text-sm ${claseEnlace}`}>
         {corregidos ? "Cambiar la corrección" : "Corregir"}
       </summary>
-      <form action={accion} className="mt-3 space-y-3">
+      <FormularioConCarga action={accion} className="mt-3 space-y-3">
         {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
         {campos.map((campo) => {
           const nombre = `valor-${campo.clave}`;
@@ -120,7 +122,7 @@ export function FormularioCorreccion({
             </button>
           )}
         </div>
-      </form>
+      </FormularioConCarga>
     </details>
   );
 }

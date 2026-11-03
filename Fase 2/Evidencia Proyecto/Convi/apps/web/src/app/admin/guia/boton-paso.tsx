@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import { type EstadoGuia, terminarPaso } from "./acciones";
@@ -23,7 +25,7 @@ export function BotonTerminarPaso({
     estadoInicial,
   );
   return (
-    <form action={accion} className="space-y-3">
+    <FormularioConCarga action={accion} className="space-y-3">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       <input type="hidden" name="version" value={version} />
       <button
@@ -33,6 +35,6 @@ export function BotonTerminarPaso({
       >
         {pendiente ? "Guardando…" : "Marcar el paso como listo"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { Selector } from "../cursos/selector";
@@ -39,7 +41,7 @@ export function FormularioMatricula({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.listo && (
         <div
@@ -85,6 +87,6 @@ export function FormularioMatricula({
       <BotonEnviar pendiente={pendiente} textoPendiente="Matriculando…">
         Matricular
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

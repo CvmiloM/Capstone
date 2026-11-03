@@ -1,5 +1,7 @@
+
+import { FormularioConCarga } from "@/app/components/actividad";
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import {
   claseBotonSecundario,
   claseEnlace,
@@ -135,12 +137,12 @@ export default async function GuiaInicial({
             })}
           </ol>
           {!guia.iniciada && (
-            <form action={irAlPortal} className="mt-4">
+            <FormularioConCarga action={irAlPortal} className="mt-4">
               <input type="hidden" name="version" value={guia.version} />
               <button type="submit" className={`w-full ${claseBotonSecundario}`}>
                 Ir al portal por ahora
               </button>
-            </form>
+            </FormularioConCarga>
           )}
           {guia.iniciada && (
             <Link href="/admin" className={`mt-4 block text-sm ${claseEnlace}`}>
@@ -234,13 +236,13 @@ export default async function GuiaInicial({
             {actual !== "bienvenida" &&
               actual !== "fin" &&
               estadoPaso.estado !== "LISTO" && (
-                <form action={omitirPaso}>
+                <FormularioConCarga action={omitirPaso}>
                   <input type="hidden" name="paso" value={actual} />
                   <input type="hidden" name="version" value={guia.version} />
                   <button type="submit" className={claseBotonSecundario}>
                     Omitir por ahora
                   </button>
-                </form>
+                </FormularioConCarga>
               )}
             {siguiente && (
               <Link

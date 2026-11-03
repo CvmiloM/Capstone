@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { FormularioConCarga } from "@/app/components/actividad";
+
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { useActionState, useEffect, useRef, useState } from "react";
 import {
   AvisoError,
@@ -139,7 +141,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
     <div className="space-y-4">
       <MascotaIA fase={fase} mensajes={mensajes} />
 
-      <form action={accion} onSubmit={() => setPaso(0)} className="space-y-3">
+      <FormularioConCarga action={accion} onSubmit={() => setPaso(0)} className="space-y-3">
         <fieldset disabled={pendiente} className="grid gap-2 sm:grid-cols-2">
           <legend className="mb-2 text-sm font-medium">
             Puedes comenzar con una de estas preguntas
@@ -206,7 +208,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
             ¿Qué se debe hacer?
           </BotonEnviar>
         </div>
-      </form>
+      </FormularioConCarga>
 
       {resultado && !pendiente && (
         <div

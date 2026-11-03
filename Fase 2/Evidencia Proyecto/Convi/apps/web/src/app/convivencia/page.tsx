@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
 // Mismos estilos de urgencia y formato de fecha que el portal del profesor.
 import { obtenerFormatoFecha, URGENCIA } from "@/app/profesor/datos";
@@ -124,6 +124,7 @@ export default async function PaginaBandeja({
               <li key={situacion.id}>
                 <Link
                   href={`/convivencia/situaciones/${situacion.id}`}
+                  anticipar
                   className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-tarjeta transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-ring sm:flex-row sm:items-center"
                 >
                   <div className="min-w-0 flex-1">

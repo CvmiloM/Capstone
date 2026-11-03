@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import {
   AvisoError,
@@ -108,7 +110,7 @@ export function AccionesConfirmacion({
       )}
 
       {enRevision && (
-        <form
+        <FormularioConCarga
           action={confirmar}
           onSubmit={(evento) => {
             const aviso =
@@ -157,11 +159,11 @@ export function AccionesConfirmacion({
               ? "Revisando las filas…"
               : `Confirmar ${filas(porConfirmar)}`}
           </button>
-        </form>
+        </FormularioConCarga>
       )}
 
       {enRevision && resumen.ERROR > 0 && (
-        <form
+        <FormularioConCarga
           action={omitir}
           onSubmit={(evento) => {
             if (
@@ -186,7 +188,7 @@ export function AccionesConfirmacion({
               ? "Omitiendo…"
               : `Omitir las ${filas(resumen.ERROR)} con error`}
           </button>
-        </form>
+        </FormularioConCarga>
       )}
     </div>
   );

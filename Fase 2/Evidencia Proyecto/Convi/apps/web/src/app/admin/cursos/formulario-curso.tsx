@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import type { NivelEducativo } from "../niveles/datos";
@@ -46,7 +48,7 @@ export function FormularioCurso({
   const nivelFijo = curso !== undefined && curso.matriculas > 0;
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.listo && (
         <div
@@ -126,6 +128,6 @@ export function FormularioCurso({
             ? "Guardar cambios"
             : "Crear curso"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

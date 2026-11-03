@@ -1,4 +1,6 @@
-import Link from "next/link";
+
+import { FormularioConCarga } from "@/app/components/actividad";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { pedir } from "../datos";
 import { claseBotonPrimario, claseEnlace } from "@/app/components/formulario";
 import { AvisoNoDisponible } from "../aviso-no-disponible";
@@ -45,7 +47,7 @@ export default async function AgendaSeguimientos({
           caso
         </p>
       </header>
-      <form className="flex flex-wrap items-end gap-3">
+      <FormularioConCarga className="flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="mes" className="mb-2 block text-sm font-medium">
             Mes
@@ -61,7 +63,7 @@ export default async function AgendaSeguimientos({
         <button type="submit" className={claseBotonPrimario}>
           Ver mes
         </button>
-      </form>
+      </FormularioConCarga>
       <p className="text-sm text-muted-foreground">
         {a.total} seguimientos, se muestran hasta 50 por página
       </p>

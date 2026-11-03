@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { Suspense } from "react";
 import logo from "@/assets/convi-logo-trim.png";
 import { AvatarUsuario } from "@/app/components/avatar-usuario";

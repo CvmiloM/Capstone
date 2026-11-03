@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import {
   AvisoError,
@@ -107,7 +109,7 @@ export function FormularioCursos({
   }
 
   return (
-    <form action={accion} noValidate className="space-y-6">
+    <FormularioConCarga action={accion} noValidate className="space-y-6">
       <input type="hidden" name="version" value={version} />
       <input type="hidden" name="anio" value={anio} />
       <input type="hidden" name="fecha_inicio" value={fechaInicio} />
@@ -389,6 +391,6 @@ export function FormularioCursos({
           </div>
         </section>
       )}
-    </form>
+    </FormularioConCarga>
   );
 }

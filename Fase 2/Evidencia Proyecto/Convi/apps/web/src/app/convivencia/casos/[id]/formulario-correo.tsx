@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import {
   AvisoError,
@@ -49,7 +51,7 @@ export function FormularioCorreo({
   );
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       {correo && <input type="hidden" name="correo_id" value={correo.id} />}
       {estado.mensaje && !estado.errores && (
@@ -172,7 +174,7 @@ export function FormularioCorreo({
             ? "Guardar cambios"
             : "Guardar borrador"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -189,7 +191,7 @@ export function BotonDescartarCorreo({
     estadoInicial,
   );
   return (
-    <form
+    <FormularioConCarga
       action={accion}
       onSubmit={(evento) => {
         if (!window.confirm("¿Descartar este borrador? No se puede recuperar."))
@@ -207,6 +209,6 @@ export function BotonDescartarCorreo({
       >
         {pendiente ? "Descartando…" : "Descartar borrador"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

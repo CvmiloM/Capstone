@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import {
   AvisoError,
@@ -39,7 +41,7 @@ export function FormularioBienvenida({
   const [elegido, setElegido] = useState(valores.metodo ?? metodo ?? "");
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       <input type="hidden" name="version" value={version} />
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
@@ -142,6 +144,6 @@ export function FormularioBienvenida({
           Omitir este paso
         </button>
       </div>
-    </form>
+    </FormularioConCarga>
   );
 }

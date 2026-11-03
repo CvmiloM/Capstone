@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useId, useState } from "react";
 import { AvisoError, claseBotonSecundario } from "@/app/components/formulario";
 import { SelectorFiltro } from "@/app/components/selector-filtro";
@@ -21,7 +23,7 @@ export function FormularioRestablecimiento({ cuentaId, solicitudId, nombre, filt
       <summary className="w-fit cursor-pointer rounded-lg text-xs font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
         Restablecer segundo factor
       </summary>
-      <form action={accion} className="mt-3 space-y-4 rounded-2xl border border-border bg-muted/30 p-4" aria-busy={pendiente}>
+      <FormularioConCarga action={accion} className="mt-3 space-y-4 rounded-2xl border border-border bg-muted/30 p-4" aria-busy={pendiente}>
         <input type="hidden" name="perfil" value={filtros.perfil} />
         <input type="hidden" name="suspendidas" value={filtros.suspendidas ? "1" : "0"} />
         <p>Usa esta opción si {nombre} perdió su aplicación autenticadora, primero verifica su identidad por un medio acordado fuera de CONVI</p>
@@ -47,7 +49,7 @@ export function FormularioRestablecimiento({ cuentaId, solicitudId, nombre, filt
           </button>
         </fieldset>
         {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
-      </form>
+      </FormularioConCarga>
     </details>
   );
 }

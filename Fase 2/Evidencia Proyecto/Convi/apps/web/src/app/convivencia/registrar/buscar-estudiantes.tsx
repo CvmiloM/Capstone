@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { CargaActiva } from "@/app/components/actividad";
 import { claseBotonSecundario } from "@/app/components/formulario";
 import { SelectorFiltro } from "@/app/components/selector-filtro";
 import { ROLES_EN_SITUACION } from "@/app/profesor/situacion-opciones";
@@ -74,6 +75,7 @@ export function BuscarEstudiantes({
   }
   return (
     <div className="space-y-4">
+      <CargaActiva activa={pendiente} />
       <p className="text-sm text-muted-foreground">
         {informante
           ? "Busca al estudiante que informó, es opcional"
