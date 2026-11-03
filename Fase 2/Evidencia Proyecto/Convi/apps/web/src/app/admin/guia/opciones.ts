@@ -18,17 +18,12 @@ export type ClavePaso =
 /** PB-033 y PB-035 a PB-037: pasos que se hacen con operaciones del portal. */
 export type PasoDelPortal = "equipo" | "reglamento" | "estudiantes" | "reglas";
 
-/**
- * HU-031 CA1: cada paso explica qué se prepara y qué ocurrirá al confirmar.
- * Los pasos que todavía no funcionan dentro de la guía llevan a la sección
- * del portal donde ya se pueden hacer.
- */
+/** HU-031 CA1: cada paso explica qué se prepara y qué ocurrirá al confirmar. */
 export const PASOS: {
   clave: ClavePaso;
   titulo: string;
   prepara: string;
   alConfirmar: string;
-  enlaces?: { href: string; texto: string }[];
 }[] = [
   {
     clave: "bienvenida",
@@ -84,7 +79,7 @@ export const PASOS: {
     prepara:
       "Un resumen de lo configurado y de lo que falta, con las cifras reales de tu escuela.",
     alConfirmar:
-      "La guía queda terminada y se abre el portal de administración.",
+      "Se guarda la fecha en que terminó la guía y se abre el portal de administración. Lo que falte se sigue haciendo desde sus secciones.",
   },
 ];
 

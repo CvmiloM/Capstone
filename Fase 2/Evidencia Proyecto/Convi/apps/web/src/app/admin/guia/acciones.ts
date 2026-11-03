@@ -8,10 +8,11 @@ import {
   enviarInicioGuia,
   enviarOmision,
   enviarPasoListo,
+  enviarTermino,
 } from "./datos";
 import type { ClavePaso, PasoDelPortal } from "./opciones";
 
-// PB-032 a PB-034, PB-036 y PB-038: acciones de la guía inicial. Cada formulario envía
+// PB-032 a PB-039: acciones de la guía inicial. Cada formulario envía
 // la huella de la guía que se veía, para que la API rechace el cambio si otro
 // administrador la avanzó entretanto (PB-139).
 
@@ -128,4 +129,16 @@ export async function terminarPaso(
   if (paso === "reglamento") irAPaso("estudiantes", "reglamento-listo");
   if (paso === "reglas") irAPaso("fin", "reglas-listo");
   irAPaso("reglas", "estudiantes-listo");
+}
+
+// PB-039 (HU-032 CA2 y CA3): termina la guía y abre el portal. Si ya estaba
+// terminada, la API responde igual y la fecha no cambia.
+export async function terminarGuia(
+  _anterior: EstadoGuia,
+  formData: FormData,
+): Promise<EstadoGuia> {
+  const resultado = await enviarTermino(leerTexto(formData, "version"));
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  revalidatePath("/admin", "layout");
+  redirect("/admin?guia=terminada");
 }

@@ -14,6 +14,7 @@ import { FormularioBienvenida } from "./formulario-bienvenida";
 import { FormularioCursos } from "./formulario-cursos";
 import { PasoEquipo } from "./paso-equipo";
 import { PasoEstudiantes } from "./paso-estudiantes";
+import { PasoFin } from "./paso-fin";
 import { PasoReglamento } from "./paso-reglamento";
 import { PasoReglas } from "./paso-reglas";
 import {
@@ -70,7 +71,7 @@ const AVISOS: Record<string, { texto: string; error?: boolean }> = {
   error: { texto: "Recarga la página e inténtalo nuevamente.", error: true },
 };
 
-// PB-032 a PB-038 (HU-025 a HU-031): guía inicial del administrador. Al volver
+// PB-032 a PB-039 (HU-025 a HU-032): guía inicial del administrador. Al volver
 // se retoma en el primer paso pendiente (HU-031 CA2) y se puede abrir cualquier
 // paso desde la lista.
 export default async function GuiaInicial({
@@ -104,6 +105,11 @@ export default async function GuiaInicial({
             Volver al Resumen
           </Link>
         </p>
+        {/* PB-039 (HU-032 CA3): la fecha y lo configurado se conservan. */}
+        <section className="mt-6 rounded-2xl border border-border bg-card p-5 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold">Lo que dejó la guía</h2>
+          <PasoFin guia={guia} fecha={fecha} terminada />
+        </section>
       </>
     );
 
@@ -248,21 +254,7 @@ export default async function GuiaInicial({
                 listo={estadoPaso.estado === "LISTO"}
               />
             )}
-            {paso.enlaces && (
-              <p className="flex flex-wrap gap-4 text-sm">
-                {paso.enlaces.map((e) => (
-                  <Link key={e.href} href={e.href} className={claseEnlace}>
-                    {e.texto}
-                  </Link>
-                ))}
-              </p>
-            )}
-            {actual === "fin" && (
-              <p className="text-sm text-muted-foreground">
-                Este paso estará disponible pronto. Mientras tanto, el Resumen
-                del portal muestra las cifras de tu escuela.
-              </p>
-            )}
+            {actual === "fin" && <PasoFin guia={guia} fecha={fecha} />}
           </div>
 
           <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-border pt-4">
