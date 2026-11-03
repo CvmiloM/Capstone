@@ -23,10 +23,10 @@ import {
   type AvanceGuia,
 } from './guia.js';
 
-// PB-032 a PB-036 (HU-025 a HU-029) y PB-038 (HU-031): guía inicial del
-// administrador. Solo entra una cuenta ADMIN activa con segundo factor (HU-025
-// CA1). Cualquier administrador de la escuela la avanza; la base audita cada
-// cambio de la escuela y conserva la fecha de término de la guía.
+// PB-032 a PB-038 (HU-025 a HU-031): guía inicial del administrador. Solo
+// entra una cuenta ADMIN activa con segundo factor (HU-025 CA1). Cualquier
+// administrador de la escuela la avanza; la base audita cada cambio de la
+// escuela y conserva la fecha de término de la guía.
 const ACCESO = { tipo: 'establecimiento', perfiles: ['ADMIN'] } as const;
 
 const TERMINADA =
@@ -55,6 +55,10 @@ const EQUIPO_INVITADO = `(SELECT count(*) FROM convi.membresias_establecimiento 
 const REGLAMENTO_CARGADO = `(SELECT count(*) FROM convi.versiones_documento v
   JOIN convi.documentos_institucionales d ON d.id = v.documento_id
   WHERE d.tipo_documento = 'RICE' AND v.estado <> 'ARCHIVADO')::int`;
+
+/** PB-037: reglas de aviso en Borrador o Activas, de cualquier tipo. */
+const REGLAS_GUARDADAS = `(SELECT count(*) FROM convi.reglas r
+  WHERE r.estado <> 'ARCHIVADO')::int`;
 
 /** Avance con el paso marcado; $2 = paso y $3 = LISTO u OMITIDO. */
 const AVANCE_CON_PASO = `e.contexto_onboarding || jsonb_build_object(
@@ -357,6 +361,19 @@ export class GuiaAdminService {
     );
   }
 
+  // PB-037 (HU-030): las categorías y las reglas se crean con las mismas
+  // operaciones del portal (PB-030 y PB-089); el paso queda Listo con al menos
+  // una regla en Borrador o Activa (por defecto).
+  terminarReglas(sesion: Sesion, cuerpo: unknown): Promise<{ id: string }> {
+    return this.terminarPaso(
+      sesion,
+      'reglas',
+      cuerpo,
+      REGLAS_GUARDADAS,
+      'Todavía no hay reglas de aviso. Guarda al menos una regla, u omite el paso por ahora.',
+    );
+  }
+
   /**
    * Deja Listo un paso que se hace con una operación del portal, si esa
    * operación ya dejó algo: la consulta (una constante de este archivo)
@@ -364,7 +381,7 @@ export class GuiaAdminService {
    */
   private terminarPaso(
     sesion: Sesion,
-    paso: 'equipo' | 'reglamento' | 'estudiantes',
+    paso: 'equipo' | 'reglamento' | 'estudiantes' | 'reglas',
     cuerpo: unknown,
     hecho: string,
     faltante: string,

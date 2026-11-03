@@ -15,6 +15,7 @@ import { FormularioCursos } from "./formulario-cursos";
 import { PasoEquipo } from "./paso-equipo";
 import { PasoEstudiantes } from "./paso-estudiantes";
 import { PasoReglamento } from "./paso-reglamento";
+import { PasoReglas } from "./paso-reglas";
 import {
   CLASE_ESTADO_PASO,
   formatoFecha,
@@ -50,6 +51,17 @@ const AVISOS: Record<string, { texto: string; error?: boolean }> = {
   "estudiantes-listo": {
     texto: "El paso Estudiantes quedó listo.",
   },
+  "regla-borrador": {
+    texto:
+      "La regla quedó guardada en Borrador, versión 1. Guardarla no genera ni envía alertas; actívala en Reglas cuando la hayas revisado.",
+  },
+  "regla-activa": {
+    texto:
+      "La regla quedó Activa, versión 1. Guardarla no genera ni envía alertas: CONVI avisará cuando se registren situaciones que la cumplan.",
+  },
+  "reglas-listo": {
+    texto: "El paso Categorías y reglas quedó listo.",
+  },
   desactualizada: {
     texto:
       "Otra persona avanzó la guía mientras la mirabas. Revisa su avance e inténtalo nuevamente.",
@@ -58,9 +70,9 @@ const AVISOS: Record<string, { texto: string; error?: boolean }> = {
   error: { texto: "Recarga la página e inténtalo nuevamente.", error: true },
 };
 
-// PB-032 (HU-025), PB-033 (HU-026), PB-034 (HU-027), PB-036 (HU-029) y PB-038
-// (HU-031): guía inicial del administrador. Al volver se retoma en el primer paso pendiente (CA2) y se
-// puede abrir cualquier paso desde la lista.
+// PB-032 a PB-038 (HU-025 a HU-031): guía inicial del administrador. Al volver
+// se retoma en el primer paso pendiente (HU-031 CA2) y se puede abrir cualquier
+// paso desde la lista.
 export default async function GuiaInicial({
   searchParams,
 }: {
@@ -227,6 +239,12 @@ export default async function GuiaInicial({
               <PasoEstudiantes
                 guia={guia}
                 fecha={fecha}
+                listo={estadoPaso.estado === "LISTO"}
+              />
+            )}
+            {actual === "reglas" && (
+              <PasoReglas
+                version={guia.version}
                 listo={estadoPaso.estado === "LISTO"}
               />
             )}

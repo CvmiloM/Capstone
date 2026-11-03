@@ -85,10 +85,20 @@ export function FormularioRegla({
   portal,
   regla,
   categorias,
+  tipoFijo,
+  volverAGuia = false,
 }: {
   portal: "admin" | "convivencia";
   regla?: Regla;
   categorias: { id: string; nombre: string }[];
+  /** PB-037: la guía inicial crea la regla con el tipo ya elegido. */
+  tipoFijo?: Tipo;
+  /**
+   * PB-037 (HU-030 CA2): en la guía inicial no se piden fechas de vigencia,
+   * se elige si la regla queda en Borrador o Activa y al guardar se vuelve a
+   * su paso.
+   */
+  volverAGuia?: boolean;
 }) {
   const [estado, accion, pendiente] = useActionState(
     regla ? editarRegla : crearRegla,
@@ -97,7 +107,7 @@ export function FormularioRegla({
   const errores = estado.errores ?? {};
 
   const [nombre, setNombre] = useState(regla?.nombre ?? "");
-  const [tipo, setTipo] = useState<Tipo>(regla?.tipo_regla ?? "RECURRENCIA");
+  const [tipo, setTipo] = useState<Tipo>(regla?.tipo_regla ?? tipoFijo ?? "RECURRENCIA");
   const [ambito, setAmbito] = useState<string>(regla?.codigo_ambito ?? "ESTUDIANTE");
   const [operador, setOperador] = useState(regla?.codigo_operador ?? "GE");
   const [umbral, setUmbral] = useState(regla?.valor_umbral?.toString() ?? "3");
@@ -107,6 +117,7 @@ export function FormularioRegla({
   const [prioridad, setPrioridad] = useState(regla?.codigo_prioridad ?? "MEDIA");
   const [desde, setDesde] = useState(regla?.vigente_desde ?? "");
   const [hasta, setHasta] = useState(regla?.vigente_hasta ?? "");
+  const [activar, setActivar] = useState(false);
 
   // Al cambiar el tipo, el ámbito y el operador quedan en un valor que el tipo admite.
   function cambiarTipo(valor: string) {
@@ -143,6 +154,7 @@ export function FormularioRegla({
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       <input type="hidden" name="portal" value={portal} />
       {regla && <input type="hidden" name="id" value={regla.id} />}
+      {volverAGuia && <input type="hidden" name="volver" value="guia" />}
 
       <Campo
         name="nombre"
@@ -155,13 +167,17 @@ export function FormularioRegla({
         error={errores.nombre}
       />
 
-      <Lista name="tipo_regla" etiqueta="Tipo de regla" valor={tipo} alCambiar={cambiarTipo} error={errores.tipo_regla} ayuda={ayudaTipo}>
-        {TIPOS.map((t) => (
-          <option key={t.valor} value={t.valor}>
-            {t.texto}
-          </option>
-        ))}
-      </Lista>
+      {tipoFijo ? (
+        <input type="hidden" name="tipo_regla" value={tipoFijo} />
+      ) : (
+        <Lista name="tipo_regla" etiqueta="Tipo de regla" valor={tipo} alCambiar={cambiarTipo} error={errores.tipo_regla} ayuda={ayudaTipo}>
+          {TIPOS.map((t) => (
+            <option key={t.valor} value={t.valor}>
+              {t.texto}
+            </option>
+          ))}
+        </Lista>
+      )}
 
       <Lista
         name="codigo_ambito"
@@ -249,33 +265,65 @@ export function FormularioRegla({
         </Lista>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Campo
-          name="vigente_desde"
-          etiqueta="Vigente desde (opcional)"
-          type="date"
-          value={desde}
-          onChange={(evento) => setDesde(evento.target.value)}
-          ayuda="Si lo dejas en blanco, empieza el día en que la actives."
-          error={errores.vigente_desde}
-        />
-        <Campo
-          name="vigente_hasta"
-          etiqueta="Vigente hasta (opcional)"
-          type="date"
-          value={hasta}
-          onChange={(evento) => setHasta(evento.target.value)}
-          error={errores.vigente_hasta}
-        />
-      </div>
+      {!volverAGuia && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo
+            name="vigente_desde"
+            etiqueta="Vigente desde (opcional)"
+            type="date"
+            value={desde}
+            onChange={(evento) => setDesde(evento.target.value)}
+            ayuda="Si lo dejas en blanco, empieza el día en que la actives."
+            error={errores.vigente_desde}
+          />
+          <Campo
+            name="vigente_hasta"
+            etiqueta="Vigente hasta (opcional)"
+            type="date"
+            value={hasta}
+            onChange={(evento) => setHasta(evento.target.value)}
+            error={errores.vigente_hasta}
+          />
+        </div>
+      )}
 
       <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Así se lee la regla</p>
         <p className="mt-1 font-medium">{frase}</p>
       </div>
 
+      {volverAGuia && (
+        <fieldset>
+          <legend className="text-sm font-medium">Cómo queda la regla</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {[
+              { valor: false, texto: "En borrador", ayuda: "La revisas y la activas después en Reglas." },
+              { valor: true, texto: "Activa desde hoy", ayuda: "CONVI la revisa con cada situación que se registre." },
+            ].map((opcion) => (
+              <label
+                key={opcion.texto}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-input bg-card px-3 py-2.5 text-sm has-[:checked]:border-primary has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring"
+              >
+                <input
+                  type="radio"
+                  name="activar"
+                  value={opcion.valor ? "si" : "no"}
+                  checked={activar === opcion.valor}
+                  onChange={() => setActivar(opcion.valor)}
+                  className="mt-0.5 accent-primary"
+                />
+                <span>
+                  <span className="block font-medium">{opcion.texto}</span>
+                  <span className="block text-muted-foreground">{opcion.ayuda}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
       <BotonEnviar pendiente={pendiente} textoPendiente="Guardando…">
-        {regla ? "Guardar cambios del borrador" : "Guardar como borrador"}
+        {regla ? "Guardar cambios del borrador" : activar ? "Guardar y activar" : "Guardar como borrador"}
       </BotonEnviar>
     </FormularioConCarga>
   );

@@ -5,18 +5,19 @@ import { FormularioConCarga } from "@/app/components/actividad";
 import { useActionState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import { type EstadoGuia, terminarPaso } from "./acciones";
+import type { PasoDelPortal } from "./opciones";
 
 const estadoInicial: EstadoGuia = {};
 
-// PB-033, PB-035 y PB-036: deja Listo un paso que se hace con una operación
-// del portal (invitar al equipo, subir el reglamento o importar la nómina)
-// cuando ya hay algo hecho; la API lo vuelve a comprobar.
+// PB-033 y PB-035 a PB-037: deja Listo un paso que se hace con una operación
+// del portal (invitar al equipo, subir el reglamento, importar la nómina o
+// guardar una regla) cuando ya hay algo hecho; la API lo vuelve a comprobar.
 export function BotonTerminarPaso({
   paso,
   version,
   habilitado,
 }: {
-  paso: "equipo" | "reglamento" | "estudiantes";
+  paso: PasoDelPortal;
   version: string;
   habilitado: boolean;
 }) {

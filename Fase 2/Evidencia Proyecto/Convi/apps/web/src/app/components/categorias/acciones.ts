@@ -30,6 +30,8 @@ function leerCategoria(formData: FormData) {
 function revalidarPortales() {
   revalidatePath("/admin/categorias");
   revalidatePath("/convivencia/categorias");
+  // PB-037: también el paso Categorías y reglas de la guía inicial.
+  revalidatePath("/admin/guia");
 }
 
 // PB-030 (HU-023 CA1): la categoría nueva queda Activa.
