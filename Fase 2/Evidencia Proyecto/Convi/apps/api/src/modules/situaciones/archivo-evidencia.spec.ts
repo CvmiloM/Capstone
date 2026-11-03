@@ -7,6 +7,7 @@ import {
   TAMANO_MAXIMO,
   validarActa,
   validarArchivo,
+  validarCorreccion,
   validarEvidencia,
 } from './archivo-evidencia.js';
 
@@ -240,6 +241,87 @@ describe('Datos de la evidencia (PB-066, HU-057)', () => {
       descripcion: 'Firmada por el apoderado',
       archivo: { formato: 'pdf' },
     });
+  });
+});
+
+describe('Corrección de una evidencia (PB-073, HU-063 CA1)', () => {
+  /** Campos con error y mensaje, o null si acepta los datos. */
+  function rechazo(validar: () => unknown) {
+    try {
+      validar();
+      return null;
+    } catch (excepcion) {
+      expect(excepcion).toBeInstanceOf(BadRequestException);
+      const respuesta = (excepcion as BadRequestException).getResponse() as {
+        mensaje: string;
+        errores: Record<string, string>;
+      };
+      return {
+        mensaje: respuesta.mensaje,
+        campos: Object.keys(respuesta.errores).sort(),
+      };
+    }
+  }
+  const motivo = 'El archivo anterior era de otro curso.';
+
+  it('exige el motivo junto con los datos de la evidencia', () => {
+    expect(rechazo(() => validarCorreccion({}, undefined, false))).toEqual({
+      mensaje: 'Revisa los datos marcados. No se guardó la corrección.',
+      campos: ['archivo', 'motivo', 'tipo', 'titulo'],
+    });
+    for (const corto of ['', '   ', 'Corto.'])
+      expect(
+        rechazo(() =>
+          validarCorreccion(
+            { titulo: 'Captura', tipo: 'IMAGEN', motivo: corto },
+            archivo('captura.png', PNG),
+            false,
+          ),
+        )?.campos,
+      ).toEqual(['motivo']);
+    expect(
+      rechazo(() =>
+        validarCorreccion(
+          { titulo: 'Captura', tipo: 'IMAGEN', motivo: 'x'.repeat(501) },
+          archivo('captura.png', PNG),
+          false,
+        ),
+      )?.campos,
+    ).toEqual(['motivo']);
+  });
+
+  it('acepta la corrección y limpia el motivo', () => {
+    expect(
+      validarCorreccion(
+        { titulo: 'Captura corregida', tipo: 'IMAGEN', motivo: `  ${motivo} ` },
+        archivo('captura.png', PNG),
+        false,
+      ),
+    ).toMatchObject({
+      titulo: 'Captura corregida',
+      tipo: 'IMAGEN',
+      motivo,
+      archivo: { formato: 'png' },
+    });
+  });
+
+  it('la corrección de un acta es otra acta con su fecha', () => {
+    expect(
+      rechazo(() =>
+        validarCorreccion(
+          { titulo: 'Acta corregida', tipo: 'DOCUMENTO', motivo },
+          archivo('acta.pdf', PDF),
+          true,
+        ),
+      )?.campos,
+    ).toEqual(['fecha_documento']);
+    expect(
+      validarCorreccion(
+        { titulo: 'Acta corregida', fecha_documento: '2026-10-30', motivo },
+        archivo('acta.pdf', PDF),
+        true,
+      ),
+    ).toMatchObject({ tipo: 'ACTA', fecha_documento: '2026-10-30', motivo });
   });
 });
 

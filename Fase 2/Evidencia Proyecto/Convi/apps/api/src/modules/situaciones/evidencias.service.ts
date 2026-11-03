@@ -16,10 +16,12 @@ import { CuentaService } from '../../database/cuenta.service.js';
 import { comprobarCasoHijo } from './portal-apoderado.js';
 import {
   validarActa,
+  validarCorreccion,
   validarEvidencia,
   type ArchivoSubido,
   type ArchivoValido,
   type NuevaActa,
+  type NuevaCorreccion,
   type NuevaEvidencia,
 } from './archivo-evidencia.js';
 import { INICIO_DEL_DIA } from './plan-intervencion.js';
@@ -27,7 +29,7 @@ import { INICIO_DEL_DIA } from './plan-intervencion.js';
 // PB-066 (HU-057): evidencias de situaciones y casos. El profesor adjunta a
 // las situaciones que registró y Convivencia a cualquier situación o caso de
 // su escuela. Cada evidencia se liga a un solo origen (CA1) y no se edita ni
-// se borra (CA4: la base lo impide; corregir es PB-073). El archivo queda en
+// se borra (CA4: la base lo impide); se corrige con otra evidencia (PB-073). El archivo queda en
 // el espacio privado convi-privado, que solo lee la API con su clave de
 // servicio, y cada descarga vuelve a comprobar el permiso (CA3). Las
 // actuaciones y los compromisos se agregan cuando existan sus pantallas.
@@ -49,12 +51,26 @@ export type EvidenciaRegistrada = {
   creado_en: Date;
   /** Dónde está ligada, por ejemplo "Caso" o "Situación SIT-2026-00010". */
   origen: string;
+  /** PB-073: la evidencia que esta corrige, o null. */
+  corrige: { id: string; titulo: string } | null;
+  motivo_correccion: string | null;
+  /** PB-073: las evidencias que la corrigen, de la más antigua a la más nueva. */
+  corregida_por: { id: string; titulo: string; creado_en: string }[];
 };
 
 const COLUMNAS_EVIDENCIA = `
   ev.id, ev.titulo, ev.tipo_evidencia AS tipo, ev.descripcion,
   ar.nombre_original AS archivo, ar.tamano_bytes::int AS tamano_bytes,
-  p.nombres || ' ' || p.apellidos AS creado_por, ev.creado_en`;
+  p.nombres || ' ' || p.apellidos AS creado_por, ev.creado_en,
+  CASE WHEN ev.rectifica_evidencia_id IS NOT NULL THEN jsonb_build_object(
+    'id', ev.rectifica_evidencia_id,
+    'titulo', (SELECT o.titulo FROM convi.evidencias o
+               WHERE o.id = ev.rectifica_evidencia_id)) END AS corrige,
+  ev.motivo_rectificacion AS motivo_correccion,
+  (SELECT coalesce(jsonb_agg(jsonb_build_object(
+       'id', c.id, 'titulo', c.titulo, 'creado_en', c.creado_en)
+     ORDER BY c.creado_en, c.id), '[]'::jsonb)
+   FROM convi.evidencias c WHERE c.rectifica_evidencia_id = ev.id) AS corregida_por`;
 
 const UNIONES_EVIDENCIA = `
   LEFT JOIN convi.archivos ar ON ar.id = ev.archivo_id
@@ -111,11 +127,20 @@ export async function evidenciasDelCaso(
 }
 
 type Origen = {
-  columna: 'situacion_id' | 'caso_id' | 'actuacion_id';
+  columna:
+    | 'situacion_id'
+    | 'caso_id'
+    | 'actuacion_id'
+    | 'compromiso_id'
+    | 'aclaracion_id';
   id: string;
   /** PB-055 (HU-048 CA3): paso del protocolo del caso al que respalda. */
   paso_caso_id?: string;
+  /** PB-073 (HU-063 CA1): la evidencia que se corrige y el motivo. */
+  corrige?: { id: string; motivo: string };
 };
+
+const NO_EXISTE_EVIDENCIA = 'La evidencia no existe.';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -320,6 +345,114 @@ export class EvidenciasService {
   }
 
   /**
+   * PB-073 (HU-063): Convivencia agrega una evidencia que corrige a otra,
+   * con el motivo obligatorio (CA1). Queda en el mismo lugar que la original,
+   * incluido el paso del protocolo que respaldaba, y la original no cambia
+   * (CA2: la base no permite editar ni borrar evidencias). Si la original es
+   * un acta, la corrección también lo es, con las mismas reglas de fecha.
+   * Decisión del PO (por defecto): una evidencia se puede corregir más de una
+   * vez y un caso cerrado no recibe correcciones hasta reabrirlo.
+   */
+  async corregir(
+    sesion: Sesion,
+    evidenciaId: string,
+    cuerpo: unknown,
+    archivo: ArchivoSubido | undefined,
+  ) {
+    // El tipo de la original, que no cambia, decide qué campos se piden.
+    const original = await this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: ['CONVIVENCIA'] },
+      async (db) =>
+        (
+          await db.query<{ tipo: string }>(
+            'SELECT tipo_evidencia AS tipo FROM convi.evidencias WHERE id = $1',
+            [evidenciaId],
+          )
+        ).rows[0],
+    );
+    if (!original) throw new NotFoundException(NO_EXISTE_EVIDENCIA);
+    const datos: NuevaCorreccion = validarCorreccion(
+      cuerpo,
+      archivo,
+      original.tipo === 'ACTA',
+    );
+    const fechaActa = 'fecha_documento' in datos ? datos.fecha_documento : null;
+    return this.guardar(
+      sesion,
+      ['CONVIVENCIA'],
+      datos,
+      archivo!,
+      async (db) => {
+        const fila = (
+          await db.query<{
+            columna: Origen['columna'] | null;
+            origen_id: string;
+            paso_caso_id: string | null;
+            caso: string | null;
+            futura: boolean | null;
+            antes_del_encuentro: boolean | null;
+          }>(
+            `SELECT CASE WHEN ev.situacion_id IS NOT NULL THEN 'situacion_id'
+                         WHEN ev.caso_id IS NOT NULL THEN 'caso_id'
+                         WHEN ev.actuacion_id IS NOT NULL THEN 'actuacion_id'
+                         WHEN ev.compromiso_id IS NOT NULL THEN 'compromiso_id'
+                         WHEN ev.aclaracion_id IS NOT NULL THEN 'aclaracion_id'
+                    END AS columna,
+                    coalesce(ev.situacion_id, ev.caso_id, ev.actuacion_id,
+                             ev.compromiso_id, ev.aclaracion_id) AS origen_id,
+                    ev.paso_caso_id, ev.caso_contexto_id AS caso,
+                    $2::date > (now() AT TIME ZONE e.zona_horaria)::date AS futura,
+                    $2::date < (a.realizado_en AT TIME ZONE e.zona_horaria)::date
+                      AS antes_del_encuentro
+             FROM convi.vw_evidencias_contexto ev
+             JOIN convi.establecimientos e ON e.id = ev.establecimiento_id
+             LEFT JOIN convi.actuaciones a ON a.id = ev.actuacion_id
+             WHERE ev.id = $1`,
+            [evidenciaId, fechaActa],
+          )
+        ).rows[0];
+        // Las evidencias del Plan de gestión no se corrigen desde aquí.
+        if (!fila?.columna) throw new NotFoundException(NO_EXISTE_EVIDENCIA);
+        if (fila.caso) {
+          // FOR SHARE impide que el caso se cierre mientras se corrige.
+          const caso = await db
+            .query<{ estado_actual: string }>(
+              'SELECT estado_actual FROM convi.casos WHERE id = $1 FOR SHARE',
+              [fila.caso],
+            )
+            .catch((error: unknown) => {
+              if ((error as { code?: string }).code === '40001')
+                throw new ConflictException(
+                  'El caso cambió mientras corregías. Recarga la página e inténtalo nuevamente.',
+                );
+              throw error;
+            });
+          if (caso.rows[0]?.estado_actual === 'CERRADO')
+            throw new ConflictException(
+              'El caso está cerrado: conserva sus evidencias, pero no recibe correcciones.',
+            );
+        }
+        if (fila.futura || fila.antes_del_encuentro)
+          throw new BadRequestException({
+            mensaje: 'Revisa los datos marcados. No se guardó la corrección.',
+            errores: {
+              fecha_documento: fila.futura
+                ? 'La fecha del acta no puede ser futura.'
+                : 'La fecha del acta no puede ser anterior al día del encuentro.',
+            },
+          });
+        return {
+          columna: fila.columna,
+          id: fila.origen_id,
+          paso_caso_id: fila.paso_caso_id ?? undefined,
+          corrige: { id: evidenciaId, motivo: datos.motivo },
+        };
+      },
+    );
+  }
+
+  /**
    * CA3: cada descarga pasa por el servidor, que vuelve a comprobar la
    * sesión, la cuenta activa, la escuela y el perfil (CuentaService.operar).
    * El profesor solo descarga lo que él aportó a sus propias situaciones.
@@ -480,9 +613,9 @@ export class EvidenciasService {
           `INSERT INTO convi.evidencias
                (establecimiento_id, archivo_id, tipo_evidencia, titulo,
                 descripcion, ${origen.columna}, paso_caso_id, fecha_documento,
-                creado_por)
+                rectifica_evidencia_id, motivo_rectificacion, creado_por)
              VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5, $6,
-                     ${INICIO_DEL_DIA('$7')}, convi.membresia_actual())
+                     ${INICIO_DEL_DIA('$7')}, $8, $9, convi.membresia_actual())
              RETURNING id`,
           [
             archivoId,
@@ -493,6 +626,8 @@ export class EvidenciasService {
             origen.paso_caso_id ?? null,
             // PB-072: la fecha del acta es un día de la escuela.
             'fecha_documento' in datos ? datos.fecha_documento : null,
+            origen.corrige?.id ?? null,
+            origen.corrige?.motivo ?? null,
           ],
         );
         return { id: evidencia.rows[0].id };

@@ -90,6 +90,20 @@ export class EvidenciasConvivenciaController {
     return this.evidencias.adjuntarActa(peticion.sesion, id, cuerpo, archivo);
   }
 
+  // PB-073 (HU-063): evidencia que corrige a la del id, con los campos de
+  // una evidencia (o de un acta, si corrige un acta) y motivo. Responde 201
+  // con el id de la corrección.
+  @Post('evidencias/:id/correcciones')
+  @UseInterceptors(CARGA)
+  corregir(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+    @UploadedFile() archivo: ArchivoSubido | undefined,
+  ) {
+    return this.evidencias.corregir(peticion.sesion, id, cuerpo, archivo);
+  }
+
   // CA3: la descarga vuelve a comprobar el permiso en cada petición.
   @Get('evidencias/:id/archivo')
   @Header('Cache-Control', 'private, no-store')
