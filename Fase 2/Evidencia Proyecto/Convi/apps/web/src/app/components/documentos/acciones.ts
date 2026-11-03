@@ -48,6 +48,13 @@ export async function cambiarDocumento(
     revalidatePath(`/${portal}/documentos`, "layout");
   if (accion === "preparar")
     return { solicitudPreparacion: (_anterior.solicitudPreparacion ?? 0) + 1 };
+  // PB-035: el reglamento subido desde la guía inicial vuelve a su paso.
+  if (accion === "cargar" && texto(f, "volver") === "guia") {
+    revalidatePath("/admin/guia");
+    redirect(
+      `/admin/guia?paso=reglamento&aviso=${resultado.preparacion_solicitada === false ? "reglamento-sin-preparacion" : "reglamento-cargado"}`,
+    );
+  }
   const portal = texto(f, "portal") === "admin" ? "admin" : "convivencia";
   redirect(
     `/${portal}/documentos/${encodeURIComponent(resultado.id)}?guardado=1${resultado.preparacion_solicitada === false ? "&preparacion=sin-confirmar" : ""}`,

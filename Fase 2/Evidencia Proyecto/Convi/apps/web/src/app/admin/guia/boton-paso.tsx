@@ -8,15 +8,15 @@ import { type EstadoGuia, terminarPaso } from "./acciones";
 
 const estadoInicial: EstadoGuia = {};
 
-// PB-033 y PB-036: deja Listo un paso que se hace con una operación del
-// portal (invitar al equipo o importar la nómina) cuando ya hay algo hecho;
-// la API lo vuelve a comprobar.
+// PB-033, PB-035 y PB-036: deja Listo un paso que se hace con una operación
+// del portal (invitar al equipo, subir el reglamento o importar la nómina)
+// cuando ya hay algo hecho; la API lo vuelve a comprobar.
 export function BotonTerminarPaso({
   paso,
   version,
   habilitado,
 }: {
-  paso: "equipo" | "estudiantes";
+  paso: "equipo" | "reglamento" | "estudiantes";
   version: string;
   habilitado: boolean;
 }) {

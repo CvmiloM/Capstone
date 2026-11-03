@@ -16,9 +16,15 @@ import type { Version } from "./datos";
 export function FormularioCarga({
   portal,
   documentoId,
+  tipoFijo,
+  volverAGuia = false,
 }: {
   portal: Portal;
   documentoId?: string;
+  /** PB-035: la guía inicial sube el reglamento con el tipo ya elegido. */
+  tipoFijo?: keyof typeof TIPOS;
+  /** PB-035: al guardar se vuelve al paso Reglamento de la guía. */
+  volverAGuia?: boolean;
 }) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [titulo, setTitulo] = useState("");
@@ -36,6 +42,7 @@ export function FormularioCarga({
       <input type="hidden" name="accion" value="cargar" />
       <input type="hidden" name="portal" value={portal} />
       <input type="hidden" name="id" value={documentoId ?? ""} />
+      {volverAGuia && <input type="hidden" name="volver" value="guia" />}
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {!documentoId && (
         <>
@@ -49,35 +56,39 @@ export function FormularioCarga({
             error={estado.errores?.titulo}
             placeholder="Reglamento interno de convivencia escolar"
           />
-          <fieldset>
-            <legend className="mb-2 text-sm font-medium">
-              Tipo de documento
-            </legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {Object.entries(TIPOS).map(([valor, nombre]) => (
-                <label
-                  key={valor}
-                  className="flex cursor-pointer items-center gap-2 rounded-xl border border-input px-3 py-2.5 text-sm has-checked:border-primary has-checked:bg-accent"
-                >
-                  <input
-                    type="radio"
-                    name="tipo_documento"
-                    value={valor}
-                    checked={tipo === valor}
-                    onChange={() => setTipo(valor)}
-                    required
-                    className="accent-primary"
-                  />
-                  {nombre}
-                </label>
-              ))}
-            </div>
-            {estado.errores?.tipo_documento && (
-              <p role="alert" className="mt-1 text-sm text-destructive">
-                {estado.errores.tipo_documento}
-              </p>
-            )}
-          </fieldset>
+          {tipoFijo ? (
+            <input type="hidden" name="tipo_documento" value={tipoFijo} />
+          ) : (
+            <fieldset>
+              <legend className="mb-2 text-sm font-medium">
+                Tipo de documento
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {Object.entries(TIPOS).map(([valor, nombre]) => (
+                  <label
+                    key={valor}
+                    className="flex cursor-pointer items-center gap-2 rounded-xl border border-input px-3 py-2.5 text-sm has-checked:border-primary has-checked:bg-accent"
+                  >
+                    <input
+                      type="radio"
+                      name="tipo_documento"
+                      value={valor}
+                      checked={tipo === valor}
+                      onChange={() => setTipo(valor)}
+                      required
+                      className="accent-primary"
+                    />
+                    {nombre}
+                  </label>
+                ))}
+              </div>
+              {estado.errores?.tipo_documento && (
+                <p role="alert" className="mt-1 text-sm text-destructive">
+                  {estado.errores.tipo_documento}
+                </p>
+              )}
+            </fieldset>
+          )}
         </>
       )}
       <Campo
