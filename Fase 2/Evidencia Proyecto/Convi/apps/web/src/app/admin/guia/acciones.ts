@@ -112,11 +112,11 @@ export async function guardarCursos(
   irAPaso("cursos", "cursos-creados");
 }
 
-// PB-033 (HU-026) y PB-036 (HU-029): las invitaciones y la nómina se hacen
-// con las operaciones del portal; el paso queda Listo si ya hay al menos una
-// cuenta del equipo o un estudiante confirmado (la API lo comprueba).
+// PB-033 (HU-026), PB-035 (HU-028) y PB-036 (HU-029): las invitaciones, el
+// reglamento y la nómina se hacen con las operaciones del portal; el paso
+// queda Listo si ya hay algo hecho (la API lo comprueba).
 export async function terminarPaso(
-  paso: "equipo" | "estudiantes",
+  paso: "equipo" | "reglamento" | "estudiantes",
   _anterior: EstadoGuia,
   formData: FormData,
 ): Promise<EstadoGuia> {
@@ -124,5 +124,6 @@ export async function terminarPaso(
   if (!resultado.ok) return { mensaje: resultado.mensaje };
   revalidatePath("/admin", "layout");
   if (paso === "equipo") irAPaso("cursos", "equipo-listo");
+  if (paso === "reglamento") irAPaso("estudiantes", "reglamento-listo");
   irAPaso("reglas", "estudiantes-listo");
 }

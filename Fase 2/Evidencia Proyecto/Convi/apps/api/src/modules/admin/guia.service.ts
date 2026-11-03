@@ -23,11 +23,10 @@ import {
   type AvanceGuia,
 } from './guia.js';
 
-// PB-032 (HU-025), PB-033 (HU-026), PB-034 (HU-027), PB-036 (HU-029) y PB-038
-// (HU-031): guía inicial del administrador. Solo entra una cuenta ADMIN activa
-// con segundo factor (HU-025 CA1). Cualquier administrador de la escuela la
-// avanza; la base audita cada cambio de la escuela y conserva la fecha de
-// término de la guía.
+// PB-032 a PB-036 (HU-025 a HU-029) y PB-038 (HU-031): guía inicial del
+// administrador. Solo entra una cuenta ADMIN activa con segundo factor (HU-025
+// CA1). Cualquier administrador de la escuela la avanza; la base audita cada
+// cambio de la escuela y conserva la fecha de término de la guía.
 const ACCESO = { tipo: 'establecimiento', perfiles: ['ADMIN'] } as const;
 
 const TERMINADA =
@@ -51,6 +50,11 @@ const ESTUDIANTES_CONFIRMADOS = `(SELECT count(*) FROM convi.filas_importacion f
 const EQUIPO_INVITADO = `(SELECT count(*) FROM convi.membresias_establecimiento m
   WHERE m.codigo_perfil IN ('CONVIVENCIA', 'PROFESOR')
     AND m.estado IN ('PENDIENTE', 'ACTIVO'))::int`;
+
+/** PB-035: versiones del reglamento (RICE) cargadas y no archivadas. */
+const REGLAMENTO_CARGADO = `(SELECT count(*) FROM convi.versiones_documento v
+  JOIN convi.documentos_institucionales d ON d.id = v.documento_id
+  WHERE d.tipo_documento = 'RICE' AND v.estado <> 'ARCHIVADO')::int`;
 
 /** Avance con el paso marcado; $2 = paso y $3 = LISTO u OMITIDO. */
 const AVANCE_CON_PASO = `e.contexto_onboarding || jsonb_build_object(
@@ -324,6 +328,19 @@ export class GuiaAdminService {
     );
   }
 
+  // PB-035 (HU-028): el reglamento se carga con la misma operación de
+  // Documentos (PB-078), que lo deja en Borrador y pide su preparación; el
+  // paso queda Listo con al menos una versión cargada (por defecto).
+  terminarReglamento(sesion: Sesion, cuerpo: unknown): Promise<{ id: string }> {
+    return this.terminarPaso(
+      sesion,
+      'reglamento',
+      cuerpo,
+      REGLAMENTO_CARGADO,
+      'Todavía no hay un reglamento cargado. Sube el archivo del RICE, u omite el paso por ahora.',
+    );
+  }
+
   // PB-036 (HU-029): la nómina se carga, revisa y confirma en la misma
   // importación del portal; el paso queda Listo cuando hay al menos un
   // estudiante confirmado por importación (por defecto).
@@ -347,7 +364,7 @@ export class GuiaAdminService {
    */
   private terminarPaso(
     sesion: Sesion,
-    paso: 'equipo' | 'estudiantes',
+    paso: 'equipo' | 'reglamento' | 'estudiantes',
     cuerpo: unknown,
     hecho: string,
     faltante: string,

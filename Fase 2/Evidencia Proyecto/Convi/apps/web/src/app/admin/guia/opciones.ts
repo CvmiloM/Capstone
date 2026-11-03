@@ -57,8 +57,7 @@ export const PASOS: {
     prepara:
       "El reglamento interno de la escuela (RICE) como documento con su versión.",
     alConfirmar:
-      "El archivo original queda guardado y se prepara para las consultas con IA de Convivencia.",
-    enlaces: [{ href: "/admin/documentos", texto: "Subir desde Documentos" }],
+      "El archivo original queda guardado en Borrador y se prepara para las consultas con IA de Convivencia. Se usa en ellas cuando lo publiques.",
   },
   {
     clave: "estudiantes",

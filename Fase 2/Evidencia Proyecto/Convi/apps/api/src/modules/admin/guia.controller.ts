@@ -11,9 +11,9 @@ import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
 import type { PeticionConSesion } from '../../common/sesion.guard.js';
 import { GuiaAdminService } from './guia.service.js';
 
-// PB-032 (HU-025), PB-033 (HU-026), PB-034 (HU-027), PB-036 (HU-029) y PB-038
-// (HU-031): guía inicial del administrador. Solo entra una cuenta ADMIN activa
-// con el segundo factor completo.
+// PB-032 a PB-036 (HU-025 a HU-029) y PB-038 (HU-031): guía inicial del
+// administrador. Solo entra una cuenta ADMIN activa con el segundo factor
+// completo.
 @Controller('admin/guia')
 @PerfilesPermitidos('ADMIN')
 export class GuiaAdminController {
@@ -53,6 +53,16 @@ export class GuiaAdminController {
   @Post('equipo')
   terminarEquipo(@Req() peticion: PeticionConSesion, @Body() cuerpo: unknown) {
     return this.guia.terminarEquipo(peticion.sesion, cuerpo);
+  }
+
+  // PB-035: deja Listo el paso Reglamento si ya hay una versión del RICE
+  // cargada. Cuerpo: version.
+  @Post('reglamento')
+  terminarReglamento(
+    @Req() peticion: PeticionConSesion,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.guia.terminarReglamento(peticion.sesion, cuerpo);
   }
 
   // PB-036: deja Listo el paso Estudiantes si ya hay estudiantes confirmados

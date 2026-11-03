@@ -14,6 +14,7 @@ import { FormularioBienvenida } from "./formulario-bienvenida";
 import { FormularioCursos } from "./formulario-cursos";
 import { PasoEquipo } from "./paso-equipo";
 import { PasoEstudiantes } from "./paso-estudiantes";
+import { PasoReglamento } from "./paso-reglamento";
 import {
   CLASE_ESTADO_PASO,
   formatoFecha,
@@ -35,6 +36,16 @@ const AVISOS: Record<string, { texto: string; error?: boolean }> = {
   },
   "equipo-listo": {
     texto: "El paso Equipo quedó listo.",
+  },
+  "reglamento-cargado": {
+    texto:
+      "El reglamento quedó guardado en Borrador y se pidió su preparación para búsqueda.",
+  },
+  "reglamento-sin-preparacion": {
+    texto: "El reglamento quedó guardado en Borrador.",
+  },
+  "reglamento-listo": {
+    texto: "El paso Reglamento quedó listo.",
   },
   "estudiantes-listo": {
     texto: "El paso Estudiantes quedó listo.",
@@ -201,6 +212,15 @@ export default async function GuiaInicial({
                 guia={guia}
                 fecha={fecha}
                 listo={estadoPaso.estado === "LISTO"}
+              />
+            )}
+            {actual === "reglamento" && (
+              <PasoReglamento
+                version={guia.version}
+                listo={estadoPaso.estado === "LISTO"}
+                sinPreparacion={
+                  parametros.aviso === "reglamento-sin-preparacion"
+                }
               />
             )}
             {actual === "estudiantes" && (

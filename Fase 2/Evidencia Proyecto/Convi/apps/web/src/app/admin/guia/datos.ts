@@ -100,9 +100,9 @@ export function enviarCursosGuia(cuerpo: unknown) {
   return enviarCambio("POST", "/admin/guia/cursos", cuerpo);
 }
 
-/** PB-033 y PB-036: deja Listo el paso Equipo o Estudiantes. */
+/** PB-033, PB-035 y PB-036: deja Listo un paso hecho en el portal. */
 export function enviarPasoListo(
-  paso: "equipo" | "estudiantes",
+  paso: "equipo" | "reglamento" | "estudiantes",
   version: string,
 ) {
   return enviarCambio("POST", `/admin/guia/${paso}`, { version });
