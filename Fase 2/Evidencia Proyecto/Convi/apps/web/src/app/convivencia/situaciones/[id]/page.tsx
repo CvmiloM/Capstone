@@ -48,6 +48,8 @@ const AVISOS: Record<string, string> = {
     "Descartaste la situación, se conserva con el motivo del descarte y ya no queda pendiente en la bandeja.",
   evidencia:
     "Adjuntaste la evidencia, quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
+  correccion:
+    "Guardaste la corrección con su motivo. La evidencia original se conserva tal cual y queda marcada como corregida.",
 };
 
 // PB-142 (HU-121): nombre de cada dato que cambia y cómo se muestra su valor.
@@ -107,6 +109,7 @@ export default async function PaginaRevisionSituacion({
     antecedente: "decision",
     descartada: "decision",
     evidencia: "evidencias",
+    correccion: "evidencias",
   };
   const seccion = pestanas.some(([clave]) => clave === solicitada)
     ? solicitada
@@ -626,6 +629,10 @@ export default async function PaginaRevisionSituacion({
             evidencias={situacion.evidencias}
             rutaDescarga="/convivencia/evidencias"
             vacio="Todavía no hay evidencias en esta situación."
+            corregir={{
+              destino: "convivencia-correccion-situacion",
+              registroId: situacion.id,
+            }}
           />
           <div className="mt-4 border-t border-border pt-4">
             <FormularioEvidencia

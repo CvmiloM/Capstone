@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { LARGO_MOTIVO } from '../academico/curso.js';
 import { esDia } from './plan-intervencion.js';
 
 // PB-130 (HU-111) y PB-066 (HU-057): archivo y datos de una evidencia. El
@@ -307,6 +308,50 @@ export function validarActa(
     archivo: revisado,
     fecha_documento: fecha,
   };
+}
+
+/** PB-073: una evidencia o un acta que corrige a otra, con su motivo. */
+export type NuevaCorreccion = (NuevaEvidencia | NuevaActa) & { motivo: string };
+
+/**
+ * PB-073 (HU-063 CA1): la corrección pide lo mismo que una evidencia, o que
+ * un acta si corrige un acta, y además el motivo, obligatorio, con el largo
+ * de los otros motivos (10 a 500 caracteres).
+ */
+export function validarCorreccion(
+  cuerpo: unknown,
+  archivo: ArchivoSubido | undefined,
+  acta: boolean,
+): NuevaCorreccion {
+  const datos = (
+    typeof cuerpo === 'object' && cuerpo !== null ? cuerpo : {}
+  ) as Record<string, unknown>;
+  const errores: Record<string, string> = {};
+  let nueva: NuevaEvidencia | NuevaActa | undefined;
+  try {
+    nueva = acta
+      ? validarActa(cuerpo, archivo)
+      : validarEvidencia(cuerpo, archivo);
+  } catch (error) {
+    if (!(error instanceof BadRequestException)) throw error;
+    const respuesta = error.getResponse() as {
+      errores?: Record<string, string>;
+    };
+    Object.assign(errores, respuesta.errores);
+  }
+
+  const motivo = typeof datos.motivo === 'string' ? datos.motivo.trim() : '';
+  if (motivo.length < LARGO_MOTIVO.minimo)
+    errores.motivo = `Explica el motivo de la corrección en al menos ${LARGO_MOTIVO.minimo} caracteres.`;
+  else if (motivo.length > LARGO_MOTIVO.maximo)
+    errores.motivo = `El motivo admite hasta ${LARGO_MOTIVO.maximo} caracteres.`;
+
+  if (!nueva || Object.keys(errores).length > 0)
+    throw new BadRequestException({
+      mensaje: 'Revisa los datos marcados. No se guardó la corrección.',
+      errores,
+    });
+  return { ...nueva, motivo };
 }
 
 /** Content-Disposition de la descarga, con el nombre original en UTF-8. */

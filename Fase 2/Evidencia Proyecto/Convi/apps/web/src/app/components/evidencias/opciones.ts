@@ -15,6 +15,11 @@ export type Evidencia = {
   creado_en: string;
   /** Dónde está ligada, por ejemplo "Caso" o "Situación SIT-2026-00010". */
   origen?: string;
+  /** PB-073: la evidencia que esta corrige, con el motivo. */
+  corrige?: { id: string; titulo: string } | null;
+  motivo_correccion?: string | null;
+  /** PB-073: las evidencias que la corrigen, de la más antigua a la más nueva. */
+  corregida_por?: { id: string; titulo: string; creado_en: string }[];
 };
 
 export type EstadoEvidencia = {
@@ -43,6 +48,9 @@ export const NOMBRE_TIPO_EVIDENCIA: Record<string, string> = {
 export const ACEPTA = ".pdf,.docx,.jpg,.jpeg,.png,.webp,.eml";
 export const TAMANO_MAXIMO = 25 * 1024 * 1024;
 
+/** PB-073: mismo largo del motivo que valida la API (LARGO_MOTIVO). */
+export const LARGO_MOTIVO_CORRECCION = { minimo: 10, maximo: 500 } as const;
+
 /** Dónde se adjunta: decide la ruta de la API y a qué página se vuelve. */
 export type DestinoEvidencia =
   | "convivencia-situacion"
@@ -51,6 +59,9 @@ export type DestinoEvidencia =
   | "convivencia-paso"
   // PB-072 (HU-062): acta firmada de una entrevista o reunión.
   | "convivencia-acta"
+  // PB-073 (HU-063): evidencia que corrige a otra, desde la situación o el caso.
+  | "convivencia-correccion-situacion"
+  | "convivencia-correccion-caso"
   | "profesor-situacion";
 
 export function formatearTamano(bytes: number) {

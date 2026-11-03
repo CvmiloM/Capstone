@@ -7,6 +7,7 @@ import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import { adjuntarEvidencia } from "./acciones";
 import {
   ACEPTA,
+  LARGO_MOTIVO_CORRECCION,
   TAMANO_MAXIMO,
   TIPOS_EVIDENCIA,
   type DestinoEvidencia,
@@ -31,6 +32,7 @@ export function FormularioEvidencia({
   pasoId,
   encuentroId,
   hoy,
+  corrige,
 }: {
   destino: DestinoEvidencia;
   registroId: string;
@@ -40,13 +42,20 @@ export function FormularioEvidencia({
   encuentroId?: string;
   /** AAAA-MM-DD de la escuela: el acta no puede tener fecha futura. */
   hoy?: string;
+  /**
+   * PB-073 (HU-063): la evidencia que se corrige. Si es un acta, la
+   * corrección también lo es. Los campos llevan su id, porque hay un
+   * formulario por evidencia en la misma página.
+   */
+  corrige?: { id: string; acta: boolean };
 }) {
   const [estado, accion, pendiente] = useActionState(
     adjuntarEvidencia,
     estadoInicial,
   );
   // PB-072 (HU-062 CA1): el acta es siempre de tipo Acta y lleva su fecha.
-  const acta = destino === "convivencia-acta";
+  const acta = destino === "convivencia-acta" || corrige?.acta === true;
+  const sufijo = corrige ? `-${corrige.id}` : "";
   const valores = estado.valores ?? {};
   // Un archivo demasiado grande se avisa antes de enviar, junto a la
   // respuesta que se veía al elegirlo.
@@ -61,14 +70,14 @@ export function FormularioEvidencia({
   }
   function describir(campo: string, ayuda?: boolean) {
     return errores[campo]
-      ? `${campo}-error`
+      ? `${campo}-error${sufijo}`
       : ayuda
-        ? `${campo}-ayuda`
+        ? `${campo}-ayuda${sufijo}`
         : undefined;
   }
   function mensajeError(campo: string) {
     return errores[campo] ? (
-      <p id={`${campo}-error`} className="mt-1.5 text-sm text-destructive">
+      <p id={`${campo}-error${sufijo}`} className="mt-1.5 text-sm text-destructive">
         {errores[campo]}
       </p>
     ) : null;
@@ -93,17 +102,20 @@ export function FormularioEvidencia({
       {encuentroId && (
         <input type="hidden" name="encuentro_id" value={encuentroId} />
       )}
+      {corrige && (
+        <input type="hidden" name="corrige_evidencia_id" value={corrige.id} />
+      )}
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
       )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="sm:col-span-2">
-          <label htmlFor="titulo_evidencia" className="block text-sm font-medium">
+          <label htmlFor={`titulo_evidencia${sufijo}`} className="block text-sm font-medium">
             Título
           </label>
           <input
-            id="titulo_evidencia"
+            id={`titulo_evidencia${sufijo}`}
             name="titulo"
             type="text"
             maxLength={LARGO_MAXIMO_TITULO}
@@ -122,13 +134,13 @@ export function FormularioEvidencia({
         {acta ? (
           <div>
             <label
-              htmlFor="fecha_documento_evidencia"
+              htmlFor={`fecha_documento_evidencia${sufijo}`}
               className="block text-sm font-medium"
             >
               Fecha del acta
             </label>
             <input
-              id="fecha_documento_evidencia"
+              id={`fecha_documento_evidencia${sufijo}`}
               name="fecha_documento"
               type="date"
               max={hoy}
@@ -141,11 +153,11 @@ export function FormularioEvidencia({
           </div>
         ) : (
           <div>
-            <label htmlFor="tipo_evidencia" className="block text-sm font-medium">
+            <label htmlFor={`tipo_evidencia${sufijo}`} className="block text-sm font-medium">
               Tipo
             </label>
             <select
-              id="tipo_evidencia"
+              id={`tipo_evidencia${sufijo}`}
               name="tipo"
               defaultValue={valores.tipo ?? ""}
               aria-invalid={errores.tipo ? true : undefined}
@@ -167,11 +179,11 @@ export function FormularioEvidencia({
       </div>
 
       <div>
-        <label htmlFor="archivo_evidencia" className="block text-sm font-medium">
+        <label htmlFor={`archivo_evidencia${sufijo}`} className="block text-sm font-medium">
           Archivo
         </label>
         <input
-          id="archivo_evidencia"
+          id={`archivo_evidencia${sufijo}`}
           name="archivo"
           type="file"
           accept={ACEPTA}
@@ -182,7 +194,7 @@ export function FormularioEvidencia({
         {errores.archivo ? (
           mensajeError("archivo")
         ) : (
-          <p id="archivo-ayuda" className="mt-1.5 text-sm text-muted-foreground">
+          <p id={`archivo-ayuda${sufijo}`} className="mt-1.5 text-sm text-muted-foreground">
             PDF, Word (DOCX), imagen JPG, PNG o WEBP, o correo exportado (EML),
             de hasta 25 MB.
             {estado.errores && " Vuelve a elegir el archivo."}
@@ -192,13 +204,13 @@ export function FormularioEvidencia({
 
       <div>
         <label
-          htmlFor="descripcion_evidencia"
+          htmlFor={`descripcion_evidencia${sufijo}`}
           className="block text-sm font-medium"
         >
           Descripción (opcional)
         </label>
         <textarea
-          id="descripcion_evidencia"
+          id={`descripcion_evidencia${sufijo}`}
           name="descripcion"
           rows={2}
           maxLength={LARGO_MAXIMO_DESCRIPCION}
@@ -210,14 +222,57 @@ export function FormularioEvidencia({
         {mensajeError("descripcion")}
       </div>
 
+      {corrige && (
+        <div>
+          <label
+            htmlFor={`motivo_evidencia${sufijo}`}
+            className="block text-sm font-medium"
+          >
+            Motivo de la corrección
+          </label>
+          <textarea
+            id={`motivo_evidencia${sufijo}`}
+            name="motivo"
+            rows={2}
+            maxLength={LARGO_MOTIVO_CORRECCION.maximo}
+            defaultValue={valores.motivo}
+            aria-invalid={errores.motivo ? true : undefined}
+            aria-describedby={describir("motivo", true)}
+            className={`${claseControl} ${borde("motivo")}`}
+          />
+          {errores.motivo ? (
+            mensajeError("motivo")
+          ) : (
+            <p
+              id={`motivo-ayuda${sufijo}`}
+              className="mt-1.5 text-sm text-muted-foreground"
+            >
+              Por qué se corrige, entre {LARGO_MOTIVO_CORRECCION.minimo} y{" "}
+              {LARGO_MOTIVO_CORRECCION.maximo} caracteres. Queda junto a la
+              corrección.
+            </p>
+          )}
+        </div>
+      )}
+
       <p className="text-sm text-muted-foreground">
-        {acta
-          ? "Sube el acta firmada y escaneada; no se pide firma electrónica. Queda guardada en forma privada con tu nombre y la fecha, y no se edita ni se borra."
-          : "Queda guardada en forma privada con tu nombre y la fecha. Una evidencia no se edita ni se borra."}
+        {corrige
+          ? "La evidencia original se conserva tal cual y queda marcada como corregida. La corrección se guarda en forma privada con tu nombre y la fecha, y no se edita ni se borra."
+          : acta
+            ? "Sube el acta firmada y escaneada; no se pide firma electrónica. Queda guardada en forma privada con tu nombre y la fecha, y no se edita ni se borra."
+            : "Queda guardada en forma privada con tu nombre y la fecha. Una evidencia no se edita ni se borra."}
       </p>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Adjuntando…" : acta ? "Adjuntar acta" : "Adjuntar evidencia"}
+        {pendiente
+          ? corrige
+            ? "Guardando…"
+            : "Adjuntando…"
+          : corrige
+            ? "Guardar corrección"
+            : acta
+              ? "Adjuntar acta"
+              : "Adjuntar evidencia"}
       </button>
     </FormularioConCarga>
   );

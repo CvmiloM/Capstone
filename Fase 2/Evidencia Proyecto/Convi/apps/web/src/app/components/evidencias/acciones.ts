@@ -31,6 +31,15 @@ const DESTINOS: Record<
     api: `/convivencia/encuentros/${encuentro}/actas`,
     volver: `/convivencia/casos/${id}?seccion=encuentros&aviso=acta#encuentro-${encuentro}`,
   }),
+  // PB-073 (HU-063): el detalle es la evidencia que se corrige.
+  "convivencia-correccion-situacion": (id, evidencia) => ({
+    api: `/convivencia/evidencias/${evidencia}/correcciones`,
+    volver: `/convivencia/situaciones/${id}?seccion=evidencias&aviso=correccion`,
+  }),
+  "convivencia-correccion-caso": (id, evidencia) => ({
+    api: `/convivencia/evidencias/${evidencia}/correcciones`,
+    volver: `/convivencia/casos/${id}?seccion=evidencias&aviso=correccion`,
+  }),
   "profesor-situacion": (id) => ({
     api: `/profesor/situaciones/${id}/evidencias`,
     volver: `/profesor/situaciones/${id}?evidencia=1`,
@@ -41,6 +50,8 @@ const DESTINOS: Record<
 const CAMPO_DETALLE: Partial<Record<DestinoEvidencia, string>> = {
   "convivencia-paso": "paso_caso_id",
   "convivencia-acta": "encuentro_id",
+  "convivencia-correccion-situacion": "corrige_evidencia_id",
+  "convivencia-correccion-caso": "corrige_evidencia_id",
 };
 
 function leerTexto(formData: FormData, campo: string) {
@@ -61,6 +72,8 @@ export async function adjuntarEvidencia(
     descripcion: leerTexto(formData, "descripcion"),
     // PB-072: solo el acta lleva la fecha del documento.
     fecha_documento: leerTexto(formData, "fecha_documento"),
+    // PB-073: solo la corrección lleva motivo.
+    motivo: leerTexto(formData, "motivo"),
   };
   const nombreDestino = leerTexto(formData, "destino");
   const campoDetalle = Object.hasOwn(CAMPO_DETALLE, nombreDestino)

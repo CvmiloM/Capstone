@@ -60,6 +60,8 @@ const AVISOS: Record<string, string> = {
     "Cerraste el caso, el cierre quedó en su historial con el resumen, y sus antecedentes se conservan.",
   evidencia:
     "Adjuntaste la evidencia al caso, quedó guardada en forma privada con tu nombre y la fecha, y no se puede editar ni borrar.",
+  correccion:
+    "Guardaste la corrección con su motivo. La evidencia original se conserva tal cual y queda marcada como corregida.",
   protocolo:
     "Aplicaste el protocolo, sus pasos quedaron en el caso con su vencimiento y su responsable.",
   normativa:
@@ -407,12 +409,17 @@ export default async function PaginaCaso({
                 evidencias={caso.evidencias}
                 rutaDescarga="/convivencia/evidencias"
                 vacio="Todavía no hay evidencias en el caso ni en sus situaciones."
+                corregir={
+                  caso.estado_actual === "CERRADO"
+                    ? undefined
+                    : { destino: "convivencia-correccion-caso", registroId: caso.id }
+                }
               />
               <div className="mt-4 border-t border-border pt-4">
                 {caso.estado_actual === "CERRADO" ? (
                   <p className="text-sm text-muted-foreground">
                     El caso está cerrado: conserva sus evidencias, pero no
-                    recibe nuevas.
+                    recibe nuevas ni correcciones.
                   </p>
                 ) : (
                   <details
