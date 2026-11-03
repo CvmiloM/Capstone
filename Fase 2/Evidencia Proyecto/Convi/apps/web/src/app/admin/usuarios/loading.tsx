@@ -1,9 +1,11 @@
+import { CargaActiva } from "@/app/components/actividad";
 // Pantalla de carga de Usuarios. Cada ruta del portal necesita la suya: al
 // navegar desde otra sección, la de admin/loading.tsx ya está montada y no
 // envuelve los datos de esta página (cacheComponents la marca como bloqueante).
 export default function CargandoUsuarios() {
   return (
     <div role="status" aria-label="Cargando">
+      <CargaActiva />
       <div className="mb-2 h-8 w-48 max-w-full animate-pulse rounded-lg bg-muted" />
       <div className="mb-6 h-4 w-96 max-w-full animate-pulse rounded bg-muted" />
       <div className="grid gap-6 lg:grid-cols-3">

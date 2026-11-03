@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState, type ReactNode } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { crearRegla, editarRegla, type EstadoFormulario } from "./acciones";
@@ -137,7 +139,7 @@ export function FormularioRegla({
   });
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       <input type="hidden" name="portal" value={portal} />
       {regla && <input type="hidden" name="id" value={regla.id} />}
@@ -275,6 +277,6 @@ export function FormularioRegla({
       <BotonEnviar pendiente={pendiente} textoPendiente="Guardando…">
         {regla ? "Guardar cambios del borrador" : "Guardar como borrador"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

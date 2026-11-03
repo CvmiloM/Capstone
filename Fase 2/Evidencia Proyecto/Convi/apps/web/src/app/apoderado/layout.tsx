@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { Suspense, type ReactNode } from "react";
 import { MarcaCompacta } from "@/app/components/marca";
 import { BotonCerrarSesion } from "@/app/components/boton-cerrar-sesion";

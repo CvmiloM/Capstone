@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseBotonPrimario } from "@/app/components/formulario";
 import type { Regla } from "./datos";
 import {

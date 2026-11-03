@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Form from "next/form";
-import Link from "next/link";
+import { FormularioBusqueda as Form } from "@/app/components/actividad";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import type { ReactNode } from "react";
 import { NOMBRE_ESTADO_ESTUDIANTE } from "@/app/admin/estudiantes/opciones";
 import {

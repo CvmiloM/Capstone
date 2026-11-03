@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { FormularioConCarga } from "@/app/components/actividad";
+
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { useActionState, useState } from "react";
 import {
   AvisoError,
@@ -97,13 +99,13 @@ export function FormularioRevision({ situacionId }: { situacionId: string }) {
     estadoInicial,
   );
   return (
-    <form action={accion} className="space-y-3">
+    <FormularioConCarga action={accion} className="space-y-3">
       <input type="hidden" name="situacion_id" value={situacionId} />
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Iniciando…" : "Iniciar revisión"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -124,7 +126,7 @@ export function FormularioUrgencia({
   const opciones = OPCIONES_URGENCIA.filter((o) => o.valor !== urgenciaActual);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="situacion_id" value={situacionId} />
       <input type="hidden" name="urgencia_anterior" value={urgenciaActual} />
       {estado.mensaje && !estado.errores && (
@@ -187,7 +189,7 @@ export function FormularioUrgencia({
       <button type="submit" disabled={pendiente} className={claseBotonSecundario}>
         {pendiente ? "Guardando…" : "Cambiar urgencia"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -219,7 +221,7 @@ export function FormularioResponsable({
   }
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="situacion_id" value={situacionId} />
       <input
         type="hidden"
@@ -310,7 +312,7 @@ export function FormularioResponsable({
             ? "Cambiar responsable"
             : "Asignar responsable"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -330,7 +332,7 @@ export function FormularioAclaracion({
   const error = estado.errores?.pregunta;
 
   return (
-    <form
+    <FormularioConCarga
       action={accion}
       noValidate
       className="mt-4 space-y-3 border-t border-border pt-4"
@@ -365,7 +367,7 @@ export function FormularioAclaracion({
       <button type="submit" disabled={pendiente} className={claseBotonSecundario}>
         {pendiente ? "Enviando…" : "Pedir aclaración"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -397,7 +399,7 @@ export function FormularioRevisionNormativa({
   const cantidad = filas ?? filasEnviadas;
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {casoId ? (
         <input type="hidden" name="caso_id" value={casoId} />
       ) : (
@@ -610,7 +612,7 @@ export function FormularioRevisionNormativa({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Guardar revisión normativa"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -647,7 +649,7 @@ export function FormularioDecision({
   const descarta = resultado === "DESCARTADA";
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       <input type="hidden" name="situacion_id" value={situacionId} />
       <input
         type="hidden"
@@ -831,7 +833,7 @@ export function FormularioDecision({
               ? "Guardar como antecedente"
               : "Guardar decisión"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -881,7 +883,7 @@ export function FormularioVinculacion({
   }
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="situacion_id" value={situacionId} />
       <input
         type="hidden"
@@ -1003,7 +1005,7 @@ export function FormularioVinculacion({
           Vincular al caso
         </button>
       )}
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -1049,7 +1051,7 @@ export function FormularioCaso({
   }
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="situacion_id" value={situacionId} />
       <input
         type="hidden"
@@ -1220,6 +1222,6 @@ export function FormularioCaso({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Abriendo…" : "Abrir caso"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

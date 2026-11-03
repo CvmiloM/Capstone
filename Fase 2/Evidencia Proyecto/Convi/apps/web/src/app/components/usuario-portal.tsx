@@ -1,5 +1,5 @@
 import { crearClienteServidor } from "@/lib/supabase/servidor";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { Icono } from "./icono";
 import { AvatarUsuario } from "./avatar-usuario";
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseEnlace } from "@/app/components/formulario";
 import { FormularioInvitacion } from "../usuarios/formulario-invitacion";
 import { NOMBRE_ESTADO, NOMBRE_PERFIL } from "../usuarios/opciones";

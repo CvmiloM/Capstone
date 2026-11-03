@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import type { ReactNode } from "react";
 import { claseBotonPrimario, claseBotonSecundario } from "../formulario";
 

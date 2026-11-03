@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { FormularioConCarga } from "@/app/components/actividad";
+
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { useActionState, useEffect, useState } from "react";
 import {
   AvisoError,
@@ -72,7 +74,7 @@ export function ConsultaReglamento() {
   return (
     <div className="space-y-6">
       <MascotaIA fase={fase} />
-      <form
+      <FormularioConCarga
         action={accion}
         onSubmit={() => setPaso(0)}
         className="space-y-4 rounded-2xl border border-border bg-card p-5"
@@ -117,7 +119,7 @@ export function ConsultaReglamento() {
             Consultar
           </BotonEnviar>
         </div>
-      </form>
+      </FormularioConCarga>
 
       {resultado && !pendiente && (
         <section

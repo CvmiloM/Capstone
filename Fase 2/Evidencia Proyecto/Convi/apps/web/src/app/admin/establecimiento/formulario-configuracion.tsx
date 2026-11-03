@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useEffect, useRef, useState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { guardarConfiguracionEscuela, type EstadoFicha } from "./acciones";
@@ -43,7 +45,7 @@ export function FormularioConfiguracion({
   }, []);
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       <h2 className="text-lg font-semibold">Fechas y plazos</h2>
       <p className="text-sm text-muted-foreground">
         Elige el horario de tu escuela y, si lo necesitas, un plazo sugerido
@@ -161,6 +163,6 @@ export function FormularioConfiguracion({
           </BotonEnviar>
         </div>
       </div>
-    </form>
+    </FormularioConCarga>
   );
 }

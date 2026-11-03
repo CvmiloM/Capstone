@@ -1,5 +1,7 @@
+
+import { FormularioConCarga } from "@/app/components/actividad";
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import {
   claseBotonPrimario,
   claseBotonSecundario,
@@ -110,12 +112,12 @@ export default async function Avisos({
           </ul>
         </nav>
         {p.no_leidos > 0 && (
-          <form action={marcarTodosLeidos}>
+          <FormularioConCarga action={marcarTodosLeidos}>
             {contexto}
             <button type="submit" className={claseBotonSecundario}>
               Marcar todos como leídos
             </button>
-          </form>
+          </FormularioConCarga>
         )}
       </div>
 
@@ -158,22 +160,22 @@ export default async function Avisos({
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {a.con_destino && !a.vencido && (
-                  <form action={abrirAviso}>
+                  <FormularioConCarga action={abrirAviso}>
                     {contexto}
                     <input type="hidden" name="aviso_id" value={a.id} />
                     <button type="submit" className={claseBotonPrimario}>
                       Abrir
                     </button>
-                  </form>
+                  </FormularioConCarga>
                 )}
                 {!a.leido_en && (
-                  <form action={marcarAvisoLeido}>
+                  <FormularioConCarga action={marcarAvisoLeido}>
                     {contexto}
                     <input type="hidden" name="aviso_id" value={a.id} />
                     <button type="submit" className={claseBotonSecundario}>
                       Marcar como leído
                     </button>
-                  </form>
+                  </FormularioConCarga>
                 )}
               </div>
             </li>

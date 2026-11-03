@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { Encabezado, AvisoError } from "@/app/components/formulario";
 import { numeroPagina, obtenerPortal } from "./datos";
 import { Paginacion } from "./paginacion";

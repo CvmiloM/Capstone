@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useEffect, useState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import {
@@ -63,7 +65,7 @@ export function FormularioCorreoIA({
   return (
     <div className="space-y-4">
       <MascotaIA fase={fase} mensajes={MENSAJES} />
-      <form
+      <FormularioConCarga
         action={accion}
         onSubmit={() => setPaso(0)}
         noValidate
@@ -131,7 +133,7 @@ export function FormularioCorreoIA({
         >
           {pendiente ? "Preparando…" : "Preparar borrador con IA"}
         </button>
-      </form>
+      </FormularioConCarga>
     </div>
   );
 }

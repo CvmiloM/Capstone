@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState, type ReactNode } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import {
@@ -59,7 +61,7 @@ export function FormularioRegistro({
           : [];
 
   return (
-    <form
+    <FormularioConCarga
       action={accion}
       noValidate
       className="grid items-start gap-6 xl:grid-cols-2"
@@ -336,7 +338,7 @@ export function FormularioRegistro({
       >
         {historico ? "Guardar registro histórico" : "Registrar situación"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }
 

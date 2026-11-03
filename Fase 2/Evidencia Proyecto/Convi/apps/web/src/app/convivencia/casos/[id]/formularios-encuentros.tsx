@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import type { EstadoAccion } from "./acciones";
@@ -141,7 +143,7 @@ export function FormularioNuevoEncuentro({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <ErrorGeneral estado={estado} />
 
@@ -293,7 +295,7 @@ export function FormularioNuevoEncuentro({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Programando…" : "Programar encuentro"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -314,7 +316,7 @@ export function FormularioAgregarAsistentes({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="encuentro_id" value={encuentroId} />
       <ErrorGeneral estado={estado} />
@@ -329,7 +331,7 @@ export function FormularioAgregarAsistentes({
           {pendiente ? "Agregando…" : "Agregar asistentes"}
         </button>
       )}
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -360,7 +362,7 @@ export function FormularioReprogramacion({
   const sufijo = encuentroId.slice(0, 8);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="encuentro_id" value={encuentroId} />
       <input type="hidden" name="version" value={version} />
@@ -415,7 +417,7 @@ export function FormularioReprogramacion({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Reprogramar"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -443,7 +445,7 @@ export function FormularioRealizacion({
   const sufijo = encuentroId.slice(0, 8);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="encuentro_id" value={encuentroId} />
       <input type="hidden" name="version" value={version} />
@@ -521,7 +523,7 @@ export function FormularioRealizacion({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Registrar como realizado"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -543,7 +545,7 @@ export function FormularioCancelacionEncuentro({
   const sufijo = encuentroId.slice(0, 8);
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="encuentro_id" value={encuentroId} />
       <input type="hidden" name="version" value={version} />
@@ -563,6 +565,6 @@ export function FormularioCancelacionEncuentro({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Cancelando…" : "Cancelar encuentro"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

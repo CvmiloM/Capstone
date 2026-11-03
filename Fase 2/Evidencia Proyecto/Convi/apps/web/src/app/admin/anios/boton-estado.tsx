@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { ConfirmarEnvio } from "@/app/components/confirmar-envio";
 import {
@@ -44,7 +46,7 @@ export function BotonEstado({
 
   return (
     <ConfirmarEnvio mensaje={textos.confirmar(anio)}>
-      <form action={accion}>
+      <FormularioConCarga action={accion}>
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="estado" value={destino} />
         <button
@@ -61,7 +63,7 @@ export function BotonEstado({
             {estado.mensaje}
           </p>
         )}
-      </form>
+      </FormularioConCarga>
     </ConfirmarEnvio>
   );
 }

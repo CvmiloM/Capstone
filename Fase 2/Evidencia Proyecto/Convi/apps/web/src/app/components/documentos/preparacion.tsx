@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useEffect, useState } from "react";
 import { AvisoError, BotonEnviar } from "@/app/components/formulario";
 import { cambiarDocumento } from "./acciones";
@@ -138,7 +140,7 @@ export function PreparacionDocumento({
           </p>
         )}
         {estado.estado_procesamiento === "NO_APLICA" && habilitable && (
-          <form action={accion} className="space-y-2">
+          <FormularioConCarga action={accion} className="space-y-2">
             <p>
               Esta versión todavía no se usa en la búsqueda con IA: al
               habilitarla
@@ -153,7 +155,7 @@ export function PreparacionDocumento({
             <BotonEnviar pendiente={pendiente} textoPendiente="Habilitando…">
               Habilitar para búsqueda con IA
             </BotonEnviar>
-          </form>
+          </FormularioConCarga>
         )}
         {estado.detalle_error_procesamiento && (
           <p role="alert">{estado.detalle_error_procesamiento}</p>
@@ -171,7 +173,7 @@ export function PreparacionDocumento({
           )}
         {version.incluir_en_busqueda_ia &&
           !["LISTO", "NO_APLICA"].includes(estado.estado_procesamiento) && (
-            <form action={accion} className="space-y-2">
+            <FormularioConCarga action={accion} className="space-y-2">
               <input type="hidden" name="accion" value="preparar" />
               <input type="hidden" name="version" value={version.id} />
               <input type="hidden" name="portal" value={portal} />
@@ -186,7 +188,7 @@ export function PreparacionDocumento({
                   ? "Reintentar preparación"
                   : "Solicitar preparación"}
               </BotonEnviar>
-            </form>
+            </FormularioConCarga>
           )}
       </div>
     </details>

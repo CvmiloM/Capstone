@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, type ReactNode } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import {
@@ -93,7 +95,7 @@ export function FormularioEstado({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input
         type="hidden"
@@ -137,7 +139,7 @@ export function FormularioEstado({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Cambiar estado"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -161,7 +163,7 @@ export function FormularioCierre({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input
         type="hidden"
@@ -251,7 +253,7 @@ export function FormularioCierre({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Cerrando…" : "Cerrar caso"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -273,7 +275,7 @@ export function FormularioAplicarProtocolo({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
@@ -316,6 +318,6 @@ export function FormularioAplicarProtocolo({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Aplicando…" : "Aplicar protocolo"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import { adjuntarEvidencia } from "./acciones";
@@ -73,7 +75,7 @@ export function FormularioEvidencia({
   }
 
   return (
-    <form
+    <FormularioConCarga
       action={accion}
       noValidate
       className="space-y-4"
@@ -217,6 +219,6 @@ export function FormularioEvidencia({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Adjuntando…" : acta ? "Adjuntar acta" : "Adjuntar evidencia"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

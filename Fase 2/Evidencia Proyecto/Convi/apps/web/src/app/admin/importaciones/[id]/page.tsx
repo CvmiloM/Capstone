@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseEnlace, Encabezado } from "@/app/components/formulario";
 import { obtenerContextoAdmin } from "../../datos";
 import { AccionesConfirmacion } from "../acciones-confirmacion";

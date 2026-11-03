@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import { ACEPTA, TAMANO_MAXIMO } from "@/app/components/evidencias/opciones";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
@@ -47,7 +49,7 @@ export function FormularioComunicacion({
   );
 
   return (
-    <form
+    <FormularioConCarga
       action={accion}
       noValidate
       className="space-y-4"
@@ -196,6 +198,6 @@ export function FormularioComunicacion({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Registrando…" : "Registrar comunicación"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

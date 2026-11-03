@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { ConfirmarEnvio } from "@/app/components/confirmar-envio";
 import {
@@ -24,7 +26,7 @@ export function BotonRevalidar({ id }: { id: string }) {
     estadoInicial,
   );
   return (
-    <form action={accion} className="flex flex-wrap items-center gap-3">
+    <FormularioConCarga action={accion} className="flex flex-wrap items-center gap-3">
       <button
         type="submit"
         disabled={pendiente}
@@ -42,7 +44,7 @@ export function BotonRevalidar({ id }: { id: string }) {
           {estado.mensaje}
         </p>
       )}
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -67,7 +69,7 @@ export function FormularioCancelacion({
   const error = estado.errores?.motivo;
   return (
     <ConfirmarEnvio mensaje={confirmacion}>
-      <form action={enviar} className="space-y-3">
+      <FormularioConCarga action={enviar} className="space-y-3">
         {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
         <div>
           <label htmlFor={`motivo-${accion}`} className="block text-sm font-medium">
@@ -108,7 +110,7 @@ export function FormularioCancelacion({
               ? "Cancelar importación"
               : "Restaurar importación"}
         </button>
-      </form>
+      </FormularioConCarga>
     </ConfirmarEnvio>
   );
 }

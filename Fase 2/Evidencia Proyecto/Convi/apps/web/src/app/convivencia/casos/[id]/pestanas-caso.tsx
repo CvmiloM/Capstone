@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { CargaActiva, EnlaceConCarga as Link } from "@/app/components/actividad";
 import { useRouter } from "next/navigation";
 import {
   type CSSProperties,
@@ -86,6 +86,7 @@ export function PestanasCaso({
 
   return (
     <>
+      <CargaActiva activa={cargando} />
       <nav
         ref={barra}
         aria-label="Secciones del caso"
@@ -104,6 +105,7 @@ export function PestanasCaso({
             <Link
               key={clave}
               href={href}
+              anticipar
               scroll={false}
               data-indice={indice}
               aria-current={seccion === clave ? "page" : undefined}

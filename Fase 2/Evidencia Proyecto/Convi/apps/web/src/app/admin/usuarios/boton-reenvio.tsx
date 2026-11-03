@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, claseBotonSecundario } from "@/app/components/formulario";
 import { reenviarCuenta, type EstadoReenvio } from "./acciones";
@@ -19,7 +21,7 @@ export function BotonReenvio({
   );
 
   return (
-    <form action={accion} className="flex max-w-xs flex-col gap-2">
+    <FormularioConCarga action={accion} className="flex max-w-xs flex-col gap-2">
       <button
         type="submit"
         disabled={pendiente}
@@ -41,6 +43,6 @@ export function BotonReenvio({
           Invitación reenviada al mismo correo.
         </p>
       )}
-    </form>
+    </FormularioConCarga>
   );
 }

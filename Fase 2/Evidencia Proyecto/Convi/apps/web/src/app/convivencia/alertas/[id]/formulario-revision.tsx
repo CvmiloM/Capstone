@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import type { EstadoAccion } from "../../casos/[id]/acciones";
@@ -29,7 +31,7 @@ export function FormularioRevision({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="alerta_id" value={alertaId} />
       <input type="hidden" name="version" value={version} />
       {estado.mensaje && !estado.errores && (
@@ -86,6 +88,6 @@ export function FormularioRevision({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : "Guardar revisión"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

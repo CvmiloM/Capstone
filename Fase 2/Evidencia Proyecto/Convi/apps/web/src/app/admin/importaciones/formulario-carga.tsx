@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useState } from "react";
 import { AvisoError, BotonEnviar } from "@/app/components/formulario";
 import { Selector } from "../cursos/selector";
@@ -28,7 +30,7 @@ export function FormularioCarga({ tipo }: { tipo?: TipoImportacion } = {}) {
   const idAyuda = errorArchivo ? "archivo-error" : "archivo-ayuda";
 
   return (
-    <form
+    <FormularioConCarga
       action={accion}
       onSubmit={(evento) => {
         if (demasiadoGrande) evento.preventDefault();
@@ -90,6 +92,6 @@ export function FormularioCarga({ tipo }: { tipo?: TipoImportacion } = {}) {
       <BotonEnviar pendiente={pendiente} textoPendiente="Cargando archivo…">
         Cargar archivo
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

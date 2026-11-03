@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, useId, useState } from "react";
 import { AvisoError, BotonEnviar } from "@/app/components/formulario";
 import { SelectorFiltro } from "@/app/components/selector-filtro";
@@ -36,7 +38,7 @@ export function FormularioContinuidad({
       </p>
     );
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
       <input type="hidden" name="modo_continuidad" value={modo} />
       <input
@@ -102,6 +104,6 @@ export function FormularioContinuidad({
       >
         {reasignar ? "Confirmar reasignación" : "Reabrir caso"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

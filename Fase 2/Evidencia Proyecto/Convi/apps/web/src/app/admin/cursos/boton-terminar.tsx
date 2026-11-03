@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { ConfirmarEnvio } from "@/app/components/confirmar-envio";
 import { claseBotonSecundario } from "@/app/components/formulario";
@@ -53,7 +55,7 @@ export function BotonTerminar({
           : `¿Terminar la asignación de ${profesor}? Se conservará su participación histórica y se aplicará la fecha que elegiste`
       }
     >
-      <form
+      <FormularioConCarga
         action={accion}
         className={
           correccion
@@ -105,7 +107,7 @@ export function BotonTerminar({
             {estado.mensaje}
           </p>
         )}
-      </form>
+      </FormularioConCarga>
     </ConfirmarEnvio>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import {
@@ -40,7 +42,7 @@ export function FormularioNivel({ nivel }: { nivel?: NivelEducativo }) {
   const ayudaFijo = "No se puede cambiar porque el nivel ya tiene cursos.";
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.creado && (
         <div
@@ -76,7 +78,7 @@ export function FormularioNivel({ nivel }: { nivel?: NivelEducativo }) {
       >
         {nivel ? "Guardar cambios" : "Crear nivel"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }
 

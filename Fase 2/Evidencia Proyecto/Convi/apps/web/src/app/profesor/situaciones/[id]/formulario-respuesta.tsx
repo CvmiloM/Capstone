@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, claseBotonPrimario } from "@/app/components/formulario";
 import { responderAclaracion, type EstadoRespuesta } from "./acciones";
@@ -25,7 +27,7 @@ export function FormularioRespuesta({
   const campo = `respuesta-${aclaracionId}`;
 
   return (
-    <form action={accion} noValidate className="mt-3 space-y-3">
+    <FormularioConCarga action={accion} noValidate className="mt-3 space-y-3">
       <input type="hidden" name="aclaracion_id" value={aclaracionId} />
       <input type="hidden" name="situacion_id" value={situacionId} />
       {estado.mensaje && !estado.error && (
@@ -64,6 +66,6 @@ export function FormularioRespuesta({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Enviando…" : "Enviar respuesta"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

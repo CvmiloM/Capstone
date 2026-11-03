@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { invitarCuenta, type EstadoInvitacion } from "./acciones";
@@ -18,7 +20,7 @@ export function FormularioInvitacion() {
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && !estado.errores && (
         <AvisoError>{estado.mensaje}</AvisoError>
       )}
@@ -97,6 +99,6 @@ export function FormularioInvitacion() {
       <BotonEnviar pendiente={pendiente} textoPendiente="Enviando invitación…">
         Enviar invitación
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

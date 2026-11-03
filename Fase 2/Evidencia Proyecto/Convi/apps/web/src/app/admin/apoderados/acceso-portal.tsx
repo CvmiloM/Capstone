@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { FormularioConCarga } from "@/app/components/actividad";
+
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { useActionState, useId } from "react";
 import { AvisoError, BotonEnviar, Campo, claseEnlace, claseBotonSecundario } from "@/app/components/formulario";
 import type { VinculoApoderado } from "../estudiantes/datos";
@@ -37,12 +39,12 @@ export function AccesoPortal({ estudianteId, vinculo: v, zonaHoraria, hoy, aviso
       {aviso && <p role="status" className="mt-3 rounded-xl bg-primary/10 p-3 text-sm">{aviso}</p>}
       {estado.mensaje && <div className="mt-3"><AvisoError>{estado.mensaje}</AvisoError></div>}
       {!v.cuenta_id && v.vigencia !== "TERMINADO" && (
-        <form action={accion} className="mt-3 space-y-3">
+        <FormularioConCarga action={accion} className="mt-3 space-y-3">
           <input type="hidden" name="operacion" value="invitar" />
           <p className="text-sm">Esta persona todavía no tiene una cuenta de CONVI, la invitación se enviará al correo de su ficha, después deberá activarla</p>
           {!v.correo && <p className="text-sm text-muted-foreground">Añade un correo al apoderado en «Corregir datos del contacto» para poder enviarle una invitación</p>}
           <button type="submit" disabled={pendiente || !v.correo} className={`${claseBotonSecundario} text-xs! disabled:opacity-50`}>{pendiente ? "Enviando…" : "Invitar cuenta de Apoderado"}</button>
-        </form>
+        </FormularioConCarga>
       )}
       {v.cuenta_id && v.perfil_cuenta !== "APODERADO" && <p className="mt-3 text-sm text-muted-foreground">Esta persona tiene una cuenta de otro perfil, el permiso requiere una cuenta de Apoderado para la misma persona</p>}
       {v.perfil_cuenta === "APODERADO" && v.estado_cuenta !== "ACTIVO" && <p className="mt-3 text-sm text-muted-foreground">{v.estado_cuenta === "PENDIENTE" ? "La persona debe completar la invitación, puedes reenviar el correo desde " : "Revisa el estado de su cuenta en "}<Link href="/admin/usuarios?perfil=APODERADO&suspendidas=1" className={claseEnlace}>Usuarios</Link></p>}
@@ -50,24 +52,24 @@ export function AccesoPortal({ estudianteId, vinculo: v, zonaHoraria, hoy, aviso
       {disponible && (
         <details className="mt-3 text-sm">
           <summary className="w-fit cursor-pointer rounded-lg font-medium text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">{renovable ? "Renovar acceso" : "Otorgar acceso"}</summary>
-          <form action={accion} className="mt-3 space-y-3">
+          <FormularioConCarga action={accion} className="mt-3 space-y-3">
             <input type="hidden" name="operacion" value={renovable ? "renovar" : "otorgar"} />
             <input type="hidden" name="acceso_id" value={v.acceso_id ?? ""} />
             <Campo name="vence_el" etiqueta="Último día con acceso" type="date" required min={minimo} max="9999-12-30" ayuda={`Incluye completo el día seleccionado, con la hora de tu escuela (${zonaHoraria})`} error={estado.errores?.vence_el} />
             <BotonEnviar pendiente={pendiente} textoPendiente="Guardando…">{renovable ? "Confirmar renovación" : "Confirmar otorgamiento"}</BotonEnviar>
-          </form>
+          </FormularioConCarga>
         </details>
       )}
       {puedeRevocar && (
         <details className="mt-3 text-sm">
           <summary className="w-fit cursor-pointer rounded-lg font-medium text-destructive focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">Revocar acceso</summary>
-          <form action={accion} className="mt-3 space-y-3">
+          <FormularioConCarga action={accion} className="mt-3 space-y-3">
             <input type="hidden" name="operacion" value="revocar" />
             <input type="hidden" name="acceso_id" value={v.acceso_id!} />
             <p>Si confirmas, esta cuenta dejará de tener permiso para consultar la información de este estudiante, sus accesos a otros estudiantes se conservarán</p>
             <label className="flex items-start gap-2"><input type="checkbox" name="confirmar" value="si" required className="mt-1 size-4 accent-primary" />Confirmo que quiero revocar este acceso</label>
             <button type="submit" disabled={pendiente} className={`${claseBotonSecundario} text-xs! text-destructive! disabled:opacity-50`}>{pendiente ? "Revocando…" : "Confirmar revocación"}</button>
-          </form>
+          </FormularioConCarga>
         </details>
       )}
     </section>

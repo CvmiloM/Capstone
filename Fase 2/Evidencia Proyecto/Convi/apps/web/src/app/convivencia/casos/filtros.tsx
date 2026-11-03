@@ -1,7 +1,7 @@
 "use client";
 
-import Form from "next/form";
-import Link from "next/link";
+import { FormularioBusqueda as Form } from "@/app/components/actividad";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { claseBotonPrimario, claseEnlace } from "@/app/components/formulario";

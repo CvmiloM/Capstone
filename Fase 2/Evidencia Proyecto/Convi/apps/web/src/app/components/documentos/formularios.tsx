@@ -1,4 +1,6 @@
 "use client";
+
+import { FormularioConCarga } from "@/app/components/actividad";
 import { useActionState, useId, useRef, useState } from "react";
 import {
   AvisoError,
@@ -26,7 +28,7 @@ export function FormularioCarga({
   const archivoId = useId();
   const [estado, accion, pendiente] = useActionState(cambiarDocumento, {});
   return (
-    <form
+    <FormularioConCarga
       action={accion}
       onReset={() => setArchivo(null)}
       className="space-y-4"
@@ -168,7 +170,7 @@ export function FormularioCarga({
       <BotonEnviar pendiente={pendiente} textoPendiente="Guardando documento…">
         {documentoId ? "Guardar nueva versión" : "Guardar documento"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -185,7 +187,7 @@ function FormularioEstado({
 }) {
   const [estado, accion, pendiente] = useActionState(cambiarDocumento, {});
   return (
-    <form action={accion} className="mt-4 space-y-3">
+    <FormularioConCarga action={accion} className="mt-4 space-y-3">
       <input type="hidden" name="accion" value={tipo} />
       <input type="hidden" name="portal" value={portal} />
       <input type="hidden" name="version" value={version.id} />
@@ -269,7 +271,7 @@ function FormularioEstado({
               ? "Guardar término de vigencia"
               : "Confirmar archivo del documento"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }
 

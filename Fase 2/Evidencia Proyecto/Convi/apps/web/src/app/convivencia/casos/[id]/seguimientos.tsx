@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseEnlace } from "@/app/components/formulario";
 import type { DetalleCaso } from "../datos";
 import { ESTADOS_CUMPLIMIENTO } from "./opciones";

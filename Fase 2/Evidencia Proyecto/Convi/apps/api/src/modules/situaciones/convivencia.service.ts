@@ -11,6 +11,10 @@ import {
 } from '@nestjs/common';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import {
+  agruparConsultas,
+  todasLasLecturas,
+} from '../../database/consultas-agrupadas.js';
 import { crearAvisos, TEXTO_AVISO } from '../alertas/crear-avisos.js';
 import { EvaluacionReglas } from '../alertas/evaluacion.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
@@ -237,6 +241,11 @@ function filtro<T extends string>(
   throw new BadRequestException('Filtro no válido.');
 }
 
+// La política de estudiantes se evalúa una vez, no por cada participante de la bandeja.
+const ESTUDIANTES_VISIBLES = `WITH estudiantes_visibles AS MATERIALIZED (
+  SELECT persona_id FROM convi.estudiantes
+)`;
+
 const COLUMNAS_BANDEJA = `
   s.id, s.codigo, s.ocurrido_en, s.reportado_en, s.estado, s.urgencia,
   s.tipo_origen, c.nombre AS curso, cat.nombre AS categoria,
@@ -245,7 +254,7 @@ const COLUMNAS_BANDEJA = `
   s.asignado_a_membresia_id AS responsable_id,
   pr.nombres || ' ' || pr.apellidos AS responsable,
   (SELECT count(*) FROM convi.participaciones pa
-    JOIN convi.estudiantes e ON e.persona_id = pa.persona_id
+    JOIN estudiantes_visibles e ON e.persona_id = pa.persona_id
     WHERE pa.situacion_id = s.id AND pa.activo_hasta IS NULL)::int AS estudiantes,
   (SELECT count(*) FROM convi.aclaraciones_situacion a
     WHERE a.situacion_id = s.id AND a.estado = 'PENDIENTE')::int AS aclaraciones_pendientes`;
@@ -279,9 +288,10 @@ export class ConvivenciaService {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
-      async (db) => {
-        const situaciones = await db.query<SituacionBandeja>(
-          `SELECT ${COLUMNAS_BANDEJA}
+      async (cliente) => {
+        const db = agruparConsultas(cliente);
+        const situaciones = db.query<SituacionBandeja>(
+          `${ESTUDIANTES_VISIBLES} SELECT ${COLUMNAS_BANDEJA}
            ${DESDE_BANDEJA}
            WHERE ($1::text IS NULL OR s.estado = $1)
              AND ($2::text IS NULL OR s.urgencia = $2)
@@ -291,14 +301,15 @@ export class ConvivenciaService {
            LIMIT $3`,
           [estado, urgencia, MAXIMO_BANDEJA],
         );
-        const conteo = await db.query<Bandeja['conteo'][number]>(
+        const conteo = db.query<Bandeja['conteo'][number]>(
           `SELECT estado, urgencia, count(*)::int AS total
            FROM convi.situaciones
            GROUP BY estado, urgencia`,
         );
+        const datos = await todasLasLecturas({ situaciones, conteo });
         return {
-          situaciones: situaciones.rows,
-          conteo: conteo.rows,
+          situaciones: datos.situaciones.rows,
+          conteo: datos.conteo.rows,
           limite: MAXIMO_BANDEJA,
         };
       },
@@ -312,7 +323,8 @@ export class ConvivenciaService {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
-      async (db) => {
+      async (cliente) => {
+        const db = agruparConsultas(cliente);
         const base = await db.query<
           SituacionBandeja & {
             lugar: string | null;
@@ -320,7 +332,7 @@ export class ConvivenciaService {
             registro_historico: boolean;
           }
         >(
-          `SELECT ${COLUMNAS_BANDEJA}, s.lugar, s.descripcion,
+          `${ESTUDIANTES_VISIBLES} SELECT ${COLUMNAS_BANDEJA}, s.lugar, s.descripcion,
                   s.registro_historico
            ${DESDE_BANDEJA}
            WHERE s.id = $1`,
@@ -329,7 +341,7 @@ export class ConvivenciaService {
         const situacion = base.rows[0];
         if (!situacion) throw new NotFoundException(NO_EXISTE);
 
-        const participantes = await db.query<
+        const participantes = db.query<
           DetalleConvivencia['participantes'][number]
         >(
           // PB-076 (HU-066 CA2): el curso del día del hecho y, aparte, el
@@ -353,7 +365,7 @@ export class ConvivenciaService {
            ORDER BY p.apellidos, p.nombres`,
           [id],
         );
-        const aclaraciones = await db.query<
+        const aclaraciones = db.query<
           DetalleConvivencia['aclaraciones'][number]
         >(
           `SELECT a.id, a.pregunta,
@@ -367,7 +379,7 @@ export class ConvivenciaService {
           [id],
         );
         // PB-144: el selector solo necesita la membresía y el nombre.
-        const responsables = await db.query<
+        const responsables = db.query<
           DetalleConvivencia['opciones_responsable'][number]
         >(
           `SELECT m.id, p.nombres || ' ' || p.apellidos AS nombre,
@@ -377,32 +389,32 @@ export class ConvivenciaService {
            WHERE m.codigo_perfil = 'CONVIVENCIA' AND m.estado = 'ACTIVO'
            ORDER BY p.apellidos, p.nombres`,
         );
-        return {
-          ...situacion,
-          participantes: participantes.rows,
-          aclaraciones: aclaraciones.rows,
-          opciones_responsable: responsables.rows,
-          revisiones_normativas: await revisionesNormativas(db, id),
-          opciones_normativa: await opcionesNormativa(db),
-          decisiones: await decisionesDeSituacion(db, id),
-          ultima_revision_id: await ultimaRevision(db, id),
-          caso_vinculado:
-            (
-              await db.query<NonNullable<DetalleConvivencia['caso_vinculado']>>(
-                `SELECT c.id, c.codigo, s.vinculado_a_caso_en AS vinculado_en,
+        // Mismas lecturas, permisos y fotografía de datos, en menos viajes a la base.
+        const datos = await todasLasLecturas({
+          participantes: participantes.then((r) => r.rows),
+          aclaraciones: aclaraciones.then((r) => r.rows),
+          opciones_responsable: responsables.then((r) => r.rows),
+          revisiones_normativas: revisionesNormativas(db, id),
+          opciones_normativa: opcionesNormativa(db),
+          decisiones: decisionesDeSituacion(db, id),
+          ultima_revision_id: ultimaRevision(db, id),
+          caso_vinculado: db
+            .query<NonNullable<DetalleConvivencia['caso_vinculado']>>(
+              `SELECT c.id, c.codigo, s.vinculado_a_caso_en AS vinculado_en,
                         p.nombres || ' ' || p.apellidos AS vinculado_por
                  FROM convi.situaciones s
                  JOIN convi.casos c ON c.id = s.caso_id
                  JOIN convi.membresias_establecimiento m ON m.id = s.vinculado_a_caso_por
                  JOIN convi.personas p ON p.id = m.persona_id
                  WHERE s.id = $1`,
-                [id],
-              )
-            ).rows[0] ?? null,
-          opciones_caso: await opcionesCaso(db, id),
-          evidencias: await evidenciasDeSituacion(db, id),
-          cambios: await cambiosDeSituacion(db, id),
-        };
+              [id],
+            )
+            .then((r) => r.rows[0] ?? null),
+          opciones_caso: opcionesCaso(db, id),
+          evidencias: evidenciasDeSituacion(db, id),
+          cambios: cambiosDeSituacion(db, id),
+        });
+        return { ...situacion, ...datos };
       },
     );
   }

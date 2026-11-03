@@ -1,3 +1,5 @@
+
+import { FormularioConCarga } from "@/app/components/actividad";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
@@ -49,7 +51,7 @@ export default async function PaginaIndicadores({ searchParams }: {
   return <div className="space-y-6">
     <Encabezado titulo="Indicadores de Convivencia"
       descripcion="Consulta situaciones, compromisos, seguimientos y cierres de tu escuela según el período que elijas" />
-    <form className={caja}>
+    <FormularioConCarga className={caja}>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Campo titulo="Desde" nombre="desde"><input id="desde" name="desde" type="date" defaultValue={datos.desde} className={control} /></Campo>
         <Campo titulo="Hasta" nombre="hasta"><input id="hasta" name="hasta" type="date" defaultValue={datos.hasta} className={control} /></Campo>
@@ -67,7 +69,7 @@ export default async function PaginaIndicadores({ searchParams }: {
         <a href="/convivencia/indicadores" className="text-sm text-primary underline-offset-4 hover:underline">Limpiar filtros</a>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Período máximo de 367 días, las fechas corresponden a la zona horaria de la escuela</p>
-    </form>
+    </FormularioConCarga>
     <p className="text-sm text-muted-foreground">Del {fechaCorta(datos.desde)} al {fechaCorta(datos.hasta)} · Cifras calculadas el {corte}</p>
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <Resumen titulo="Situaciones" valor={String(datos.total_situaciones)} ayuda="Hechos ocurridos en el período, cada situación cuenta una vez" />

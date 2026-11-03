@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState, type ReactNode } from "react";
 import {
   AvisoError,
@@ -73,7 +75,7 @@ export function FormularioProtocolo() {
   const valores = estado.valores ?? {};
   const errores = estado.errores ?? {};
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       {estado.mensaje && !estado.errores && <AvisoError>{estado.mensaje}</AvisoError>}
       <div className="grid gap-4 sm:grid-cols-3">
         <Campo
@@ -104,7 +106,7 @@ export function FormularioProtocolo() {
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Creando…" : "Crear protocolo"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -112,13 +114,13 @@ export function FormularioProtocolo() {
 export function BotonNuevaVersion({ protocoloId }: { protocoloId: string }) {
   const [estado, accion, pendiente] = useActionState(crearVersion, estadoInicial);
   return (
-    <form action={accion} className="space-y-3">
+    <FormularioConCarga action={accion} className="space-y-3">
       <input type="hidden" name="protocolo_id" value={protocoloId} />
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       <button type="submit" disabled={pendiente} className={claseBotonSecundario}>
         {pendiente ? "Creando…" : "Crear una versión nueva"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -142,7 +144,7 @@ export function FormularioDatosVersion({
   const valores = estado.valores ?? {};
   const errores = estado.errores ?? {};
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="version_id" value={versionId} />
       {estado.mensaje && !estado.errores && <AvisoError>{estado.mensaje}</AvisoError>}
       <Campo
@@ -183,7 +185,7 @@ export function FormularioDatosVersion({
       <button type="submit" disabled={pendiente} className={claseBotonSecundario}>
         {pendiente ? "Guardando…" : "Guardar datos de la versión"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -228,7 +230,7 @@ export function FormularioPaso({
   };
 
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="version_id" value={versionId} />
       {paso && <input type="hidden" name="paso_id" value={paso.id} />}
       {estado.mensaje && !estado.errores && <AvisoError>{estado.mensaje}</AvisoError>}
@@ -312,7 +314,7 @@ export function FormularioPaso({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Guardando…" : paso ? "Guardar cambios del paso" : "Agregar paso"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }
 
@@ -330,7 +332,7 @@ export function FormularioPublicacion({
   const errores = estado.errores ?? {};
   const faltan = [errores.pasos, errores.version_documento_origen_id].filter(Boolean);
   return (
-    <form action={accion} noValidate className="space-y-4">
+    <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="version_id" value={versionId} />
       {estado.mensaje && (faltan.length > 0 || !estado.errores) && (
         <AvisoError>
@@ -365,6 +367,6 @@ export function FormularioPublicacion({
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Publicando…" : "Publicar versión"}
       </button>
-    </form>
+    </FormularioConCarga>
   );
 }

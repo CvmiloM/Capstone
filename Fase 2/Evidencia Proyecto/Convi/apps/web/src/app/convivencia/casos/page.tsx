@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { Encabezado, claseEnlace } from "@/app/components/formulario";
 import { obtenerFormatoFecha } from "@/app/profesor/datos";
 import { FiltrosListaCasos, type FiltrosCasos } from "./filtros";
@@ -72,6 +72,7 @@ export default async function PaginaCasos({
             <li key={caso.id}>
               <Link
                 href={`/convivencia/casos/${caso.id}`}
+                anticipar
                 className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-tarjeta transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-ring sm:flex-row sm:items-center"
               >
                 <div className="min-w-0 flex-1">

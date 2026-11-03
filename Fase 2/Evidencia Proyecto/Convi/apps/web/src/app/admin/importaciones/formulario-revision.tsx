@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar } from "@/app/components/formulario";
 import { Selector } from "../cursos/selector";
@@ -40,7 +42,7 @@ export function FormularioRevision({
     importacion;
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
 
       <div>
@@ -185,6 +187,6 @@ export function FormularioRevision({
           Revisar filas
         </BotonEnviar>
       </div>
-    </form>
+    </FormularioConCarga>
   );
 }

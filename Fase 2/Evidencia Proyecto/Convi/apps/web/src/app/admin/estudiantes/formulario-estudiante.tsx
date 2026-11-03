@@ -1,5 +1,7 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
+
 import { useActionState } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import {
@@ -44,7 +46,7 @@ export function FormularioEstudiante({
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.listo && (
         <div
@@ -143,6 +145,6 @@ export function FormularioEstudiante({
       >
         {ficha ? "Guardar cambios" : "Crear ficha"}
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }
