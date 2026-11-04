@@ -9,6 +9,8 @@ export type ProtocoloLista = {
   codigo: string;
   nombre: string;
   estado: string;
+  /** PB-124: OFICIAL o PROPUESTA_IA, una propuesta de la IA nunca es oficial. */
+  naturaleza: string;
   versiones: number;
   version_publicada: number | null;
   /** AAAA-MM-DD. */
@@ -31,6 +33,8 @@ export type VersionProtocolo = {
   creado_por: string;
   creado_en: string;
   pasos: number;
+  /** PB-124: versión redactada por la IA. */
+  generado_por_ia: boolean;
 };
 
 export type DetalleProtocolo = {
@@ -38,6 +42,7 @@ export type DetalleProtocolo = {
   codigo: string;
   nombre: string;
   estado: string;
+  naturaleza: string;
   borrador_id: string | null;
   versiones: VersionProtocolo[];
 };
@@ -57,6 +62,7 @@ export type DetalleVersion = VersionProtocolo & {
   protocolo_id: string;
   protocolo_codigo: string;
   protocolo_nombre: string;
+  protocolo_naturaleza: string;
   pasos_detalle: PasoProtocolo[];
   documentos_origen: { id: string; nombre: string }[];
   /** AAAA-MM-DD de hoy en la escuela. */

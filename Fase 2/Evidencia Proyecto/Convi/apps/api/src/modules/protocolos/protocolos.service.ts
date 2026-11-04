@@ -24,6 +24,9 @@ import {
 // para publicar (CA1). Aplicar una versión a un caso es PB-082 (casos).
 // Decisión del PO (por defecto): por ahora solo Convivencia lo usa; el
 // administrador también podrá publicar cuando tenga su pantalla.
+// PB-124 (HU-105): las propuestas de la IA (naturaleza PROPUESTA_IA) se ven,
+// editan y publican aquí como cualquier protocolo, marcadas como no oficiales;
+// la base impide que cambien a oficiales y exige revisor y documento de origen.
 const PERFILES: Perfil[] = ['CONVIVENCIA'];
 
 const NO_EXISTE = 'El protocolo no existe.';
@@ -40,6 +43,8 @@ export type ProtocoloLista = {
   codigo: string;
   nombre: string;
   estado: string;
+  /** OFICIAL o PROPUESTA_IA (PB-124). */
+  naturaleza: string;
   versiones: number;
   /** Número de la última versión publicada y desde cuándo rige. */
   version_publicada: number | null;
@@ -63,6 +68,8 @@ export type VersionProtocolo = {
   creado_por: string;
   creado_en: Date;
   pasos: number;
+  /** PB-124: versión redactada por la IA. */
+  generado_por_ia: boolean;
 };
 
 export type DetalleProtocolo = Omit<
@@ -76,6 +83,7 @@ export type DetalleVersion = VersionProtocolo & {
   protocolo_id: string;
   protocolo_codigo: string;
   protocolo_nombre: string;
+  protocolo_naturaleza: string;
   pasos_detalle: PasoProtocolo[];
   /** Versiones de documentos institucionales que se pueden indicar como origen. */
   documentos_origen: { id: string; nombre: string }[];
@@ -91,7 +99,7 @@ const COLUMNAS_VERSION = `
   d.titulo || ' · ' || dv.etiqueta_version AS documento_origen, v.notas,
   pc.nombres || ' ' || pc.apellidos AS creado_por, v.creado_en,
   (SELECT count(*) FROM convi.pasos_protocolo p
-   WHERE p.version_protocolo_id = v.id)::int AS pasos`;
+   WHERE p.version_protocolo_id = v.id)::int AS pasos, v.generado_por_ia`;
 
 const DESDE_VERSION = `
   FROM convi.versiones_protocolo v
@@ -135,7 +143,7 @@ export class ProtocolosService {
   listar(sesion: Sesion): Promise<ProtocoloLista[]> {
     return this.operar(sesion, async (db) => {
       const protocolos = await db.query<ProtocoloLista>(
-        `SELECT pr.id, pr.codigo, pr.nombre, pr.estado,
+        `SELECT pr.id, pr.codigo, pr.nombre, pr.estado, pr.naturaleza,
                 (SELECT count(*) FROM convi.versiones_protocolo v
                  WHERE v.protocolo_id = pr.id)::int AS versiones,
                 pub.numero_version AS version_publicada,
@@ -150,8 +158,7 @@ export class ProtocolosService {
            SELECT id, numero_version FROM convi.versiones_protocolo v
            WHERE v.protocolo_id = pr.id AND v.estado = 'BORRADOR'
            ORDER BY numero_version DESC LIMIT 1) bor ON true
-         WHERE pr.naturaleza = 'OFICIAL'
-         ORDER BY pr.estado, pr.nombre`,
+         ORDER BY pr.naturaleza, pr.estado, pr.nombre`,
       );
       return protocolos.rows;
     });
@@ -216,8 +223,8 @@ export class ProtocolosService {
       const protocolo = await db.query<
         Omit<DetalleProtocolo, 'versiones' | 'borrador_id'>
       >(
-        `SELECT id, codigo, nombre, estado FROM convi.protocolos
-         WHERE id = $1 AND naturaleza = 'OFICIAL'`,
+        `SELECT id, codigo, nombre, estado, naturaleza FROM convi.protocolos
+         WHERE id = $1`,
         [id],
       );
       if (!protocolo.rows[0]) throw new NotFoundException(NO_EXISTE);
@@ -242,8 +249,7 @@ export class ProtocolosService {
   nuevaVersion(sesion: Sesion, protocoloId: string): Promise<{ id: string }> {
     return this.operar(sesion, async (db) => {
       const protocolo = await db.query(
-        `SELECT 1 FROM convi.protocolos
-         WHERE id = $1 AND naturaleza = 'OFICIAL' FOR UPDATE`,
+        `SELECT 1 FROM convi.protocolos WHERE id = $1 FOR UPDATE`,
         [protocoloId],
       );
       if (protocolo.rowCount === 0) throw new NotFoundException(NO_EXISTE);
@@ -298,10 +304,11 @@ export class ProtocolosService {
         Omit<DetalleVersion, 'pasos_detalle' | 'documentos_origen' | 'hoy'>
       >(
         `SELECT ${COLUMNAS_VERSION}, pr.id AS protocolo_id,
-                pr.codigo AS protocolo_codigo, pr.nombre AS protocolo_nombre
+                pr.codigo AS protocolo_codigo, pr.nombre AS protocolo_nombre,
+                pr.naturaleza AS protocolo_naturaleza
          ${DESDE_VERSION}
          JOIN convi.protocolos pr ON pr.id = v.protocolo_id
-         WHERE v.id = $1 AND pr.naturaleza = 'OFICIAL'`,
+         WHERE v.id = $1`,
         [id],
       );
       if (!version.rows[0]) throw new NotFoundException(NO_EXISTE_VERSION);
