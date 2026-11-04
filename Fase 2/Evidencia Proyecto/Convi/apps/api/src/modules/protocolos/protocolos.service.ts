@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { PoolClient } from 'pg';
+import { rechazoPublicado } from '../../common/publicado.js';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import {
@@ -115,11 +116,19 @@ function codigoError(error: unknown) {
 export class ProtocolosService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
+  // PB-150 (HU-129): si la base rechaza cambiar una versión publicada o sus
+  // pasos, se responde lo mismo que al intentar editarla desde la API.
   private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
-      trabajo,
+      async (db) => {
+        try {
+          return await trabajo(db);
+        } catch (error) {
+          throw rechazoPublicado(error, SOLO_BORRADOR);
+        }
+      },
     );
   }
 
