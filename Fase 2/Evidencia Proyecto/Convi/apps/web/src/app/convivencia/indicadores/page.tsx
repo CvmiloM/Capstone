@@ -2,7 +2,9 @@
 import type { Metadata } from "next";
 import { Encabezado } from "@/app/components/formulario";
 import { pedir } from "../datos";
+import { explicarComparacion } from "../acciones-explicacion";
 import { AvisoNoDisponible } from "../aviso-no-disponible";
+import { ExplicacionIA } from "../explicacion-ia";
 import { FiltrosIndicadores, type OpcionesIndicadores } from "./filtros";
 
 export const metadata: Metadata = { title: "Indicadores de Convivencia" };
@@ -62,11 +64,11 @@ export default async function PaginaIndicadores({ searchParams }: {
       descripcion="Consulta situaciones, compromisos, seguimientos y cierres de tu escuela según el período que elijas" />
     <FiltrosIndicadores key={JSON.stringify(inicial)} inicial={inicial} opciones={respuesta.datos.opciones}
       error={solicitado && !valido ? "Elige dos fechas válidas, Hasta debe ser igual o posterior a Desde y el período no puede superar 367 días" : undefined} />
-    {datos && <Resultados datos={datos} />}
+    {datos && <Resultados datos={datos} filtros={inicial} />}
   </div>;
 }
 
-function Resultados({ datos }: { datos: Indicadores }) {
+function Resultados({ datos, filtros }: { datos: Indicadores; filtros: { desde: string; hasta: string; curso: string; categoria: string } }) {
   const corte = new Intl.DateTimeFormat("es-CL", {
     dateStyle: "long", timeStyle: "short", timeZone: datos.zona_horaria,
   }).format(new Date(datos.calculado_en));
@@ -103,6 +105,23 @@ function Resultados({ datos }: { datos: Indicadores }) {
         </table>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Variación = (actual − anterior) × 100 / anterior, si el conteo anterior es cero, no se calcula, situaciones usa la fecha del hecho, cierres y reaperturas usan la fecha de cada cambio de estado</p>
+      {/* PB-123 (HU-104): la IA explica esta tabla con los mismos valores, recalculados en el servidor. */}
+      <div className="mt-5 border-t border-border pt-5">
+        <ExplicacionIA
+          key={JSON.stringify(filtros)}
+          accion={explicarComparacion.bind(null, filtros)}
+          boton="Explicar la comparación"
+          ayuda="La IA explica con palabras simples la tabla de arriba, usando solo los períodos, conteos y denominadores que calculó CONVI con los mismos filtros"
+          mensajes={{
+            reposo: "Puedo explicarte con palabras simples qué cambió entre los dos períodos",
+            buscando: "Recalculando los dos períodos con tus filtros…",
+            pensando: "Comparando cada conteo con su denominador…",
+            escribiendo: "Escribiendo la explicación…",
+            listo: "Listo, compara el texto con los valores de al lado",
+            error: "No pude explicarla ahora, la tabla de arriba sigue siendo válida",
+          }}
+        />
+      </div>
     </section>
     <div className="grid gap-4 md:grid-cols-3">
       <Resumen titulo="Tiempo de gestión promedio"

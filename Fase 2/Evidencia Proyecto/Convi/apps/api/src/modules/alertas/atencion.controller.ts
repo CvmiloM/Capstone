@@ -54,6 +54,15 @@ export class AtencionController {
     return this.alertas.revisar(peticion.sesion, id, cuerpo);
   }
 
+  // PB-122 (HU-104): explicación con IA de la alerta, sin cuerpo.
+  @Post('alertas/:id/explicacion')
+  explicarAlerta(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.alertas.explicar(peticion.sesion, id);
+  }
+
   // ?ver=no-leidos (al entrar) o todos, y ?pagina=
   @Get('avisos')
   listarAvisos(
