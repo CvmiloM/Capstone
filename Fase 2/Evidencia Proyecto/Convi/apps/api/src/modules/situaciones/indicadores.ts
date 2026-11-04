@@ -34,6 +34,13 @@ export function validarFiltrosIndicadores(datos: Record<string, unknown>): Filtr
   return { desde, hasta, curso: id(datos.curso), categoria: id(datos.categoria) };
 }
 
+export const OPCIONES_INDICADORES = `SELECT jsonb_build_object(
+    'categorias',coalesce((SELECT jsonb_agg(jsonb_build_object('id',id,'nombre',nombre) ORDER BY nombre)
+      FROM convi.categorias_convivencia WHERE estado='ACTIVO'),'[]'::jsonb),
+    'cursos',coalesce((SELECT jsonb_agg(jsonb_build_object('id',c.id,'nombre',c.nombre || ' · ' || a.anio::text)
+      ORDER BY a.anio DESC,c.nombre)
+      FROM convi.cursos c JOIN convi.anios_academicos a ON a.id=c.anio_academico_id),'[]'::jsonb)) AS opciones`;
+
 // Una situación se cuenta una vez, aunque tenga varios participantes
 // current_date y las conversiones de timestamptz usan la zona de la escuela
 export const CONSULTA_INDICADORES = `
@@ -41,6 +48,8 @@ WITH parametros AS (
   SELECT coalesce($1::date,date_trunc('year',current_date)::date) desde,
          coalesce($2::date,current_date) hasta,
          $3::uuid curso, $4::uuid categoria
+), anterior AS (
+  SELECT desde - (hasta - desde + 1) desde, desde - 1 hasta FROM parametros
 ), hechos AS MATERIALIZED (
   SELECT s.id, s.ocurrido_en::date fecha, s.categoria_id, s.curso_contexto_id,
          nullif(trim(s.lugar),'') lugar
@@ -67,36 +76,66 @@ WITH parametros AS (
       SELECT 1 FROM convi.situaciones s WHERE s.caso_id=a.caso_id AND s.curso_contexto_id=$3::uuid))
     AND ($4::uuid IS NULL OR EXISTS (
       SELECT 1 FROM convi.situaciones s WHERE s.caso_id=a.caso_id AND s.categoria_id=$4::uuid))
-), cierres AS MATERIALIZED (
-  SELECT c.cerrado_en, c.fecha_limite_cierre
-  FROM convi.casos c, parametros p
-  WHERE c.estado_actual='CERRADO' AND c.cerrado_en >= p.desde::timestamptz
-    AND c.cerrado_en < (p.hasta + 1)::timestamptz
-    AND ($3::uuid IS NULL OR EXISTS (
+), casos_filtrados AS NOT MATERIALIZED (
+  SELECT c.id, c.estado_actual, c.abierto_en, c.cerrado_en, c.fecha_limite_cierre
+  FROM convi.casos c
+  WHERE ($3::uuid IS NULL OR EXISTS (
       SELECT 1 FROM convi.situaciones s WHERE s.caso_id=c.id AND s.curso_contexto_id=$3::uuid))
     AND ($4::uuid IS NULL OR EXISTS (
       SELECT 1 FROM convi.situaciones s WHERE s.caso_id=c.id AND s.categoria_id=$4::uuid))
+), cierres AS MATERIALIZED (
+  SELECT c.* FROM casos_filtrados c, parametros p
+  WHERE c.estado_actual='CERRADO' AND c.cerrado_en >= p.desde::timestamptz
+    AND c.cerrado_en < (p.hasta + 1)::timestamptz
+), movimientos AS MATERIALIZED (
+  SELECT h.caso_id, h.estado_nuevo, h.cambiado_en >= p.desde::timestamptz actual
+  FROM convi.historial_estados_caso h
+  JOIN casos_filtrados c ON c.id=h.caso_id
+  CROSS JOIN parametros p CROSS JOIN anterior a
+  WHERE h.estado_nuevo IN ('CERRADO','REABIERTO')
+    AND h.cambiado_en >= a.desde::timestamptz
+    AND h.cambiado_en < (p.hasta + 1)::timestamptz
+), comparables AS (
+  SELECT 1 orden, 'Situaciones' indicador, (SELECT count(*)::int FROM hechos) actual,
+    (SELECT count(*)::int FROM convi.situaciones s, anterior a, parametros p
+     WHERE s.ocurrido_en >= a.desde::timestamptz AND s.ocurrido_en < (a.hasta + 1)::timestamptz
+       AND (p.curso IS NULL OR s.curso_contexto_id=p.curso)
+       AND (p.categoria IS NULL OR s.categoria_id=p.categoria)) anterior
+  UNION ALL
+  SELECT 2, 'Cierres', count(*) FILTER (WHERE actual)::int, count(*) FILTER (WHERE NOT actual)::int
+  FROM movimientos WHERE estado_nuevo='CERRADO'
+  UNION ALL
+  SELECT 3, 'Reaperturas', count(*) FILTER (WHERE actual)::int, count(*) FILTER (WHERE NOT actual)::int
+  FROM movimientos WHERE estado_nuevo='REABIERTO'
 )
 SELECT to_char(p.desde,'YYYY-MM-DD') AS desde,
   to_char(p.hasta,'YYYY-MM-DD') AS hasta,
   current_timestamp AS calculado_en,
   current_setting('TimeZone') AS zona_horaria,
+  (SELECT jsonb_build_object('desde',to_char(a.desde,'YYYY-MM-DD'),'hasta',to_char(a.hasta,'YYYY-MM-DD'),
+    'dias',p.hasta-p.desde+1,
+    'indicadores',(SELECT jsonb_agg(jsonb_build_object('nombre',indicador,'actual',actual,'anterior',anterior,
+      'variacion_porcentual',round((actual-anterior)*100.0/nullif(anterior,0),1)) ORDER BY orden)
+      FROM comparables)) FROM anterior a) AS comparacion,
+  (SELECT jsonb_build_object('casos_cerrados',count(*)::int,
+    'dias_promedio',round(avg(cerrado_en::date-abierto_en::date),1)) FROM cierres) AS gestion,
   (SELECT jsonb_build_object(
-    'categorias',coalesce((SELECT jsonb_agg(jsonb_build_object('id',id,'nombre',nombre) ORDER BY nombre)
-      FROM convi.categorias_convivencia WHERE estado='ACTIVO'),'[]'::jsonb),
-    'cursos',coalesce((SELECT jsonb_agg(jsonb_build_object('id',c.id,'nombre',c.nombre || ' · ' || a.anio::text)
-      ORDER BY a.anio DESC,c.nombre)
-      FROM convi.cursos c JOIN convi.anios_academicos a ON a.id=c.anio_academico_id),'[]'::jsonb))) AS opciones,
+    'cierres',count(*) FILTER (WHERE estado_nuevo='CERRADO')::int,
+    'casos_con_cierre',count(DISTINCT caso_id) FILTER (WHERE estado_nuevo='CERRADO')::int,
+    'reaperturas',count(*) FILTER (WHERE estado_nuevo='REABIERTO')::int,
+    'casos_reabiertos',count(DISTINCT caso_id) FILTER (WHERE estado_nuevo='REABIERTO')::int)
+    FROM movimientos WHERE actual) AS movimientos,
+  (${OPCIONES_INDICADORES}) AS opciones,
   (SELECT count(*)::int FROM hechos) AS total_situaciones,
   (SELECT coalesce(jsonb_agg(jsonb_build_object('fecha',fecha,'total',total) ORDER BY fecha),'[]'::jsonb)
    FROM (SELECT fecha,count(*)::int total FROM hechos GROUP BY fecha) x) AS por_dia,
   (SELECT coalesce(jsonb_agg(jsonb_build_object('mes',mes,'total',total) ORDER BY mes),'[]'::jsonb)
    FROM (SELECT to_char(fecha,'YYYY-MM') mes,count(*)::int total FROM hechos GROUP BY 1) x) AS por_mes,
   (SELECT coalesce(jsonb_agg(jsonb_build_object('nombre',nombre,'total',total) ORDER BY total DESC,nombre),'[]'::jsonb)
-   FROM (SELECT coalesce(cat.nombre,'Sin categoría') nombre,count(*)::int total
+   FROM (SELECT coalesce(cat.nombre,'Sin especificar') nombre,count(*)::int total
          FROM hechos h LEFT JOIN convi.categorias_convivencia cat ON cat.id=h.categoria_id GROUP BY 1) x) AS por_categoria,
   (SELECT coalesce(jsonb_agg(jsonb_build_object('nombre',nombre,'total',total) ORDER BY total DESC,nombre),'[]'::jsonb)
-   FROM (SELECT coalesce(lugar,'Sin lugar indicado') nombre,count(*)::int total FROM hechos GROUP BY 1) x) AS por_lugar,
+   FROM (SELECT coalesce(lugar,'Sin especificar') nombre,count(*)::int total FROM hechos GROUP BY 1) x) AS por_lugar,
   (SELECT coalesce(jsonb_agg(jsonb_build_object('nombre',nombre,'total',total) ORDER BY total DESC,nombre),'[]'::jsonb)
    FROM (SELECT coalesce(c.nombre || ' · ' || a.anio::text,'Sin curso indicado') nombre,count(*)::int total
          FROM hechos h LEFT JOIN convi.cursos c ON c.id=h.curso_contexto_id

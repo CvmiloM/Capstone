@@ -1,10 +1,9 @@
 
-import { FormularioConCarga } from "@/app/components/actividad";
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
-import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
+import { Encabezado } from "@/app/components/formulario";
 import { pedir } from "../datos";
 import { AvisoNoDisponible } from "../aviso-no-disponible";
+import { FiltrosIndicadores, type OpcionesIndicadores } from "./filtros";
 
 export const metadata: Metadata = { title: "Indicadores de Convivencia" };
 
@@ -16,6 +15,12 @@ type Indicadores = {
   calculado_en: string;
   zona_horaria: string;
   total_situaciones: number;
+  comparacion: {
+    desde: string; hasta: string; dias: number;
+    indicadores: { nombre: string; actual: number; anterior: number; variacion_porcentual: number | null }[];
+  };
+  gestion: { casos_cerrados: number; dias_promedio: number | null };
+  movimientos: { cierres: number; casos_con_cierre: number; reaperturas: number; casos_reabiertos: number };
   por_dia: { fecha: string; total: number }[];
   por_mes: { mes: string; total: number }[];
   por_categoria: Grupo;
@@ -24,23 +29,44 @@ type Indicadores = {
   compromisos: Estado;
   seguimientos: Estado;
   cierres: { total: number; con_plazo: number; sin_plazo: number; oportunos: number };
-  opciones: { cursos: { id: string; nombre: string }[]; categorias: { id: string; nombre: string }[] };
+  opciones: OpcionesIndicadores;
 };
 
 const caja = "rounded-2xl border border-border bg-card p-5 shadow-tarjeta";
-const control = "w-full rounded-xl border border-input bg-card px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring";
 const fechaCorta = (fecha: string) => fecha.split("-").reverse().join("-");
 
 export default async function PaginaIndicadores({ searchParams }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const entrada = await searchParams;
-  const filtros = new URLSearchParams();
-  for (const nombre of ["desde", "hasta", "curso", "categoria"])
-    if (typeof entrada[nombre] === "string") filtros.set(nombre, entrada[nombre]);
-  const respuesta = await pedir<Indicadores>(`/convivencia/indicadores?${filtros}`);
+  const inicial = {
+    desde: typeof entrada.desde === "string" ? entrada.desde : "",
+    hasta: typeof entrada.hasta === "string" ? entrada.hasta : "",
+    curso: typeof entrada.curso === "string" ? entrada.curso : "",
+    categoria: typeof entrada.categoria === "string" ? entrada.categoria : "",
+  };
+  const fechaValida = (valor: string) => /^\d{4}-\d{2}-\d{2}$/.test(valor) &&
+    Number.isFinite(Date.parse(`${valor}T00:00:00Z`)) &&
+    new Date(`${valor}T00:00:00Z`).toISOString().slice(0, 10) === valor;
+  const valido = fechaValida(inicial.desde) && fechaValida(inicial.hasta) &&
+    inicial.desde <= inicial.hasta &&
+    (Date.parse(`${inicial.hasta}T00:00:00Z`) - Date.parse(`${inicial.desde}T00:00:00Z`)) / 86400000 <= 366;
+  const solicitado = entrada.buscar === "1";
+  const filtros = solicitado && valido ? new URLSearchParams(inicial) : new URLSearchParams();
+  const respuesta = await pedir<Indicadores | Pick<Indicadores, "opciones">>(`/convivencia/indicadores?${filtros}`);
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia" />;
-  const datos = respuesta.datos;
+  const datos = "total_situaciones" in respuesta.datos ? respuesta.datos : null;
+
+  return <div className="space-y-6">
+    <Encabezado titulo="Indicadores de Convivencia"
+      descripcion="Consulta situaciones, compromisos, seguimientos y cierres de tu escuela según el período que elijas" />
+    <FiltrosIndicadores key={JSON.stringify(inicial)} inicial={inicial} opciones={respuesta.datos.opciones}
+      error={solicitado && !valido ? "Elige dos fechas válidas, Hasta debe ser igual o posterior a Desde y el período no puede superar 367 días" : undefined} />
+    {datos && <Resultados datos={datos} />}
+  </div>;
+}
+
+function Resultados({ datos }: { datos: Indicadores }) {
   const corte = new Intl.DateTimeFormat("es-CL", {
     dateStyle: "long", timeStyle: "short", timeZone: datos.zona_horaria,
   }).format(new Date(datos.calculado_en));
@@ -48,34 +74,44 @@ export default async function PaginaIndicadores({ searchParams }: {
     ? `${Math.round(datos.cierres.oportunos * 100 / datos.cierres.con_plazo)} %`
     : "Sin datos";
 
-  return <div className="space-y-6">
-    <Encabezado titulo="Indicadores de Convivencia"
-      descripcion="Consulta situaciones, compromisos, seguimientos y cierres de tu escuela según el período que elijas" />
-    <FormularioConCarga className={caja}>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Campo titulo="Desde" nombre="desde"><input id="desde" name="desde" type="date" defaultValue={datos.desde} className={control} /></Campo>
-        <Campo titulo="Hasta" nombre="hasta"><input id="hasta" name="hasta" type="date" defaultValue={datos.hasta} className={control} /></Campo>
-        <Campo titulo="Curso" nombre="curso"><select id="curso" name="curso" defaultValue={typeof entrada.curso === "string" ? entrada.curso : ""} className={control}>
-          <option value="">Todos los cursos</option>
-          {datos.opciones.cursos.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-        </select></Campo>
-        <Campo titulo="Categoría" nombre="categoria"><select id="categoria" name="categoria" defaultValue={typeof entrada.categoria === "string" ? entrada.categoria : ""} className={control}>
-          <option value="">Todas las categorías</option>
-          {datos.opciones.categorias.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-        </select></Campo>
-      </div>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button className={claseBotonPrimario}>Aplicar filtros</button>
-        <a href="/convivencia/indicadores" className="text-sm text-primary underline-offset-4 hover:underline">Limpiar filtros</a>
-      </div>
-      <p className="mt-3 text-xs text-muted-foreground">Período máximo de 367 días, las fechas corresponden a la zona horaria de la escuela</p>
-    </FormularioConCarga>
-    <p className="text-sm text-muted-foreground">Del {fechaCorta(datos.desde)} al {fechaCorta(datos.hasta)} · Cifras calculadas el {corte}</p>
+  return <>
+    <p className="text-sm text-muted-foreground">Del {fechaCorta(datos.desde)} al {fechaCorta(datos.hasta)} · Cifras calculadas el {corte} · Zona horaria {datos.zona_horaria}</p>
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <Resumen titulo="Situaciones" valor={String(datos.total_situaciones)} ayuda="Hechos ocurridos en el período, cada situación cuenta una vez" />
       <Resumen titulo="Compromisos vencidos" valor={String(datos.compromisos.vencidos)} ayuda="No completados ni cancelados, con vencimiento en el período y plazo pasado" />
       <Resumen titulo="Seguimientos pendientes" valor={String(datos.seguimientos.pendientes)} ayuda="Programados en el período, aún sin realizar y con fecha futura" />
       <Resumen titulo="Cierres oportunos" valor={porcentaje} ayuda={`${datos.cierres.oportunos} de ${datos.cierres.con_plazo} casos cerrados con plazo, ${datos.cierres.sin_plazo} sin plazo excluidos`} />
+    </div>
+    <section className={caja} aria-labelledby="comparacion-periodos">
+      <h2 id="comparacion-periodos" className="font-titulo text-xl font-semibold">Comparación entre períodos</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Período actual del {fechaCorta(datos.desde)} al {fechaCorta(datos.hasta)}, período anterior del {fechaCorta(datos.comparacion.desde)} al {fechaCorta(datos.comparacion.hasta)}, ambos incluyen {datos.comparacion.dias} {datos.comparacion.dias === 1 ? "día" : "días"} y usan los mismos filtros.</p>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <caption className="sr-only">Conteos y variación respecto del período inmediatamente anterior</caption>
+          <thead className="border-b border-border text-muted-foreground"><tr>
+            <th scope="col" className="py-2 pr-4 font-medium">Indicador</th>
+            <th scope="col" className="px-3 py-2 text-right font-medium">Anterior</th>
+            <th scope="col" className="px-3 py-2 text-right font-medium">Actual</th>
+            <th scope="col" className="py-2 pl-3 text-right font-medium">Variación</th>
+          </tr></thead>
+          <tbody>{datos.comparacion.indicadores.map((fila) => <tr key={fila.nombre} className="border-b border-border last:border-0">
+            <th scope="row" className="py-3 pr-4 font-medium">{fila.nombre}</th>
+            <td className="px-3 py-3 text-right tabular-nums">{fila.anterior}</td>
+            <td className="px-3 py-3 text-right tabular-nums">{fila.actual}</td>
+            <td className="py-3 pl-3 text-right tabular-nums">{fila.variacion_porcentual === null ? "No calculable" : `${fila.variacion_porcentual > 0 ? "+" : ""}${fila.variacion_porcentual.toLocaleString("es-CL")} %`}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">Variación = (actual − anterior) × 100 / anterior, si el conteo anterior es cero, no se calcula, situaciones usa la fecha del hecho, cierres y reaperturas usan la fecha de cada cambio de estado</p>
+    </section>
+    <div className="grid gap-4 md:grid-cols-3">
+      <Resumen titulo="Tiempo de gestión promedio"
+        valor={datos.gestion.dias_promedio === null ? "Sin datos" : `${datos.gestion.dias_promedio.toLocaleString("es-CL")} días`}
+        ayuda={`${datos.gestion.casos_cerrados} casos actualmente cerrados cuyo último cierre está en el período, promedio de días calendario entre apertura y último cierre, en la zona horaria de la escuela, incluye el tiempo antes de una reapertura`} />
+      <Resumen titulo="Cierres registrados" valor={String(datos.movimientos.cierres)}
+        ayuda={`${datos.movimientos.casos_con_cierre} casos distintos con cierres en el período, cada cierre del historial cuenta, aunque el caso se haya reabierto después`} />
+      <Resumen titulo="Reaperturas registradas" valor={String(datos.movimientos.reaperturas)}
+        ayuda={`${datos.movimientos.casos_reabiertos} casos distintos reabiertos en el período, cada reapertura del historial cuenta`} />
     </div>
     <div className="grid gap-4 xl:grid-cols-2">
       <Estados titulo="Compromisos" datos={datos.compromisos} fecha="fecha de vencimiento" />
@@ -97,11 +133,7 @@ export default async function PaginaIndicadores({ searchParams }: {
       <div className="mt-4"><Distribucion titulo="Días con situaciones" datos={datos.por_dia.map((x) => ({ nombre: fechaCorta(x.fecha), total: x.total }))} total={datos.total_situaciones} sinBorde /></div>
     </details>
     <p className="text-xs text-muted-foreground">Las situaciones se agrupan por fecha del hecho, los compromisos por vencimiento, los seguimientos por fecha programada y los cierres por fecha de cierre, los estados se consultan al momento indicado arriba, las cifras por curso y categoría de compromisos, seguimientos y cierres corresponden a casos con al menos una situación vinculada que coincida con cada filtro</p>
-  </div>;
-}
-
-function Campo({ titulo, nombre, children }: { titulo: string; nombre: string; children: ReactNode }) {
-  return <div><label htmlFor={nombre} className="mb-1.5 block text-sm font-medium">{titulo}</label>{children}</div>;
+  </>;
 }
 
 function Resumen({ titulo, valor, ayuda }: { titulo: string; valor: string; ayuda: string }) {

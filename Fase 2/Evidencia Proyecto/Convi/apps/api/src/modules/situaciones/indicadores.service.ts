@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
-import { CONSULTA_INDICADORES, validarFiltrosIndicadores } from './indicadores.js';
+import { CONSULTA_INDICADORES, OPCIONES_INDICADORES, validarFiltrosIndicadores } from './indicadores.js';
 
 @Injectable()
 export class IndicadoresService {
@@ -13,6 +13,10 @@ export class IndicadoresService {
       sesion,
       { tipo: 'establecimiento', perfiles: ['CONVIVENCIA'] },
       async (db) => {
+        if (!filtros.desde && !filtros.hasta) {
+          const { rows } = await db.query(OPCIONES_INDICADORES);
+          return rows[0];
+        }
         const { rows } = await db.query(CONSULTA_INDICADORES, [
           filtros.desde, filtros.hasta, filtros.curso, filtros.categoria,
         ]);
