@@ -181,8 +181,11 @@ export class OrientacionService {
   }
 }
 
-/** Lee el expediente con la sesión de Convivencia: la RLS ya separa por escuela. */
-async function leerCaso(
+/**
+ * Lee el expediente con la sesión de Convivencia: la RLS ya separa por escuela.
+ * También lo usan los borradores de acta e informe (PB-125 y PB-126).
+ */
+export async function leerCaso(
   db: PoolClient,
   casoId: string,
 ): Promise<{ contexto: ContextoCaso; personas: PersonaCaso[] }> {

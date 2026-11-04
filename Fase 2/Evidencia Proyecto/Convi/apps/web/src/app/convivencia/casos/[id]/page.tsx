@@ -23,6 +23,7 @@ import {
 } from "./formularios";
 import { SeguimientoCaso } from "./seguimientos";
 import { Comunicaciones } from "./comunicaciones";
+import { BorradoresIA, type BorradoresDelCaso } from "./borradores-ia";
 import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
 import { PlanIntervencion } from "./plan-intervencion";
@@ -109,6 +110,15 @@ const AVISOS: Record<string, string> = {
     "Guardaste los cambios del borrador, el correo no se envió.",
   "correo-descartado":
     "Descartaste el borrador, el descarte quedó en la auditoría.",
+  // PB-125 y PB-126 (HU-106 y HU-107): borradores de acta e informe con IA.
+  "borrador-ia":
+    "La IA preparó el borrador y quedó marcado como generado con IA y pendiente de revisión: no es un acta firmada ni un informe publicado",
+  "borrador-editado":
+    "Guardaste la corrección como una nueva edición, el texto anterior se conserva",
+  "borrador-revisado":
+    "Marcaste el borrador como revisado, quedó con tu nombre y la fecha",
+  "borrador-descartado":
+    "Descartaste el borrador, quedó en el caso con tu nombre y la fecha",
 };
 
 /** HU-047 CA2: las tareas sin terminar, en palabras. */
@@ -181,12 +191,18 @@ export default async function PaginaCaso({
   const seccion =
     secciones.find(([clave]) => clave === solicitada)?.[0] ?? "resumen";
   // Cada pestaña pide solo sus datos, y el historial va en paralelo con el caso.
-  const [respuesta, formatearFecha, historial] = await Promise.all([
+  const [respuesta, formatearFecha, historial, borradores] = await Promise.all([
     obtenerCaso(id, seccion),
     obtenerFormatoFecha(),
     seccion === "historial"
       ? pedir<PaginaHistorial>(
           `/convivencia/casos/${encodeURIComponent(id)}/historial${antes ? `?antes=${encodeURIComponent(typeof antes === "string" ? antes : "invalida")}` : ""}`,
+        )
+      : null,
+    // PB-125 y PB-126: borradores de acta e informe, solo en la pestaña de IA.
+    seccion === "ia"
+      ? pedir<BorradoresDelCaso>(
+          `/convivencia/casos/${encodeURIComponent(id)}/borradores`,
         )
       : null,
   ]);
@@ -289,6 +305,18 @@ export default async function PaginaCaso({
           {seccion === "ia" && (
             <Seccion titulo="Orientación con IA" className="lg:col-span-3">
               <OrientacionCaso casoId={caso.id} />
+            </Seccion>
+          )}
+          {seccion === "ia" && borradores?.ok && (
+            <Seccion
+              titulo="Borradores de acta e informe con IA"
+              className="lg:col-span-3"
+            >
+              <BorradoresIA
+                casoId={caso.id}
+                datos={borradores.datos}
+                formatearFecha={formatearFecha}
+              />
             </Seccion>
           )}
 
