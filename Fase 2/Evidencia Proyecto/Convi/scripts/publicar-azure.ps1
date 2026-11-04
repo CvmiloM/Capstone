@@ -99,9 +99,9 @@ try {
     try {
         $env:NEXT_PUBLIC_SUPABASE_URL = $cloud['SUPABASE_URL']
         $env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = $cloud['SUPABASE_PUBLISHABLE_KEY']
-        & docker build -f Dockerfile.production --target api -t $apiImage .
+        & docker build --pull -f Dockerfile.production --target api -t $apiImage .
         Comprobar-Docker
-        & docker build -f Dockerfile.production --target web --build-arg NEXT_PUBLIC_SUPABASE_URL --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY --build-arg "DEPLOYMENT_ID=$Version" -t $webImage .
+        & docker build --pull -f Dockerfile.production --target web --build-arg NEXT_PUBLIC_SUPABASE_URL --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY --build-arg "DEPLOYMENT_ID=$Version" -t $webImage .
         Comprobar-Docker
         $null = Invocar-Az -Argumentos @('acr', 'login', '--name', $base.registryName.value)
         & docker push $apiImage

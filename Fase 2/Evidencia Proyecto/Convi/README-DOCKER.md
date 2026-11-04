@@ -15,7 +15,7 @@
 
 - Windows 10/11, Docker Desktop iniciado con WSL2/motor Linux.
 - Git, para clonar/actualizar el repositorio.
-- Node.js **20 o superior**, con `npx.cmd` en PATH. El script utiliza **Supabase CLI 2.117.0** con `npx` y la instala/cachea en el primer uso. Node no se usa para servir las apps, que se ejecutan dentro de Docker.
+- Node.js **22.23.4**, con `npx.cmd` en PATH, alineado con `.node-version`, Docker y GitHub Actions. El script utiliza **Supabase CLI 2.117.0** con `npx` y la instala/cachea en el primer uso. Node no se usa para servir las apps, que se ejecutan dentro de Docker.
 - Memoria y espacio libre suficientes para el stack local de Supabase (es pesado).
 - Conexion a internet en la primera ejecucion para descargar imagenes de Docker y la CLI.
 
@@ -81,6 +81,54 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\detener.ps1
 
 Si se modifican dependencias o Dockerfile, usa la variante con `-Build`.
 
+### Actualización de seguridad de Node y dependencias (noviembre de 2026)
+
+Después de actualizar el repositorio, cada integrante debe instalar Node **22.23.4**
+desde [el sitio oficial](https://nodejs.org/en/blog/release/v22.23.4), abrir otra
+terminal y comprobar `node --version`. Quien use un gestor de versiones puede
+seleccionar la versión indicada en `.node-version`. Esto actualiza las herramientas
+de Windows; las aplicaciones usan su propio Node dentro de Docker.
+
+Desde la carpeta Convi, ejecutar:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\iniciar.ps1 -Build
+```
+
+El arranque reconstruye las imágenes y sincroniza los volúmenes de dependencias con
+`pnpm-lock.yaml`, con web y API detenidas durante la instalación. Conserva la base,
+archivos, `.env` y colas. No requiere migraciones, `db reset` ni `docker compose down -v`.
+Para verificar el runtime:
+
+```powershell
+docker compose exec api node --version
+docker compose exec web node --version
+```
+
+Ambos deben mostrar `v22.23.4`. Azure recibirá el mismo runtime al publicar las nuevas
+imágenes mediante el flujo habitual de PR y merge; actualizar Windows no actualiza
+por sí solo un despliegue existente.
+
+La revisión del 04-11-2026 dejó `pnpm audit` sin avisos altos ni críticos,
+incluyendo herramientas de desarrollo. En producción pasó de 2 altos y 4
+moderados a 0 altos y 3 moderados. El flujo de GitHub bloquea nuevos avisos altos
+o críticos de producción antes de compilar y publicar.
+
+Quedan avisos moderados transitivos de `uuid` y `minimatch`, que deben seguirse
+revisando, no ocultarse con `audit --ignore`. ExcelJS 4.4.0 sigue dependiendo de
+versiones antiguas: usa UUID v4, mientras que el aviso afecta v3/v5/v6 con buffer;
+CONVI lee y genera archivos XLSX, no recibe patrones glob de los usuarios.
+El aviso de minimatch también alcanza a la CLI de Nest. Forzar minimatch 11 en
+los consumidores antiguos cambiaría su API y puede romper la importación o la
+compilación. Se conserva esta limitación hasta actualizar sus consumidores o
+comprobar una sustitución compatible con pruebas específicas.
+
+Los overrides de Undici y tmp corrigen versiones fijadas por Mau y su editor;
+deben retirarse cuando esos paquetes incorporen los parches. No se autorizan
+scripts de instalación adicionales ni se desactivan comprobaciones de TLS.
+La auditoría de paquetes Node no cubre las imágenes del sistema operativo,
+servicios administrados, Python ni un pentesting de permisos y lógica.
+
 ## C. Sin scripts (alternativa manual)
 
 Abre Docker Desktop, inicia Supabase y las aplicaciones por separado:
@@ -133,7 +181,7 @@ Los compañeros hacen `git pull` desde la raiz de Capstone y ejecutan el paso A 
 ## F. Resolucion de problemas
 
 - **Docker sin Engine:** abre Docker Desktop; `docker version` debe mostrar secciones Client y Server.
-- **Node o npx no existe:** instala Node.js 20+ y reabre la terminal.
+- **Node o npx no existe:** instala Node.js 22.23.4 y reabre la terminal.
 - **`npx` no puede descargar Supabase:** comprueba internet/proxy/firewall; el primer uso necesita red.
 - **Puertos 3000/3001/54321-54324 ocupados:** cierra el otro proceso o ajusta de forma coordinada config.toml y .env.
 - **La web/API no responde:** `docker compose ps` y `docker compose logs --tail=100 web api`.

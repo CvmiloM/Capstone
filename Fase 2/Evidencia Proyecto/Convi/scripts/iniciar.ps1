@@ -11,7 +11,7 @@ Set-StrictMode -Version Latest
 function Iniciar-Aplicaciones {
     param([string[]]$ComposeArguments = @())
     if ($Build) {
-        & docker compose @ComposeArguments build
+        & docker compose @ComposeArguments build --pull
         if ($LASTEXITCODE -ne 0) { throw 'Fallo la construccion de las imagenes de CONVI.' }
     }
     & docker compose @ComposeArguments stop api web

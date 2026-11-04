@@ -4,3 +4,8 @@ packages:
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# Mau y su editor fijan dependencias antiguas; retirar al corregirse aguas arriba.
+overrides:
+  '@nestjs/mau>undici': '6.29.1'
+  'external-editor>tmp': '0.2.7'
