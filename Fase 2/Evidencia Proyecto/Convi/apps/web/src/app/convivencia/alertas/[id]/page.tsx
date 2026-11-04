@@ -11,7 +11,9 @@ import {
   type Ambito,
   type Tipo,
 } from "@/app/components/reglas/opciones";
+import { explicarAlerta } from "../../acciones-explicacion";
 import { AvisoNoDisponible } from "../../aviso-no-disponible";
+import { ExplicacionIA } from "../../explicacion-ia";
 import { NOMBRE_ESTADO } from "../../datos";
 import { obtenerAlerta, type DetalleAlerta } from "../datos";
 import {
@@ -101,6 +103,23 @@ export default async function DetalleDeAlerta({
             {a.formula}
           </p>
         )}
+      </Seccion>
+
+      {/* PB-122 (HU-104): la IA explica el cálculo guardado, sin cambiar la alerta. */}
+      <Seccion titulo="Explicación con IA">
+        <ExplicacionIA
+          accion={explicarAlerta.bind(null, a.id)}
+          boton="Explicar esta alerta"
+          ayuda="La IA explica con palabras simples el cálculo de arriba, usando solo la regla y los valores que guardó CONVI, sin el nombre del estudiante, curso o caso"
+          mensajes={{
+            reposo: "Puedo explicarte con palabras simples por qué se generó esta alerta",
+            buscando: "Leyendo la regla y el cálculo guardado…",
+            pensando: "Revisando el período, el conteo y el umbral…",
+            escribiendo: "Escribiendo la explicación…",
+            listo: "Listo, compara el texto con los valores de al lado",
+            error: "No pude explicarla ahora, el cálculo de arriba sigue siendo válido",
+          }}
+        />
       </Seccion>
 
       <Seccion titulo="A qué se refiere">

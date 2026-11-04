@@ -7,6 +7,14 @@ import {
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import {
+  prepararAlerta,
+  type AlertaParaExplicar,
+} from '../orientacion/explicacion-ia.js';
+import {
+  explicarConIA,
+  type ExplicacionIA,
+} from '../orientacion/explicar-con-ia.js';
+import {
   leerFiltrosAlertas,
   POR_PAGINA_ALERTAS,
   validarRevisionAlerta,
@@ -217,6 +225,31 @@ export class AtencionAlertasService {
         return resultado.rows[0];
       },
     );
+  }
+
+  // PB-122 (HU-104): la IA explica la alerta con la regla y el cálculo que
+  // guardó el motor, sin el nombre del estudiante, curso o caso. Se puede pedir
+  // en cualquier estado y no cambia la alerta ni su revisión.
+  explicar(sesion: Sesion, id: string): Promise<ExplicacionIA> {
+    return explicarConIA(this.cuentas, sesion, {
+      tipo: 'ALERTA',
+      alertaId: id,
+      preparar: async (db) => {
+        const resultado = await db.query<AlertaParaExplicar>(
+          `SELECT r.codigo_regla, r.numero_version, r.nombre AS regla,
+             r.tipo_regla, r.codigo_prioridad AS prioridad,
+             r.codigo_ambito AS ambito, cat.nombre AS categoria,
+             a.datos_explicacion AS explicacion
+           FROM convi.alertas a
+           JOIN convi.reglas r ON r.id = a.regla_id
+           LEFT JOIN convi.categorias_convivencia cat ON cat.id = r.categoria_id
+           WHERE a.id = $1`,
+          [id],
+        );
+        if (!resultado.rows[0]) throw new NotFoundException(NO_EXISTE);
+        return prepararAlerta(resultado.rows[0]);
+      },
+    });
   }
 
   // CA2 y CA3: marca la alerta Revisada o Archivada con lo que se hizo. Pasa
