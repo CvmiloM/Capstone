@@ -46,7 +46,7 @@ import {
 import {
   crearPasosDelCaso,
   insertarRevisionNormativaDelCaso,
-  PROTOCOLOS_APLICABLES,
+  PROTOCOLOS_Y_PROPUESTAS_APLICABLES,
   protocolosAplicables,
   protocolosDelCaso,
   revisionesNormativasDelCaso,
@@ -441,7 +441,7 @@ export class CasosService {
           ),
           protocolos_aplicables: cargar(
             'normativa',
-            () => protocolosAplicables(db),
+            () => protocolosAplicables(db, true),
             [],
           ),
           revisiones_normativas: cargar(
@@ -557,7 +557,7 @@ export class CasosService {
         await casoAbierto(db, casoId);
         const errores: Record<string, string> = {};
         const version = await db.query<{ protocolo_id: string }>(
-          `SELECT vp.protocolo_id ${PROTOCOLOS_APLICABLES} AND vp.id = $1`,
+          `SELECT vp.protocolo_id ${PROTOCOLOS_Y_PROPUESTAS_APLICABLES} AND vp.id = $1`,
           [datos.version_protocolo_id],
         );
         const protocoloId = version.rows[0]?.protocolo_id;

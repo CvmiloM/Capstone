@@ -27,6 +27,16 @@ export const PROTOCOLOS_APLICABLES = `
     AND (vp.vigente_desde IS NULL OR vp.vigente_desde <= ${HOY})
     AND (vp.vigente_hasta IS NULL OR vp.vigente_hasta >= ${HOY})`;
 
+// PB-124 (HU-105 CA2): en el caso también se pueden aplicar las propuestas de
+// la IA ya publicadas, siempre marcadas como no oficiales. La orientación y la
+// revisión normativa siguen considerando solo los oficiales.
+export const PROTOCOLOS_Y_PROPUESTAS_APLICABLES = `
+  FROM convi.versiones_protocolo vp
+  JOIN convi.protocolos pr ON pr.id = vp.protocolo_id
+  WHERE vp.estado = 'PUBLICADO' AND pr.estado = 'ACTIVO'
+    AND (vp.vigente_desde IS NULL OR vp.vigente_desde <= ${HOY})
+    AND (vp.vigente_hasta IS NULL OR vp.vigente_hasta >= ${HOY})`;
+
 export type Aplicacion = { version_protocolo_id: string; fundamento: string };
 
 export function validarAplicacion(cuerpo: unknown): Aplicacion {
@@ -54,20 +64,26 @@ export function validarAplicacion(cuerpo: unknown): Aplicacion {
   return { version_protocolo_id: version.toLowerCase(), fundamento };
 }
 
-/** Versiones que se pueden aplicar hoy, con su cantidad de pasos. */
+/**
+ * Versiones que se pueden aplicar hoy, con su cantidad de pasos. Con
+ * propuestas también van las de la IA publicadas, con su nombre marcado.
+ */
 export async function protocolosAplicables(
   db: PoolClient,
+  propuestas = false,
 ): Promise<{ id: string; nombre: string; pasos: number }[]> {
   const versiones = await db.query<{
     id: string;
     nombre: string;
     pasos: number;
   }>(
-    `SELECT vp.id, pr.nombre || ' · versión ' || vp.numero_version AS nombre,
+    `SELECT vp.id,
+            CASE WHEN pr.naturaleza = 'PROPUESTA_IA' THEN 'Propuesta IA, no oficial: ' ELSE '' END ||
+            pr.nombre || ' · versión ' || vp.numero_version AS nombre,
             (SELECT count(*) FROM convi.pasos_protocolo p
              WHERE p.version_protocolo_id = vp.id)::int AS pasos
-     ${PROTOCOLOS_APLICABLES}
-     ORDER BY pr.nombre`,
+     ${propuestas ? PROTOCOLOS_Y_PROPUESTAS_APLICABLES : PROTOCOLOS_APLICABLES}
+     ORDER BY pr.naturaleza, pr.nombre`,
   );
   return versiones.rows;
 }
@@ -87,6 +103,8 @@ export type ProtocoloAplicado = {
   id: string;
   protocolo: string;
   codigo: string;
+  /** PB-124: es una propuesta de la IA, no un protocolo oficial. */
+  propuesta_ia: boolean;
   numero_version: number;
   estado: string;
   fundamento: string;
@@ -127,7 +145,8 @@ export async function protocolosDelCaso(
   casoId: string,
 ): Promise<ProtocoloAplicado[]> {
   const aplicados = await db.query<Omit<ProtocoloAplicado, 'pasos'>>(
-    `SELECT pc.id, pr.nombre AS protocolo, pr.codigo, vp.numero_version,
+    `SELECT pc.id, pr.nombre AS protocolo, pr.codigo,
+            pr.naturaleza = 'PROPUESTA_IA' AS propuesta_ia, vp.numero_version,
             pc.estado, pc.fundamento, pc.aplicado_en,
             p.nombres || ' ' || p.apellidos AS aplicado_por,
             coalesce(pc.completado_en, t.ocurrido_en) AS terminado_en,

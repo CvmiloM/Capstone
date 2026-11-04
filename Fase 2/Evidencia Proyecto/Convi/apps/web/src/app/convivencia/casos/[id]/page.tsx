@@ -28,6 +28,7 @@ import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
 import { PlanIntervencion } from "./plan-intervencion";
 import { ProtocolosAplicados } from "./protocolo-aplicado";
+import { PropuestaProtocolo } from "./propuesta-protocolo";
 import { ResumenCaso } from "./resumen";
 import { PestanasCaso } from "./pestanas-caso";
 import { FormularioContinuidad } from "./formulario-continuidad";
@@ -574,6 +575,18 @@ export default async function PaginaCaso({
                   </div>
                 </div>
               )}
+              {/* PB-124 (HU-105): sin un protocolo oficial activo, la IA puede proponer uno. */}
+              {caso.estado_actual !== "CERRADO" &&
+                !caso.protocolos_aplicados.some(
+                  (p) => p.estado === "ACTIVO" && !p.propuesta_ia,
+                ) && (
+                  <div className="mt-4 border-t border-border pt-4">
+                    <h3 className="mb-3 text-sm font-semibold">
+                      ¿Ningún protocolo oficial calza con este caso?
+                    </h3>
+                    <PropuestaProtocolo casoId={caso.id} />
+                  </div>
+                )}
             </Seccion>
           )}
 
