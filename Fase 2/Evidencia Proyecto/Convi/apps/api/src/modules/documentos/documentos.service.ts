@@ -10,6 +10,7 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import { rechazoPublicado } from '../../common/publicado.js';
 import type { Sesion } from '../../common/sesion.js';
 import {
   CuentaService,
@@ -42,6 +43,7 @@ const DESDE_VERSION = `FROM convi.versiones_documento v
   JOIN convi.personas p ON p.id = m.persona_id`;
 
 // Un choque con otra operación al mismo tiempo se informa como conflicto para que la pantalla pida recargar.
+// PB-150 (HU-129): si la base rechaza cambiar una versión publicada o archivada, se pide otra versión.
 function conConflicto<T>(trabajo: (db: PoolClient) => Promise<T>) {
   return async (db: PoolClient) => {
     try {
@@ -51,7 +53,10 @@ function conConflicto<T>(trabajo: (db: PoolClient) => Promise<T>) {
         throw new ConflictException(
           'El documento cambió mientras trabajabas, recarga la página',
         );
-      throw error;
+      throw rechazoPublicado(
+        error,
+        'Esta versión ya está publicada o archivada: no se modifica. Sube otra versión para corregirla.',
+      );
     }
   };
 }
