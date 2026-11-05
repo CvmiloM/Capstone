@@ -4,8 +4,8 @@ import { destinatariosDeComunicacion } from './comunicaciones.js';
 
 // PB-151 (HU-130) y PB-086 (HU-075): correos al apoderado desde el caso. Un
 // correo es una comunicación de tipo CORREO que nace en estado BORRADOR, se
-// redacta a mano o con IA y se edita mientras nadie lo confirme. El envío con
-// confirmación es PB-087 (HU-076): aquí nada se envía ni se marca entregado.
+// redacta a mano o con IA y se edita mientras nadie lo confirme. PB-087
+// (HU-076): un profesional de Convivencia lo confirma y se envía.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CORREO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -79,6 +79,29 @@ export function validarBorradorCorreo(cuerpo: unknown): BorradorCorreo {
   };
 }
 
+export type SolicitudEnvio = {
+  /** Clave única del envío, creada al mostrar la página (HU-076 CA1 y CA3). */
+  clave_envio: string;
+  /** HU-076 CA5: el profesional vio la advertencia y quiere enviar igual. */
+  con_advertencia: boolean;
+};
+
+// HU-076 CA3: la misma clave en una repetición no envía otro correo.
+export function validarEnvio(cuerpo: unknown): SolicitudEnvio {
+  const datos = datosDe(cuerpo);
+  const clave = texto(datos.clave_envio);
+  if (!UUID.test(clave))
+    throw new BadRequestException({
+      mensaje:
+        'Recarga la página e inténtalo nuevamente. No se envió el correo.',
+      errores: { clave_envio: 'Falta la clave del envío.' },
+    });
+  return {
+    clave_envio: clave.toLowerCase(),
+    con_advertencia: datos.con_advertencia === true,
+  };
+}
+
 export type SolicitudCorreoIA = {
   persona_destinataria_id: string;
   indicacion: string;
@@ -121,7 +144,11 @@ export type CorreoCaso = {
   creado_por: string;
   creado_en: Date;
   confirmado_en: Date | null;
+  /** PB-087: quién confirmó el envío, o null. */
+  confirmado_por: string | null;
   enviado_en: Date | null;
+  /** PB-087: referencia del servicio de correo, por ejemplo mailpit:abc. */
+  referencia: string | null;
   /** Se puede editar o descartar: borrador que nadie confirmó. */
   editable: boolean;
 };
@@ -136,13 +163,17 @@ export async function correosDelCaso(
             co.direccion_destinatario AS direccion, co.asunto,
             co.cuerpo_enviado AS contenido, co.estado_entrega AS estado,
             co.generado_por_ia, pc.nombres || ' ' || pc.apellidos AS creado_por,
-            co.creado_en, co.confirmado_en, co.enviado_en,
+            co.creado_en, co.confirmado_en,
+            pf.nombres || ' ' || pf.apellidos AS confirmado_por,
+            co.enviado_en, co.referencia_externa AS referencia,
             (co.estado_entrega = 'BORRADOR' AND co.confirmado_en IS NULL
              AND co.enviado_en IS NULL) AS editable
      FROM convi.comunicaciones co
      LEFT JOIN convi.personas p ON p.id = co.persona_destinataria_id
      JOIN convi.membresias_establecimiento m ON m.id = co.creado_por
      JOIN convi.personas pc ON pc.id = m.persona_id
+     LEFT JOIN convi.membresias_establecimiento mf ON mf.id = co.confirmado_por
+     LEFT JOIN convi.personas pf ON pf.id = mf.persona_id
      WHERE co.caso_id = $1 AND co.tipo_comunicacion = 'CORREO'
      ORDER BY co.creado_en DESC, co.id`,
     [casoId],

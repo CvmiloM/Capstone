@@ -6,7 +6,11 @@ import {
   interpretarCorreo,
   prepararCorreo,
 } from './correo-ia.js';
-import { validarBorradorCorreo, validarSolicitudCorreoIA } from './correos.js';
+import {
+  validarBorradorCorreo,
+  validarEnvio,
+  validarSolicitudCorreoIA,
+} from './correos.js';
 
 const ID = '3f2b8c4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f';
 
@@ -183,5 +187,30 @@ describe('PB-086 (HU-075): redacción con seudónimos', () => {
         'Firma',
       ),
     ).toThrow(ErrorIA);
+  });
+});
+
+describe('Envío con confirmación (PB-087, HU-076)', () => {
+  it('exige la clave del envío creada al mostrar la página (CA1 y CA3)', () => {
+    expect(Object.keys(errores(() => validarEnvio({})))).toEqual([
+      'clave_envio',
+    ]);
+    expect(
+      Object.keys(errores(() => validarEnvio({ clave_envio: 'otra-cosa' }))),
+    ).toEqual(['clave_envio']);
+    expect(validarEnvio({ clave_envio: ID.toUpperCase() })).toEqual({
+      clave_envio: ID,
+      con_advertencia: false,
+    });
+  });
+
+  it('solo cuenta la advertencia confirmada con true (CA5)', () => {
+    expect(
+      validarEnvio({ clave_envio: ID, con_advertencia: true }).con_advertencia,
+    ).toBe(true);
+    for (const con_advertencia of ['true', 'si', 1, null])
+      expect(
+        validarEnvio({ clave_envio: ID, con_advertencia }).con_advertencia,
+      ).toBe(false);
   });
 });

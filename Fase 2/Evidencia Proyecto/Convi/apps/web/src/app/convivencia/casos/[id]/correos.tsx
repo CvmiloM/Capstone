@@ -1,11 +1,14 @@
+import { randomUUID } from "node:crypto";
 import type { DetalleCaso } from "../datos";
+import { BotonCopiarCorreo, BotonEnviarCorreo } from "./envio-correo";
 import { BotonDescartarCorreo, FormularioCorreo } from "./formulario-correo";
 import { FormularioCorreoIA } from "./formulario-correo-ia";
 import { NOMBRE_ESTADO_CORREO } from "./opciones";
 
 // PB-151 (HU-130) y PB-086 (HU-075): correos al apoderado del caso, del más
-// reciente al más antiguo. Se redactan a mano o con IA, se editan mientras
-// sean borradores y el envío con confirmación es PB-087 (HU-076).
+// reciente al más antiguo. Se redactan a mano o con IA y se editan mientras
+// sean borradores. PB-087 (HU-076): Convivencia confirma y se envía; lo
+// enviado no cambia y se copia en un borrador nuevo para corregirlo.
 export function Correos({
   caso,
   formatearFecha,
@@ -19,8 +22,8 @@ export function Correos({
     <div id="correos" className="mt-6 border-t border-border pt-4">
       <h3 className="text-sm font-semibold">Correos al apoderado</h3>
       <p className="mt-1 text-sm text-muted-foreground">
-        Se preparan como borrador y no se envían desde aquí: el envío necesita
-        la confirmación de un profesional de Convivencia.
+        Se preparan como borrador. Para enviarlo, un profesional de
+        Convivencia lo revisa y confirma; una vez enviado ya no se edita.
       </p>
 
       {caso.correos.length === 0 ? (
@@ -29,7 +32,12 @@ export function Correos({
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-border border-y border-border text-sm">
-          {caso.correos.map((c) => (
+          {caso.correos.map((c) => {
+            const advertencia =
+              caso.destinatarios_correo.find(
+                (d) => d.persona_id === c.persona_destinataria_id,
+              )?.no_contactable ?? false;
+            return (
             <li key={c.id} className="py-3">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
@@ -52,6 +60,20 @@ export function Correos({
                   {c.contenido}
                 </p>
               )}
+              {(c.confirmado_en || c.enviado_en) && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {c.enviado_en
+                    ? `Enviado el ${formatearFecha(c.enviado_en)}`
+                    : `Confirmado el ${formatearFecha(c.confirmado_en!)}`}
+                  {c.confirmado_por ? ` · confirmado por ${c.confirmado_por}` : ""}
+                  {c.referencia ? ` · referencia ${c.referencia}` : ""}
+                </p>
+              )}
+              {!c.editable && abierto && (
+                <div className="mt-3">
+                  <BotonCopiarCorreo casoId={caso.id} correoId={c.id} />
+                </div>
+              )}
               {c.editable && abierto && (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm font-medium text-primary">
@@ -67,8 +89,27 @@ export function Correos({
                   </div>
                 </details>
               )}
+              {c.editable && abierto && (
+                <div className="mt-3 rounded-xl border border-border p-3">
+                  <p className="text-sm font-medium">Confirmar y enviar</p>
+                  <p className="mt-1 mb-3 text-xs text-muted-foreground">
+                    Se envía tal cual
+                    {c.direccion ? ` a ${c.direccion}` : ""}, con tu nombre como
+                    quien confirmó. Después no se edita: para cambiarlo se usa
+                    como borrador nuevo.
+                  </p>
+                  <BotonEnviarCorreo
+                    casoId={caso.id}
+                    correoId={c.id}
+                    claveEnvio={randomUUID()}
+                    advertencia={advertencia}
+                    completo={Boolean(c.direccion && c.asunto && c.contenido)}
+                  />
+                </div>
+              )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 

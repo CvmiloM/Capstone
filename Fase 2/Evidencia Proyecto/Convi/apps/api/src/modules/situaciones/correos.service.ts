@@ -26,13 +26,20 @@ import {
 import {
   destinatariosDeCorreo,
   validarBorradorCorreo,
+  validarEnvio,
   validarSolicitudCorreoIA,
   type BorradorCorreo,
 } from './correos.js';
+import {
+  ENVIO_CORREO,
+  ErrorEnvio,
+  type EnviarCorreo,
+  type MotivoErrorEnvio,
+} from './envio-correo.js';
 
 // PB-151 (HU-130) y PB-086 (HU-075): borradores de correo al apoderado. Solo
 // Convivencia activa con segundo factor; la seguridad por fila separa por
-// escuela. Nada de esto envía el correo: eso es PB-087 (HU-076).
+// escuela. PB-087 (HU-076): el envío, con la confirmación de Convivencia.
 const PERFILES: Perfil[] = ['CONVIVENCIA'];
 const NO_GUARDADO = 'Revisa los datos marcados. No se guardó el borrador.';
 const NO_EXISTE = 'El correo no existe.';
@@ -41,10 +48,26 @@ const NO_EDITABLE =
 const NO_DISPONIBLE =
   'La IA no está disponible en este momento, puedes redactar el correo a mano e intentarlo con IA más tarde.';
 
+// PB-087: lo que se responde si el servicio de correo no envió. En todos los
+// casos el correo sigue en borrador y se puede reintentar con la misma clave.
+const NO_ENVIADO: Record<MotivoErrorEnvio, string> = {
+  NO_CONFIGURADO:
+    'El envío de correos no está configurado en este ambiente. El correo sigue en borrador.',
+  NO_PERMITIDO:
+    'En este ambiente de pruebas solo se envía a los correos permitidos. El correo sigue en borrador.',
+  RECHAZADO:
+    'El servicio de correo rechazó el envío. El correo sigue en borrador: revisa la dirección e inténtalo nuevamente.',
+  SIN_RESPUESTA:
+    'El servicio de correo no respondió. El correo sigue en borrador: inténtalo nuevamente en unos minutos.',
+};
+
 @Injectable()
 export class CorreosService {
   private readonly logger = new Logger(CorreosService.name);
-  constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
+  constructor(
+    @Inject(CuentaService) private readonly cuentas: CuentaService,
+    @Inject(ENVIO_CORREO) private readonly entregar: EnviarCorreo,
+  ) {}
 
   private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
     return this.cuentas.operar(
@@ -123,6 +146,156 @@ export class CorreosService {
         correoId,
       ]);
       return { id: correoId };
+    });
+  }
+
+  /**
+   * PB-087 (HU-076): un profesional de Convivencia activo confirma y se envía.
+   * Con el patrón del reenvío de invitaciones (PB-146): la confirmación guarda
+   * quién, cuándo y la clave creada al mostrar la página (CA1); la misma clave
+   * repetida responde lo mismo sin enviar otro correo (CA3); si el servicio de
+   * correo falla se deshace todo, el correo sigue en borrador y se reintenta.
+   * Enviado, la base no deja cambiarlo (CA4). CA5: si el apoderado no puede
+   * ser contactado hay que confirmar la advertencia, y la base la deja en la
+   * auditoría. READ COMMITTED: una repetición simultánea espera el bloqueo y
+   * ve el envío de la primera.
+   */
+  enviar(
+    sesion: Sesion,
+    correoId: string,
+    cuerpo: unknown,
+  ): Promise<{ id: string; estado: string }> {
+    const { clave_envio, con_advertencia } = validarEnvio(cuerpo);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'establecimiento', perfiles: PERFILES },
+      async (db) => {
+        const correo = (
+          await db.query<{
+            caso_id: string;
+            persona_destinataria_id: string | null;
+            direccion: string | null;
+            asunto: string | null;
+            contenido: string | null;
+            estado: string;
+            clave_envio: string | null;
+          }>(
+            `SELECT caso_id, persona_destinataria_id,
+                    direccion_destinatario AS direccion, asunto,
+                    cuerpo_enviado AS contenido, estado_entrega AS estado,
+                    clave_envio::text
+             FROM convi.comunicaciones
+             WHERE id = $1 AND tipo_comunicacion = 'CORREO'
+             FOR UPDATE`,
+            [correoId],
+          )
+        ).rows[0];
+        if (!correo) throw new NotFoundException(NO_EXISTE);
+        if (correo.clave_envio === clave_envio)
+          return { id: correoId, estado: correo.estado };
+        if (correo.clave_envio || correo.estado !== 'BORRADOR')
+          throw new ConflictException(
+            'Este correo ya fue confirmado: recarga la página para ver su estado.',
+          );
+        await casoAbierto(db, correo.caso_id);
+        if (!correo.direccion || !correo.asunto || !correo.contenido)
+          throw new ConflictException(
+            'Al borrador le falta la dirección, el asunto o el contenido: complétalo antes de enviarlo.',
+          );
+        const persona = correo.persona_destinataria_id
+          ? (await destinatariosDeCorreo(db, correo.caso_id)).find(
+              (p) => p.persona_id === correo.persona_destinataria_id,
+            )
+          : undefined;
+        if (correo.persona_destinataria_id && !persona)
+          throw new ConflictException(
+            'El destinatario ya no está en el caso: edita el borrador y elige a otra persona.',
+          );
+        if (persona?.no_contactable && !con_advertencia)
+          throw new BadRequestException({
+            mensaje:
+              'El vínculo indica que este apoderado no puede ser contactado. Confirma que quieres enviarlo igual.',
+            errores: {
+              con_advertencia: 'Marca la casilla para enviar igual.',
+            },
+          });
+
+        await db
+          .query(
+            `UPDATE convi.comunicaciones
+             SET estado_entrega = 'PENDIENTE', confirmado_por = convi.membresia_actual(),
+                 confirmado_en = now(), clave_envio = $2::uuid
+             WHERE id = $1`,
+            [correoId, clave_envio],
+          )
+          .catch((error: unknown) => {
+            if ((error as { code?: string }).code === '23505')
+              throw new ConflictException(
+                'Esta confirmación ya se usó en otro correo: recarga la página.',
+              );
+            throw error;
+          });
+        const escuela = (
+          await db.query<{ nombre: string; correo_contacto: string | null }>(
+            `SELECT nombre, correo_contacto FROM convi.establecimientos
+             WHERE id = convi.establecimiento_actual()`,
+          )
+        ).rows[0];
+        let referencia: string;
+        try {
+          ({ referencia } = await this.entregar({
+            para: correo.direccion,
+            nombrePara: persona?.nombre ?? null,
+            asunto: correo.asunto,
+            texto: correo.contenido,
+            nombreRemitente: escuela.nombre,
+            responderA: escuela.correo_contacto,
+          }));
+        } catch (error) {
+          if (!(error instanceof ErrorEnvio)) throw error;
+          // Sin la dirección ni el contenido, solo el motivo. 409 con el mensaje,
+          // para que la pantalla lo muestre tal cual.
+          this.logger.warn(`No se envió un correo del caso: ${error.motivo}`);
+          throw new ConflictException(NO_ENVIADO[error.motivo]);
+        }
+        await db.query(
+          `UPDATE convi.comunicaciones
+           SET estado_entrega = 'ENVIADO', enviado_en = now(), referencia_externa = $2
+           WHERE id = $1`,
+          [correoId, referencia],
+        );
+        return { id: correoId, estado: 'ENVIADO' };
+      },
+      'READ COMMITTED',
+    );
+  }
+
+  // HU-076 CA2: lo confirmado o enviado no cambia; para corregirlo se copia
+  // en un borrador nuevo, que conserva la marca de IA si la tenía.
+  copiar(sesion: Sesion, correoId: string): Promise<{ id: string }> {
+    return this.operar(sesion, async (db) => {
+      const origen = (
+        await db.query<{ caso_id: string }>(
+          `SELECT caso_id FROM convi.comunicaciones
+           WHERE id = $1 AND tipo_comunicacion = 'CORREO'`,
+          [correoId],
+        )
+      ).rows[0];
+      if (!origen) throw new NotFoundException(NO_EXISTE);
+      await casoAbierto(db, origen.caso_id);
+      const copia = await db.query<{ id: string }>(
+        `INSERT INTO convi.comunicaciones
+           (establecimiento_id, caso_id, tipo_comunicacion, persona_destinataria_id,
+            direccion_destinatario, asunto, cuerpo_enviado, resumen, estado_entrega,
+            creado_por, generado_por_ia)
+         SELECT establecimiento_id, caso_id, 'CORREO', persona_destinataria_id,
+                direccion_destinatario, asunto, cuerpo_enviado, resumen, 'BORRADOR',
+                convi.membresia_actual(), generado_por_ia
+         FROM convi.comunicaciones WHERE id = $1
+         RETURNING id`,
+        [correoId],
+      );
+      return copia.rows[0];
     });
   }
 
