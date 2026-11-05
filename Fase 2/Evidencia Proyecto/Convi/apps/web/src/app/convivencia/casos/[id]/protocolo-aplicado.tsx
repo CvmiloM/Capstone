@@ -48,6 +48,12 @@ export function ProtocolosAplicados({
           <span className="ml-2 rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
             {NOMBRE_ESTADO_PROTOCOLO[aplicado.estado] ?? aplicado.estado}
           </span>
+          {/* PB-124 (HU-105 CA2): aplicada no se vuelve oficial. */}
+          {aplicado.propuesta_ia && (
+            <span className="ml-1.5 rounded-full bg-amarillo/20 px-2.5 py-0.5 text-xs font-medium">
+              Propuesta IA, no oficial
+            </span>
+          )}
         </p>
         <p className="mt-1 whitespace-pre-line">{aplicado.fundamento}</p>
         <p className="mt-1 text-xs text-muted-foreground">

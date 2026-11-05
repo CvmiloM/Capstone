@@ -11,6 +11,7 @@ import {
   FormularioPaso,
   FormularioPublicacion,
 } from "../../formularios";
+import { AvisoPropuesta } from "../../aviso-propuesta";
 import { NOMBRE_ESTADO_VERSION, textoPlazo } from "../../opciones";
 
 export const metadata: Metadata = { title: "Versión del protocolo" };
@@ -22,6 +23,9 @@ const AVISOS: Record<string, string> = {
   paso: "Guardaste el paso.",
   publicada:
     "Publicaste la versión. Desde la fecha indicada se puede aplicar a los casos; ya no cambia.",
+  // PB-124 (HU-105 CA1).
+  propuesta:
+    "La IA preparó la propuesta y quedó en borrador, marcada como generada con IA y no oficial: revisa cada paso con sus fuentes antes de publicarla",
 };
 
 // PB-081 (HU-070) y PB-083 (HU-072): una versión del protocolo con sus pasos.
@@ -72,8 +76,18 @@ export default async function PaginaVersionProtocolo({
           <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
             {NOMBRE_ESTADO_VERSION[version.estado] ?? version.estado}
           </span>
+          {version.generado_por_ia && (
+            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium">
+              Generada con IA
+            </span>
+          )}
         </div>
       </div>
+
+      {/* PB-124 (HU-105): la declaración y las fuentes van en las notas. */}
+      {version.protocolo_naturaleza === "PROPUESTA_IA" && (
+        <AvisoPropuesta notas={version.generado_por_ia ? version.notas : null} />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Seccion titulo="Pasos" className="lg:col-span-2">

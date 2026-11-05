@@ -169,6 +169,8 @@ export type ProtocoloAplicado = {
   id: string;
   protocolo: string;
   codigo: string;
+  /** PB-124: es una propuesta de la IA, no un protocolo oficial. */
+  propuesta_ia: boolean;
   numero_version: number;
   estado: string;
   fundamento: string;

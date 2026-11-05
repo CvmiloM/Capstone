@@ -6,6 +6,7 @@ import { AvisoNoDisponible } from "../../aviso-no-disponible";
 import { formatearDia } from "../../casos/datos";
 import { obtenerProtocolo } from "../datos";
 import { BotonNuevaVersion } from "../formularios";
+import { AvisoPropuesta } from "../aviso-propuesta";
 import { NOMBRE_ESTADO_VERSION } from "../opciones";
 
 export const metadata: Metadata = { title: "Protocolo" };
@@ -50,6 +51,9 @@ export default async function PaginaProtocolo({
         <h1 className="mt-1 text-2xl font-semibold">{protocolo.nombre}</h1>
       </div>
 
+      {/* PB-124 (HU-105 CA2): una propuesta de la IA nunca es un protocolo oficial. */}
+      {protocolo.naturaleza === "PROPUESTA_IA" && <AvisoPropuesta />}
+
       <section className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta">
         <h2 className="mb-3 text-base font-semibold">Versiones</h2>
         <ul className="divide-y divide-border text-sm">
@@ -66,6 +70,11 @@ export default async function PaginaProtocolo({
                   <span className="ml-2 rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
                     {NOMBRE_ESTADO_VERSION[v.estado] ?? v.estado}
                   </span>
+                  {v.generado_por_ia && (
+                    <span className="ml-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium">
+                      Generada con IA
+                    </span>
+                  )}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {[
