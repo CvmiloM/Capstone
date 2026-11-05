@@ -90,7 +90,7 @@ export async function enviarEvidencia(
  * HU-057 CA3: pide el archivo a la API, que vuelve a comprobar el permiso, y
  * lo entrega como descarga. Sin permiso vigente responde 404 sin revelar nada.
  */
-export async function responderDescarga(ruta: string) {
+export async function responderDescarga(ruta: string, noDisponible = "La evidencia no existe o no tienes permiso para descargarla.") {
   const token = await tokenDeSesion();
   let respuesta: Response;
   try {
@@ -105,7 +105,7 @@ export async function responderDescarga(ruta: string) {
   if (respuesta.status === 401) redirect("/login");
   if (!respuesta.ok)
     return [400, 403, 404].includes(respuesta.status)
-      ? texto("La evidencia no existe o no tienes permiso para descargarla.", 404)
+      ? texto(noDisponible, 404)
       : texto("No pudimos descargar el archivo. Inténtalo de nuevo en unos minutos.", 503);
 
   const contenido = await respuesta.arrayBuffer();

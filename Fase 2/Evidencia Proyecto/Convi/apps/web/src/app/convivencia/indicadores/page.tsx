@@ -30,7 +30,8 @@ type Indicadores = {
   por_curso: Grupo;
   compromisos: Estado;
   seguimientos: Estado;
-  cierres: { total: number; con_plazo: number; sin_plazo: number; oportunos: number };
+  cierres: { total: number; con_plazo: number; sin_plazo: number; oportunos: number; porcentaje_oportunos: number | null };
+  definiciones: { indicador: string; fecha: string; formula: string; denominador: string }[];
   opciones: OpcionesIndicadores;
 };
 
@@ -72,8 +73,8 @@ function Resultados({ datos, filtros }: { datos: Indicadores; filtros: { desde: 
   const corte = new Intl.DateTimeFormat("es-CL", {
     dateStyle: "long", timeStyle: "short", timeZone: datos.zona_horaria,
   }).format(new Date(datos.calculado_en));
-  const porcentaje = datos.cierres.con_plazo
-    ? `${Math.round(datos.cierres.oportunos * 100 / datos.cierres.con_plazo)} %`
+  const porcentaje = datos.cierres.porcentaje_oportunos !== null
+    ? `${datos.cierres.porcentaje_oportunos.toLocaleString("es-CL")} %`
     : "Sin datos";
 
   return <>
@@ -151,7 +152,7 @@ function Resultados({ datos, filtros }: { datos: Indicadores; filtros: { desde: 
       <summary className="cursor-pointer font-titulo text-xl font-semibold">Distribución por día</summary>
       <div className="mt-4"><Distribucion titulo="Días con situaciones" datos={datos.por_dia.map((x) => ({ nombre: fechaCorta(x.fecha), total: x.total }))} total={datos.total_situaciones} sinBorde /></div>
     </details>
-    <p className="text-xs text-muted-foreground">Las situaciones se agrupan por fecha del hecho, los compromisos por vencimiento, los seguimientos por fecha programada y los cierres por fecha de cierre, los estados se consultan al momento indicado arriba, las cifras por curso y categoría de compromisos, seguimientos y cierres corresponden a casos con al menos una situación vinculada que coincida con cada filtro</p>
+    <details className={caja}><summary className="cursor-pointer text-sm font-semibold">Definiciones de cálculo del servidor</summary><dl className="mt-4 space-y-4 text-sm">{datos.definiciones.map(d=><div key={d.indicador}><dt className="font-semibold">{d.indicador}</dt><dd className="mt-1 space-y-1 text-muted-foreground"><p>{d.fecha}</p><p>{d.formula}</p><p>{d.denominador}</p></dd></div>)}</dl></details>
   </>;
 }
 

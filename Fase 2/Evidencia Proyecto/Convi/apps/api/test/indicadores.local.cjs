@@ -26,7 +26,10 @@ async function main() {
       CREATE TEMP TABLE casos (id uuid, estado_actual text, abierto_en timestamptz, cerrado_en timestamptz, fecha_limite_cierre date);
       CREATE TEMP TABLE historial_estados_caso (caso_id uuid, estado_nuevo text, cambiado_en timestamptz);
       CREATE TEMP TABLE categorias_convivencia (id uuid, nombre text, estado text);
-      CREATE TEMP TABLE cursos (id uuid, nombre text, anio_academico_id uuid);
+      CREATE TEMP TABLE cursos (id uuid, nombre text, anio_academico_id uuid, nivel_id uuid);
+      CREATE TEMP TABLE niveles_educativos (id uuid, nombre text);
+      CREATE TEMP TABLE estudiantes (id uuid, persona_id uuid);
+      CREATE TEMP TABLE participaciones (persona_id uuid, situacion_id uuid, caso_id uuid, activo_hasta timestamptz);
       CREATE TEMP TABLE anios_academicos (id uuid, anio int);
       INSERT INTO casos VALUES
         ('00000000-0000-4000-8000-000000000001','CERRADO','2026-10-30 23:00-03','2026-11-02 00:30-03','2026-11-02'),
@@ -49,7 +52,7 @@ async function main() {
         (gen_random_uuid(),'2026-11-03 00:00-03',NULL,NULL,NULL,NULL);
     `);
     const consultar = async (desde, hasta, curso = null, categoria = null) =>
-      (await db.query(consulta.replaceAll('convi.', 'pg_temp.'), [desde, hasta, curso, categoria])).rows[0];
+      (await db.query(consulta.replaceAll('convi.', 'pg_temp.'), [desde, hasta, curso, categoria, null, null, null])).rows[0];
     const datos = await consultar('2026-11-01', '2026-11-02');
     assert.equal(datos.zona_horaria, 'America/Santiago');
     assert.equal(datos.total_situaciones, 3, 'Límites según día de la escuela');
@@ -63,8 +66,8 @@ async function main() {
     ]);
     assert.deepEqual(datos.gestion, { casos_cerrados: 1, dias_promedio: 3 }, 'Último cierre, incluye días previos a reapertura');
     assert.deepEqual(datos.movimientos, { cierres: 3, casos_con_cierre: 2, reaperturas: 3, casos_reabiertos: 2 });
-    assert.deepEqual(datos.cierres, { total: 1, con_plazo: 1, sin_plazo: 0, oportunos: 1 }, 'Conserva PB-108');
-    for (const campo of ['por_dia', 'por_mes', 'por_categoria', 'por_lugar', 'por_curso'])
+    assert.deepEqual(datos.cierres, { total: 1, con_plazo: 1, sin_plazo: 0, oportunos: 1, porcentaje_oportunos: 100 }, 'Conserva PB-108');
+    for (const campo of ['por_dia', 'por_mes', 'por_categoria', 'por_lugar', 'por_curso','por_nivel'])
       assert.equal(datos[campo].reduce((total, fila) => total + fila.total, 0), datos.total_situaciones, campo);
     assert.equal(datos.por_categoria[0].nombre, 'Sin especificar');
     assert.equal(datos.por_lugar[0].nombre, 'Sin especificar');
@@ -86,6 +89,24 @@ async function main() {
     assert.equal(verano.comparacion.desde, '2026-09-04');
     assert.equal(verano.comparacion.hasta, '2026-09-05');
     assert.equal(verano.comparacion.dias, 2, 'Duración en días calendario incluso con cambio de hora');
+    await db.query(`
+      INSERT INTO estudiantes VALUES ('00000000-0000-4000-8000-000000000020','00000000-0000-4000-8000-000000000021');
+      INSERT INTO participaciones SELECT '00000000-0000-4000-8000-000000000021',id,NULL,NULL
+        FROM situaciones WHERE caso_id='00000000-0000-4000-8000-000000000001';
+      INSERT INTO participaciones SELECT * FROM participaciones;
+      INSERT INTO niveles_educativos VALUES ('00000000-0000-4000-8000-000000000030','Nivel de prueba');
+      INSERT INTO cursos VALUES ('00000000-0000-4000-8000-000000000010','Curso de prueba',NULL,'00000000-0000-4000-8000-000000000030');
+    `);
+    const alumno = (await db.query(consulta.replaceAll('convi.','pg_temp.'),['2026-11-01','2026-11-02',null,null,'00000000-0000-4000-8000-000000000020',null,null])).rows[0];
+    assert.equal(alumno.total_situaciones,2,'Participaciones repetidas no multiplican situaciones');
+    assert.equal(alumno.movimientos.cierres,2,'Alcance del estudiante conserva los casos correspondientes');
+    const caso = (await db.query(consulta.replaceAll('convi.','pg_temp.'),['2026-11-01','2026-11-02',null,null,null,'00000000-0000-4000-8000-000000000001',null])).rows[0];
+    assert.equal(caso.total_situaciones,2,'Solo situaciones del caso seleccionado');
+    const nivel = (await db.query(consulta.replaceAll('convi.','pg_temp.'),['2026-11-01','2026-11-02',null,null,null,null,'00000000-0000-4000-8000-000000000030'])).rows[0];
+    assert.equal(nivel.total_situaciones,2,'Nivel según el curso contextual');
+    assert.deepEqual(nivel.por_nivel,[{nombre:'Nivel de prueba',total:2}]);
+    assert.equal(nivel.categorias_por_mes.reduce((s,f)=>s+f.total,0),nivel.total_situaciones);
+    assert.equal(vacio.cierres.porcentaje_oportunos,null,'No inventa un porcentaje sin denominador');
     console.log('Indicadores: comparación, límites, filtros, último cierre, historial, cero y calendario correctos.');
   } finally {
     await db.query('ROLLBACK');
