@@ -13,8 +13,8 @@ import { CorreosService } from './correos.service.js';
 
 // PB-151 (HU-130) y PB-086 (HU-075): borradores de correo al apoderado. Como
 // en las comunicaciones, solo entra Convivencia activa con segundo factor. Se
-// ven en GET /convivencia/casos/:id (sección comunicaciones). Ninguna ruta
-// envía el correo: eso es PB-087 (HU-076).
+// ven en GET /convivencia/casos/:id (sección comunicaciones). PB-087 (HU-076):
+// el envío con confirmación.
 @Controller('convivencia')
 @PerfilesPermitidos('CONVIVENCIA')
 export class CorreosController {
@@ -52,6 +52,26 @@ export class CorreosController {
     @Body() cuerpo: unknown,
   ) {
     return this.correos.editar(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-087: JSON con clave_envio (creada al mostrar la página) y con_advertencia.
+  // 201 con id y estado; la misma clave repetida responde lo mismo sin enviar.
+  @Post('correos/:id/envio')
+  enviar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.correos.enviar(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-087 (HU-076 CA2): copia un correo en un borrador nuevo. 201 con el id.
+  @Post('correos/:id/copia')
+  copiar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.correos.copiar(peticion.sesion, id);
   }
 
   // Borra un borrador nunca confirmado; la base deja el descarte en la auditoría.

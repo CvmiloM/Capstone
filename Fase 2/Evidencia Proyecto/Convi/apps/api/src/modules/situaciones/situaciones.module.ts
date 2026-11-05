@@ -10,6 +10,11 @@ import { ComunicacionesController } from './comunicaciones.controller.js';
 import { ComunicacionesService } from './comunicaciones.service.js';
 import { CorreosController } from './correos.controller.js';
 import { CorreosService } from './correos.service.js';
+import {
+  crearEnvioCorreo,
+  ENVIO_CORREO,
+  leerConfiguracion,
+} from './envio-correo.js';
 import { ConvivenciaController } from './convivencia.controller.js';
 import { ConvivenciaService } from './convivencia.service.js';
 import { EncuentrosController } from './encuentros.controller.js';
@@ -86,6 +91,11 @@ import { ProfesorService } from './profesor.service.js';
     ComunicacionesService,
     CorreosService,
     EvidenciasService,
+    // PB-087: Mailpit en local, Brevo en la nube; sin ellos no se envía.
+    {
+      provide: ENVIO_CORREO,
+      useFactory: () => crearEnvioCorreo(leerConfiguracion(process.env)),
+    },
     {
       provide: ALMACENAMIENTO,
       useFactory: () => {

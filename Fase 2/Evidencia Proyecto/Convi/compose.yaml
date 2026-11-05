@@ -26,6 +26,13 @@ services:
       IA_EMBEDDINGS_TOKEN: "${IA_EMBEDDINGS_TOKEN:-}"
       # PB-118: POST /api/chat de convi-ia, usa el mismo token.
       IA_GENERACION_URL: "${IA_GENERACION_URL:-}"
+      # PB-087: correos al apoderado. En local van a Mailpit, el buzón de
+      # pruebas de Supabase (http://localhost:54324), y no salen a internet.
+      # Con BREVO_API_KEY se usa Brevo en su lugar.
+      CORREO_MAILPIT_URL: "${CORREO_MAILPIT_URL:-http://host.docker.internal:54324}"
+      CORREO_REMITENTE: "${CORREO_REMITENTE:-convivencia@convi.test}"
+      BREVO_API_KEY: "${BREVO_API_KEY:-}"
+      CORREO_DESTINOS_PERMITIDOS: "${CORREO_DESTINOS_PERMITIDOS:-}"
     ports:
       - "127.0.0.1:${API_PORT:-3001}:3001"
     volumes:

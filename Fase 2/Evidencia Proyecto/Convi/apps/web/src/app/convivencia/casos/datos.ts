@@ -133,7 +133,11 @@ export type CorreoCaso = {
   creado_por: string;
   creado_en: string;
   confirmado_en: string | null;
+  /** PB-087: quién confirmó el envío. */
+  confirmado_por: string | null;
   enviado_en: string | null;
+  /** PB-087: referencia del servicio de correo. */
+  referencia: string | null;
   /** Borrador que nadie confirmó: se puede editar o descartar. */
   editable: boolean;
 };

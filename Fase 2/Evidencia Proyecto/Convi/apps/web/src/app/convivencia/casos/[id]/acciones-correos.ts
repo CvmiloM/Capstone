@@ -6,7 +6,8 @@ import { enviar } from "../../datos";
 import type { EstadoAccion } from "./acciones";
 
 // PB-151 (HU-130) y PB-086 (HU-075): borradores de correo al apoderado. La API
-// vuelve a validar todo y ninguna de estas acciones envía el correo (PB-087).
+// vuelve a validar todo. PB-087 (HU-076): solo enviarCorreo envía, con la
+// confirmación del profesional.
 const URL_API =
   process.env.API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
@@ -73,6 +74,49 @@ export async function descartarCorreo(
   );
   if (!resultado.ok) return { mensaje: resultado.mensaje };
   volver(casoId, "correo-descartado");
+  return {};
+}
+
+// PB-087 (HU-076): confirma y envía. La clave viene de la página, así que
+// repetir el mismo envío no manda otro correo; si el envío falla, el correo
+// sigue en borrador.
+export async function enviarCorreo(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const casoId = leerTexto(formData, "caso_id");
+  const correoId = leerTexto(formData, "correo_id");
+  const claveEnvio = leerTexto(formData, "clave_envio");
+  if (!UUID.test(casoId) || !UUID.test(correoId) || !UUID.test(claveEnvio))
+    return { mensaje: NO_VALIDO };
+  const resultado = await enviar(
+    "POST",
+    `/convivencia/correos/${correoId}/envio`,
+    {
+      clave_envio: claveEnvio,
+      con_advertencia: leerTexto(formData, "con_advertencia") === "si",
+    },
+  );
+  if (!resultado.ok)
+    return { mensaje: resultado.mensaje, errores: resultado.errores };
+  volver(casoId, "correo-enviado");
+  return {};
+}
+
+// HU-076 CA2: copia un correo confirmado o enviado en un borrador nuevo.
+export async function copiarCorreo(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const casoId = leerTexto(formData, "caso_id");
+  const correoId = leerTexto(formData, "correo_id");
+  if (!UUID.test(casoId) || !UUID.test(correoId)) return { mensaje: NO_VALIDO };
+  const resultado = await enviar(
+    "POST",
+    `/convivencia/correos/${correoId}/copia`,
+  );
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  volver(casoId, "correo-copiado");
   return {};
 }
 
