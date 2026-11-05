@@ -8,14 +8,20 @@ export type FiltrosIndicadores = {
 };
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function validarFiltrosIndicadores(datos: Record<string, unknown>): FiltrosIndicadores {
+export function validarFiltrosIndicadores(
+  datos: Record<string, unknown>,
+): FiltrosIndicadores {
   const fecha = (valor: unknown) => {
     if (valor === undefined || valor === '') return null;
-    if (typeof valor !== 'string' || !FECHA.test(valor) ||
+    if (
+      typeof valor !== 'string' ||
+      !FECHA.test(valor) ||
       !Number.isFinite(Date.parse(`${valor}T00:00:00Z`)) ||
-      new Date(`${valor}T00:00:00Z`).toISOString().slice(0, 10) !== valor)
+      new Date(`${valor}T00:00:00Z`).toISOString().slice(0, 10) !== valor
+    )
       throw new BadRequestException('Revisa las fechas del período');
     return valor;
   };
@@ -27,11 +33,23 @@ export function validarFiltrosIndicadores(datos: Record<string, unknown>): Filtr
   };
   const desde = fecha(datos.desde);
   const hasta = fecha(datos.hasta);
-  if ((desde && !hasta) || (!desde && hasta) ||
-    (desde && hasta && (desde > hasta ||
-      (Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86400000 > 366)))
+  if (
+    (desde && !hasta) ||
+    (!desde && hasta) ||
+    (desde &&
+      hasta &&
+      (desde > hasta ||
+        (Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) /
+          86400000 >
+          366))
+  )
     throw new BadRequestException('Elige un período válido de hasta 367 días');
-  return { desde, hasta, curso: id(datos.curso), categoria: id(datos.categoria) };
+  return {
+    desde,
+    hasta,
+    curso: id(datos.curso),
+    categoria: id(datos.categoria),
+  };
 }
 
 export const OPCIONES_INDICADORES = `SELECT jsonb_build_object(
@@ -47,22 +65,43 @@ export const CONSULTA_INDICADORES = `
 WITH parametros AS (
   SELECT coalesce($1::date,date_trunc('year',current_date)::date) desde,
          coalesce($2::date,current_date) hasta,
-         $3::uuid curso, $4::uuid categoria
+         $3::uuid curso, $4::uuid categoria, $5::uuid estudiante, $6::uuid caso, $7::uuid nivel
 ), anterior AS (
   SELECT desde - (hasta - desde + 1) desde, desde - 1 hasta FROM parametros
+), alumno AS (
+  SELECT persona_id FROM convi.estudiantes WHERE id=$5::uuid
+), situaciones_ambito AS NOT MATERIALIZED (
+  SELECT s.* FROM convi.situaciones s
+  WHERE ($5::uuid IS NULL OR EXISTS (SELECT 1 FROM convi.participaciones pa, alumno a
+    WHERE pa.persona_id=a.persona_id AND pa.situacion_id=s.id AND pa.activo_hasta IS NULL))
+    AND ($6::uuid IS NULL OR s.caso_id=$6::uuid)
+    AND ($7::uuid IS NULL OR EXISTS (SELECT 1 FROM convi.cursos c WHERE c.id=s.curso_contexto_id AND c.nivel_id=$7::uuid))
 ), hechos AS MATERIALIZED (
   SELECT s.id, s.ocurrido_en::date fecha, s.categoria_id, s.curso_contexto_id,
          nullif(trim(s.lugar),'') lugar
-  FROM convi.situaciones s, parametros p
+  FROM situaciones_ambito s, parametros p
   WHERE s.ocurrido_en >= p.desde::timestamptz
     AND s.ocurrido_en < (p.hasta + 1)::timestamptz
     AND (p.curso IS NULL OR s.curso_contexto_id=p.curso)
     AND (p.categoria IS NULL OR s.categoria_id=p.categoria)
+), casos_filtrados AS NOT MATERIALIZED (
+  SELECT c.id, c.estado_actual, c.abierto_en, c.cerrado_en, c.fecha_limite_cierre
+  FROM convi.casos c
+  WHERE ($6::uuid IS NULL OR c.id=$6::uuid)
+    AND ($5::uuid IS NULL OR EXISTS (SELECT 1 FROM situaciones_ambito s WHERE s.caso_id=c.id)
+      OR EXISTS (SELECT 1 FROM convi.participaciones pa, alumno a
+        WHERE pa.caso_id=c.id AND pa.persona_id=a.persona_id AND pa.activo_hasta IS NULL))
+    AND ($7::uuid IS NULL OR EXISTS (SELECT 1 FROM situaciones_ambito s WHERE s.caso_id=c.id))
+    AND ($3::uuid IS NULL OR EXISTS (
+      SELECT 1 FROM convi.situaciones s WHERE s.caso_id=c.id AND s.curso_contexto_id=$3::uuid))
+    AND ($4::uuid IS NULL OR EXISTS (
+      SELECT 1 FROM convi.situaciones s WHERE s.caso_id=c.id AND s.categoria_id=$4::uuid))
 ), compromisos AS MATERIALIZED (
   SELECT c.estado, c.vence_en, c.completado_en
   FROM convi.compromisos c, parametros p
   WHERE c.vence_en >= p.desde::timestamptz
     AND c.vence_en < (p.hasta + 1)::timestamptz
+    AND c.caso_id IN (SELECT id FROM casos_filtrados)
     AND ($3::uuid IS NULL OR EXISTS (
       SELECT 1 FROM convi.situaciones s WHERE s.caso_id=c.caso_id AND s.curso_contexto_id=$3::uuid))
     AND ($4::uuid IS NULL OR EXISTS (
@@ -72,17 +111,11 @@ WITH parametros AS (
   FROM convi.actuaciones a, parametros p
   WHERE a.tipo_actuacion='SEGUIMIENTO' AND a.programado_en >= p.desde::timestamptz
     AND a.programado_en < (p.hasta + 1)::timestamptz
+    AND a.caso_id IN (SELECT id FROM casos_filtrados)
     AND ($3::uuid IS NULL OR EXISTS (
       SELECT 1 FROM convi.situaciones s WHERE s.caso_id=a.caso_id AND s.curso_contexto_id=$3::uuid))
     AND ($4::uuid IS NULL OR EXISTS (
       SELECT 1 FROM convi.situaciones s WHERE s.caso_id=a.caso_id AND s.categoria_id=$4::uuid))
-), casos_filtrados AS NOT MATERIALIZED (
-  SELECT c.id, c.estado_actual, c.abierto_en, c.cerrado_en, c.fecha_limite_cierre
-  FROM convi.casos c
-  WHERE ($3::uuid IS NULL OR EXISTS (
-      SELECT 1 FROM convi.situaciones s WHERE s.caso_id=c.id AND s.curso_contexto_id=$3::uuid))
-    AND ($4::uuid IS NULL OR EXISTS (
-      SELECT 1 FROM convi.situaciones s WHERE s.caso_id=c.id AND s.categoria_id=$4::uuid))
 ), cierres AS MATERIALIZED (
   SELECT c.* FROM casos_filtrados c, parametros p
   WHERE c.estado_actual='CERRADO' AND c.cerrado_en >= p.desde::timestamptz
@@ -97,7 +130,7 @@ WITH parametros AS (
     AND h.cambiado_en < (p.hasta + 1)::timestamptz
 ), comparables AS (
   SELECT 1 orden, 'Situaciones' indicador, (SELECT count(*)::int FROM hechos) actual,
-    (SELECT count(*)::int FROM convi.situaciones s, anterior a, parametros p
+    (SELECT count(*)::int FROM situaciones_ambito s, anterior a, parametros p
      WHERE s.ocurrido_en >= a.desde::timestamptz AND s.ocurrido_en < (a.hasta + 1)::timestamptz
        AND (p.curso IS NULL OR s.curso_contexto_id=p.curso)
        AND (p.categoria IS NULL OR s.categoria_id=p.categoria)) anterior
@@ -140,6 +173,13 @@ SELECT to_char(p.desde,'YYYY-MM-DD') AS desde,
    FROM (SELECT coalesce(c.nombre || ' · ' || a.anio::text,'Sin curso indicado') nombre,count(*)::int total
          FROM hechos h LEFT JOIN convi.cursos c ON c.id=h.curso_contexto_id
          LEFT JOIN convi.anios_academicos a ON a.id=c.anio_academico_id GROUP BY 1) x) AS por_curso,
+  (SELECT coalesce(jsonb_agg(jsonb_build_object('nombre',nombre,'total',total) ORDER BY total DESC,nombre),'[]'::jsonb)
+   FROM (SELECT coalesce(n.nombre,'Sin nivel indicado') nombre,count(*)::int total FROM hechos h
+     LEFT JOIN convi.cursos c ON c.id=h.curso_contexto_id
+     LEFT JOIN convi.niveles_educativos n ON n.id=c.nivel_id GROUP BY 1) x) AS por_nivel,
+  (SELECT coalesce(jsonb_agg(jsonb_build_object('mes',mes,'nombre',nombre,'total',total) ORDER BY mes,nombre),'[]'::jsonb)
+   FROM (SELECT to_char(h.fecha,'YYYY-MM') mes,coalesce(c.nombre,'Sin especificar') nombre,count(*)::int total
+     FROM hechos h LEFT JOIN convi.categorias_convivencia c ON c.id=h.categoria_id GROUP BY 1,2) x) AS categorias_por_mes,
   (SELECT jsonb_build_object(
     'total',count(*)::int,
     'vencidos',count(*) FILTER (WHERE estado NOT IN ('COMPLETADO','CANCELADO') AND vence_en < current_timestamp)::int,
@@ -158,6 +198,7 @@ SELECT to_char(p.desde,'YYYY-MM-DD') AS desde,
     'total',count(*)::int,
     'con_plazo',count(fecha_limite_cierre)::int,
     'sin_plazo',count(*) FILTER (WHERE fecha_limite_cierre IS NULL)::int,
-    'oportunos',count(*) FILTER (WHERE fecha_limite_cierre IS NOT NULL AND cerrado_en::date <= fecha_limite_cierre)::int)
+    'oportunos',count(*) FILTER (WHERE fecha_limite_cierre IS NOT NULL AND cerrado_en::date <= fecha_limite_cierre)::int,
+    'porcentaje_oportunos',round(count(*) FILTER (WHERE fecha_limite_cierre IS NOT NULL AND cerrado_en::date <= fecha_limite_cierre)*100.0/nullif(count(fecha_limite_cierre),0),0))
    FROM cierres) AS cierres
 FROM parametros p`;
