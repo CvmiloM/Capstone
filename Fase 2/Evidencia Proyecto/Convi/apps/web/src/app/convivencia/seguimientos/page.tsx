@@ -1,3 +1,4 @@
+import { PestanasGrupo } from "../pestanas-grupo";
 
 import { FormularioConCarga } from "@/app/components/actividad";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
@@ -38,6 +39,7 @@ export default async function AgendaSeguimientos({
     `?${new URLSearchParams({ mes: a.mes, pagina: String(pagina) })}`;
   return (
     <div className="space-y-6">
+      <PestanasGrupo grupo="agenda" className="" />
       <header>
         <h1 className="font-titulo text-3xl font-semibold">
           Agenda de seguimientos

@@ -1,3 +1,4 @@
+import { PestanasGrupo } from "../pestanas-grupo";
 import { randomUUID } from "node:crypto";
 import { Encabezado } from "@/app/components/formulario";
 import { EnlaceConCarga } from "@/app/components/actividad";
@@ -18,6 +19,7 @@ export default async function PaginaInformes({ searchParams }: { searchParams:Pr
     inicial={...anterior.datos.definiciones_calculo.alcance,anterior:anterior.datos.id};
   }
   return <div className="mx-auto max-w-6xl">
+    <PestanasGrupo grupo="consultas" />
     <div className="mb-2 flex flex-wrap items-start justify-between gap-3"><Encabezado titulo="Informes de convivencia" descripcion="Elige qué necesitas revisar y prepara un informe a tu medida"/><EnlaceConCarga href="/convivencia/informes/guardados" className="py-2 text-sm font-medium text-primary underline-offset-4 hover:underline">Informes guardados</EnlaceConCarga></div>
     <AsistenteInforme opciones={r.datos} solicitud={randomUUID()} inicial={inicial}/>
   </div>;

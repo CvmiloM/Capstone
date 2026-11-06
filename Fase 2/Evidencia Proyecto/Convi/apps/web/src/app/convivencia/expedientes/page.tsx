@@ -1,3 +1,4 @@
+import { PestanasGrupo } from "../pestanas-grupo";
 import type { Metadata } from "next";
 import { FormularioBusqueda as Form } from "@/app/components/actividad";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
@@ -81,6 +82,7 @@ export default async function PaginaBuscarExpedientes({
 
   return (
     <>
+      <PestanasGrupo grupo="expedientes" />
       <Encabezado
         titulo="Buscar expedientes"
         descripcion="Encuentra situaciones y casos de tu escuela por código, estudiante, estado o período, y abre el que necesites."

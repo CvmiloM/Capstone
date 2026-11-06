@@ -1,3 +1,4 @@
+import { PestanasGrupo } from "../pestanas-grupo";
 import type { Metadata } from "next";
 import { FormularioBusqueda as Form } from "@/app/components/actividad";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
@@ -57,6 +58,7 @@ export default async function PaginaEstudiantesConvivencia({
 
   return (
     <>
+      <PestanasGrupo grupo="expedientes" />
       <Encabezado
         titulo="Historial de estudiantes"
         descripcion="Busca a un estudiante para ver en orden sus situaciones y casos, con la fecha, el autor y los respaldos de cada uno."
