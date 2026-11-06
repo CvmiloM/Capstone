@@ -217,6 +217,13 @@ export type DatosCaso = {
   categoria: string | null;
   fecha_inicio: string;
   fecha_limite_cierre: string | null;
+  /**
+   * Consulta desde la revisión de una situación: codigo, resumen, estado y
+   * fecha son los de la situación, que puede no tener caso todavía.
+   */
+  ambito?: 'SITUACION';
+  urgencia?: string | null;
+  lugar?: string | null;
 };
 
 export type SituacionCaso = {
@@ -322,10 +329,16 @@ export function construirReferencias(
       contenido,
     });
   const { caso } = contexto;
-  hecho(
-    `Resumen del caso ${caso.codigo}`,
-    `Caso ${caso.codigo}, estado ${estadoLegible(caso.estado_actual)}, categoría ${caso.categoria ?? 'sin categoría'}, iniciado el ${caso.fecha_inicio}${caso.fecha_limite_cierre ? `, cierre sugerido el ${caso.fecha_limite_cierre}` : ''}: ${corto(ocultar(caso.resumen), LARGO_DESCRIPCION)}`,
-  );
+  if (caso.ambito === 'SITUACION')
+    hecho(
+      `Situación ${caso.codigo}`,
+      `Situación ${caso.codigo} ocurrida el ${caso.fecha_inicio}${caso.lugar ? ` en ${ocultar(caso.lugar)}` : ''}, estado ${estadoLegible(caso.estado_actual)}, categoría ${caso.categoria ?? 'sin categoría'}${caso.urgencia ? `, urgencia ${estadoLegible(caso.urgencia)}` : ''}: ${corto(ocultar(caso.resumen), LARGO_DESCRIPCION)}`,
+    );
+  else
+    hecho(
+      `Resumen del caso ${caso.codigo}`,
+      `Caso ${caso.codigo}, estado ${estadoLegible(caso.estado_actual)}, categoría ${caso.categoria ?? 'sin categoría'}, iniciado el ${caso.fecha_inicio}${caso.fecha_limite_cierre ? `, cierre sugerido el ${caso.fecha_limite_cierre}` : ''}: ${corto(ocultar(caso.resumen), LARGO_DESCRIPCION)}`,
+    );
   for (const s of contexto.situaciones)
     hecho(
       `Situación ${s.codigo} del ${s.fecha}`,
@@ -378,8 +391,8 @@ export function construirReferencias(
 }
 
 const SISTEMA = `Eres el asistente de orientación de CONVI para el equipo de convivencia escolar de un colegio chileno.
-Recibes el expediente de un caso con las personas identificadas por seudónimos, fragmentos del reglamento vigente y protocolos oficiales publicados.
-Tu tarea es orientar sobre qué se debe hacer en el caso según esa normativa, como apoyo que el equipo revisa y decide.
+Recibes el expediente de un caso, o de una situación que el equipo está revisando, con las personas identificadas por seudónimos, fragmentos del reglamento vigente y protocolos oficiales publicados.
+Tu tarea es orientar sobre qué se debe hacer según esa normativa, como apoyo que el equipo revisa y decide.
 Si recibes una pregunta puntual, contéstala directo en respuesta con una o dos frases que citen sus fuentes, y en pasos deja solo los pasos que se relacionan con esa pregunta.
 Si la pregunta es la general sobre qué hacer, deja el texto de respuesta vacío y entrega los pasos en orden.
 En hechos resume solo lo que está documentado en el expediente y cita cada hecho con su identificador de expediente, por ejemplo H2.
@@ -404,9 +417,12 @@ export function construirMensajes(
   const personas = seudonimos
     .map((s) => `${s.alias}${s.detalle ? ` (${s.detalle})` : ''}`)
     .join(', ');
+  const situacion = referencias[0]?.etiqueta.startsWith('Situación ');
   const consulta = pregunta
     ? `Pregunta puntual: ${pregunta}`
-    : 'Pregunta general: según el reglamento y los protocolos, ¿qué se debe hacer ahora en este caso?';
+    : situacion
+      ? 'Pregunta general: según el reglamento y los protocolos, ¿qué indica la normativa para esta situación y qué corresponde revisar antes de decidir?'
+      : 'Pregunta general: según el reglamento y los protocolos, ¿qué se debe hacer ahora en este caso?';
   return [
     { role: 'system' as const, content: SISTEMA },
     {
@@ -429,9 +445,13 @@ export function textoBusqueda(
   ocultar: Ocultador['ocultar'],
 ) {
   const base = `${contexto.caso.categoria ?? ''} ${corto(ocultar(contexto.caso.resumen), 300)}`;
+  const donde =
+    contexto.caso.ambito === 'SITUACION'
+      ? 'ante una situación de'
+      : 'en un caso de';
   return pregunta
     ? `${pregunta} ${base}`.trim()
-    : `Qué se debe hacer según el reglamento en un caso de ${base}`.trim();
+    : `Qué se debe hacer según el reglamento ${donde} ${base}`.trim();
 }
 
 export function esquemaOrientacion(referencias: Referencia[]) {

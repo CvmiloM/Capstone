@@ -32,4 +32,16 @@ export class OrientacionController {
   ) {
     return this.orientacion.orientar(peticion.sesion, id, cuerpo);
   }
+
+  // Pregunta a CONVI IA desde la pestaña Revisión de una situación, con la misma
+  // respuesta que la orientación del caso: { pregunta? } y 200 con sus fuentes.
+  @Post('situaciones/:id/orientacion')
+  @HttpCode(200)
+  orientarSituacion(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+  ) {
+    return this.orientacion.orientarSituacion(peticion.sesion, id, cuerpo);
+  }
 }
