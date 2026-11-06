@@ -41,6 +41,10 @@ const NO_EXISTE = 'El caso no existe.';
 const NO_DISPONIBLE =
   'La orientación con IA no está disponible en este momento, el caso y sus protocolos se pueden seguir usando sin ella, intenta de nuevo más tarde';
 
+const NO_EXISTE_SITUACION = 'La situación no existe.';
+const NO_DISPONIBLE_SITUACION =
+  'CONVI IA no está disponible en este momento, puedes seguir con la revisión normativa manual, intenta de nuevo más tarde';
+
 const MAXIMO_SITUACIONES = 10;
 const MAXIMO_PROTOCOLOS = 5;
 const FRAGMENTOS_ORIENTACION = 5;
@@ -95,6 +99,73 @@ export class OrientacionService {
         return { ...leido, solicitudId: registro.rows[0].id };
       },
     );
+    return this.responder(sesion, {
+      contexto,
+      personas,
+      solicitudId,
+      pregunta,
+      inicio,
+      nombre: 'del caso',
+    });
+  }
+
+  /**
+   * Pregunta a CONVI IA desde la pestaña Revisión de una situación: lo que indican
+   * el reglamento y los protocolos para esa situación, con las mismas reglas que la
+   * orientación del caso. No cambia la situación, la revisión normativa la registra
+   * la persona y queda marcada como asistida por IA. La solicitud se registra como
+   * consulta del reglamento, unida al caso si la situación ya tiene uno.
+   */
+  async orientarSituacion(
+    sesion: Sesion,
+    situacionId: string,
+    cuerpo: unknown,
+  ): Promise<Orientacion & { solicitud_id: string }> {
+    const pregunta = validarSolicitud(cuerpo);
+    const inicio = Date.now();
+    const { contexto, personas, solicitudId } = await this.operar(
+      sesion,
+      async (db) => {
+        const leido = await leerSituacion(db, situacionId);
+        const registro = await db.query<{ id: string }>(
+          `INSERT INTO convi.registros_solicitudes_ia
+             (establecimiento_id, membresia_id, caso_id, codigo_proposito, nombre_modelo)
+           VALUES (convi.establecimiento_actual(), convi.membresia_actual(), $1, 'CONSULTA_REGLAMENTO', $2)
+           RETURNING id`,
+          [leido.casoId, MODELO_GENERACION],
+        );
+        return { ...leido, solicitudId: registro.rows[0].id };
+      },
+    );
+    return this.responder(sesion, {
+      contexto,
+      personas,
+      solicitudId,
+      pregunta,
+      inicio,
+      nombre: 'de la situación',
+    });
+  }
+
+  /** Parte común: seudónimos, búsqueda en el reglamento, IA y registro del resultado. */
+  private async responder(
+    sesion: Sesion,
+    {
+      contexto,
+      personas,
+      solicitudId,
+      pregunta,
+      inicio,
+      nombre,
+    }: {
+      contexto: ContextoCaso;
+      personas: PersonaCaso[];
+      solicitudId: string;
+      pregunta: string | null;
+      inicio: number;
+      nombre: string;
+    },
+  ): Promise<Orientacion & { solicitud_id: string }> {
     const { seudonimos, ocultar } = crearOcultador(personas);
 
     // HU-104 CA2: pedir clasificar, predecir o diagnosticar no llega al modelo.
@@ -102,7 +173,7 @@ export class OrientacionService {
       await this.cerrar(sesion, solicitudId, 'COMPLETADO', inicio, {
         fuentes: 0,
         resumen:
-          'Orientación del caso no entregada porque la pregunta pedía clasificar, predecir o diagnosticar',
+          `Orientación ${nombre} no entregada porque la pregunta pedía clasificar, predecir o diagnosticar`,
       });
       return { ...rechazoPorLimite(seudonimos), solicitud_id: solicitudId };
     }
@@ -138,7 +209,7 @@ export class OrientacionService {
       ).length;
       await this.cerrar(sesion, solicitudId, 'COMPLETADO', inicio, {
         fuentes,
-        resumen: `Orientación del caso ${preguntaOculta ? `con pregunta puntual${orientacion.respuesta ? ' respondida' : ' sin respuesta directa'}` : 'general'}, ${orientacion.hechos.length} hechos y ${orientacion.pasos.length} pasos citados, ${fragmentos.length} fragmentos y ${contexto.protocolos.length} protocolos disponibles${orientacion.descartados ? `, ${orientacion.descartados} elementos descartados por cruzar los límites` : ''}${orientacion.sin_disposicion ? ', sin pasos de la normativa' : ''}`,
+        resumen: `Orientación ${nombre} ${preguntaOculta ? `con pregunta puntual${orientacion.respuesta ? ' respondida' : ' sin respuesta directa'}` : 'general'}, ${orientacion.hechos.length} hechos y ${orientacion.pasos.length} pasos citados, ${fragmentos.length} fragmentos y ${contexto.protocolos.length} protocolos disponibles${orientacion.descartados ? `, ${orientacion.descartados} elementos descartados por cruzar los límites` : ''}${orientacion.sin_disposicion ? ', sin pasos de la normativa' : ''}`,
       });
       return { ...orientacion, solicitud_id: solicitudId };
     } catch (error) {
@@ -147,12 +218,14 @@ export class OrientacionService {
       // HU-128: el registro dice qué falló, sin el expediente ni la pregunta.
       const motivo =
         error instanceof Error ? error.message : 'Error del servicio de IA';
-      this.logger.warn(`Falló la orientación del caso ${solicitudId}`);
+      this.logger.warn(`Falló la orientación ${nombre} ${solicitudId}`);
       await this.cerrar(sesion, solicitudId, 'FALLIDO', inicio, {
         fuentes: 0,
-        resumen: `Orientación del caso fallida con ${fragmentos.length} fragmentos encontrados: ${motivo}`,
+        resumen: `Orientación ${nombre} fallida con ${fragmentos.length} fragmentos encontrados: ${motivo}`,
       }).catch(() => {});
-      throw new ServiceUnavailableException(NO_DISPONIBLE);
+      throw new ServiceUnavailableException(
+        nombre === 'del caso' ? NO_DISPONIBLE : NO_DISPONIBLE_SITUACION,
+      );
     }
   }
 
@@ -284,6 +357,90 @@ export async function leerCaso(
       motivo: m.motivo,
     }));
 
+  return {
+    contexto: {
+      caso,
+      situaciones,
+      pasos,
+      compromisos,
+      actuaciones,
+      movimientos,
+      protocolos: await protocolosOficiales(db),
+    },
+    personas: ordenadas,
+  };
+}
+
+/**
+ * Lee una situación para consultarla con CONVI IA desde su revisión, con la RLS
+ * de Convivencia. Usa la forma del expediente del caso con solo el dato de la
+ * situación, sus participantes para los seudónimos y los protocolos oficiales.
+ */
+export async function leerSituacion(
+  db: PoolClient,
+  situacionId: string,
+): Promise<{
+  contexto: ContextoCaso;
+  personas: PersonaCaso[];
+  casoId: string | null;
+}> {
+  const fila = (
+    await db.query<ContextoCaso['caso'] & { caso_id: string | null }>(
+      `SELECT s.id, s.codigo, s.descripcion AS resumen, s.estado AS estado_actual,
+              cat.nombre AS categoria, s.ocurrido_en::date::text AS fecha_inicio,
+              NULL::text AS fecha_limite_cierre, 'SITUACION' AS ambito,
+              s.urgencia, s.lugar, s.caso_id
+       FROM convi.situaciones s
+       LEFT JOIN convi.categorias_convivencia cat ON cat.id = s.categoria_id
+       WHERE s.id = $1`,
+      [situacionId],
+    )
+  ).rows[0];
+  if (!fila) throw new NotFoundException(NO_EXISTE_SITUACION);
+  const { caso_id: casoId, ...caso } = fila;
+
+  const personas = await db.query<PersonaCaso>(
+    `SELECT DISTINCT ON (p.id) p.id AS persona_id, p.nombres, p.apellidos,
+            (e.id IS NOT NULL) AS es_estudiante, pa.rol_contextual AS rol,
+            cm.nombre AS curso, true AS en_caso
+     FROM convi.participaciones pa
+     JOIN convi.personas p ON p.id = pa.persona_id
+     LEFT JOIN convi.estudiantes e ON e.persona_id = p.id
+     LEFT JOIN convi.matriculas mt ON mt.id = pa.matricula_contexto_id
+     LEFT JOIN convi.cursos cm ON cm.id = mt.curso_id
+     WHERE pa.activo_hasta IS NULL AND pa.situacion_id = $1
+     ORDER BY p.id`,
+    [situacionId],
+  );
+  // Primero los estudiantes, para que los seudónimos sean estables.
+  const ordenadas = personas.rows.sort(
+    (a, b) =>
+      Number(b.es_estudiante) - Number(a.es_estudiante) ||
+      `${a.apellidos} ${a.nombres}`.localeCompare(
+        `${b.apellidos} ${b.nombres}`,
+        'es',
+      ),
+  );
+
+  return {
+    contexto: {
+      caso,
+      situaciones: [],
+      pasos: [],
+      compromisos: [],
+      actuaciones: [],
+      movimientos: [],
+      protocolos: await protocolosOficiales(db),
+    },
+    personas: ordenadas,
+    casoId,
+  };
+}
+
+/** Protocolos oficiales publicados de la escuela, con sus pasos, para el modelo. */
+async function protocolosOficiales(
+  db: PoolClient,
+): Promise<ContextoCaso['protocolos']> {
   const disponibles = (await protocolosAplicables(db)).slice(
     0,
     MAXIMO_PROTOCOLOS,
@@ -299,7 +456,7 @@ export async function leerCaso(
         )
       ).rows
     : [];
-  const protocolos = disponibles.map((d) => ({
+  return disponibles.map((d) => ({
     version_id: d.id,
     nombre: d.nombre,
     pasos: pasosOficiales
@@ -307,17 +464,4 @@ export async function leerCaso(
       .slice(0, 12)
       .map((p) => p.nombre),
   }));
-
-  return {
-    contexto: {
-      caso,
-      situaciones,
-      pasos,
-      compromisos,
-      actuaciones,
-      movimientos,
-      protocolos,
-    },
-    personas: ordenadas,
-  };
 }

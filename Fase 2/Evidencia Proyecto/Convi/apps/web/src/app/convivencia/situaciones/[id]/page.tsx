@@ -21,10 +21,10 @@ import {
   FormularioDecision,
   FormularioResponsable,
   FormularioRevision,
-  FormularioRevisionNormativa,
   FormularioUrgencia,
   FormularioVinculacion,
 } from "./formularios";
+import { RevisionNormativaConIA } from "./revision-normativa-ia";
 import { APLICABILIDAD, MODO_REVISION, NOMBRE_DECISION } from "./opciones";
 
 export const metadata: Metadata = { title: "Revisión de la situación" };
@@ -448,7 +448,8 @@ export default async function PaginaRevisionSituacion({
             situacion.estado,
           ) && (
             <div className="mt-4 border-t border-border pt-4">
-              <FormularioRevisionNormativa
+              {/* CONVI IA responde con la normativa, la revisión la registra la persona. */}
+              <RevisionNormativaConIA
                 situacionId={situacion.id}
                 protocolos={situacion.opciones_normativa.protocolos}
                 documentos={situacion.opciones_normativa.documentos}

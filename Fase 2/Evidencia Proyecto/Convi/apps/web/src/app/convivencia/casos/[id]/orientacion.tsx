@@ -7,6 +7,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import {
   AvisoError,
   BotonEnviar,
+  claseBotonSecundario,
   claseEnlace,
 } from "@/app/components/formulario";
 import {
@@ -16,8 +17,10 @@ import {
 } from "@/app/components/normativa/mascota-ia";
 import {
   orientarCaso,
+  orientarSituacion,
   type ElementoOrientacion,
   type EstadoOrientacion,
+  type Orientacion,
   type ReferenciaOrientacion,
 } from "./acciones-orientacion";
 
@@ -36,6 +39,44 @@ const MENSAJES: MensajesMascota = {
   listo: "Listo, revisa los hechos y las fuentes antes de decidir",
   "sin-disposicion": "La normativa no indica pasos para esto",
 };
+
+// Textos que cambian entre el caso y la revisión de una situación.
+const TEXTOS = {
+  caso: {
+    reposo: MENSAJES.reposo,
+    buscando: MENSAJES.buscando,
+    sugerencias: [
+      "¿Qué hechos están documentados en este caso?",
+      "¿Qué compromisos siguen pendientes?",
+      "¿Qué indica el reglamento para este caso?",
+      "¿Qué antecedentes conviene revisar antes del próximo seguimiento?",
+    ],
+    etiqueta: "¿Algo puntual que quieras saber? (opcional)",
+    ejemplo: "Por ejemplo: ¿a quién hay que citar primero?",
+    ayuda:
+      "La IA recibe el expediente con seudónimos, sin nombres, RUT ni datos de contacto, y no clasifica, predice ni diagnostica a estudiantes.",
+    boton: "¿Qué se debe hacer?",
+    pendiente: "Revisando el caso…",
+    aviso:
+      "Orientación generada con IA a partir del expediente y la normativa publicada: es un apoyo para revisar con sus fuentes, no decide sanciones ni cambia el caso, y la decisión es del equipo.",
+    hechos: "Hechos del caso",
+  },
+  situacion: {
+    reposo:
+      "Pregúntame qué indican el reglamento y los protocolos de tu escuela para esta situación",
+    buscando: "Leyendo la situación y buscando en el reglamento…",
+    sugerencias: [],
+    etiqueta: "¿Qué quieres saber de la normativa? (opcional)",
+    ejemplo: "Por ejemplo: ¿qué protocolo corresponde y en qué plazo?",
+    ayuda:
+      "La IA recibe la situación con seudónimos, sin nombres, RUT ni datos de contacto, y no clasifica, predice ni diagnostica a estudiantes, si no escribes nada te dice qué indica la normativa para esta situación.",
+    boton: "Preguntar a CONVI IA",
+    pendiente: "Revisando la situación…",
+    aviso:
+      "Respuesta generada con IA a partir de la situación y la normativa publicada: es un apoyo para revisar con sus fuentes, no decide ni cambia la situación, y la revisión normativa la registras tú.",
+    hechos: "Hechos de la situación",
+  },
+} as const;
 
 function Referencias({
   ids,
@@ -98,10 +139,46 @@ function Lista({
  * presenta como apoyo revisable (PB-148): no cambia el caso ni decide nada.
  */
 export function OrientacionCaso({ casoId }: { casoId: string }) {
-  const [estado, accion, pendiente] = useActionState(
-    orientarCaso.bind(null, casoId),
-    estadoInicial,
+  return (
+    <OrientacionIA ambito="caso" orientar={orientarCaso.bind(null, casoId)} />
   );
+}
+
+/**
+ * CONVI IA en la pestaña Revisión de una situación: lo que indica la normativa,
+ * con sus fuentes. Con "Usar en la revisión normativa" la respuesta pasa al
+ * formulario, que queda marcado como asistido por IA y lo guarda la persona.
+ */
+export function OrientacionSituacion({
+  situacionId,
+  alUsar,
+}: {
+  situacionId: string;
+  alUsar?: (resultado: Orientacion) => void;
+}) {
+  return (
+    <OrientacionIA
+      ambito="situacion"
+      orientar={orientarSituacion.bind(null, situacionId)}
+      alUsar={alUsar}
+    />
+  );
+}
+
+function OrientacionIA({
+  ambito,
+  orientar,
+  alUsar,
+}: {
+  ambito: keyof typeof TEXTOS;
+  orientar: (
+    anterior: EstadoOrientacion,
+    formData: FormData,
+  ) => Promise<EstadoOrientacion>;
+  alUsar?: (resultado: Orientacion) => void;
+}) {
+  const textos = TEXTOS[ambito];
+  const [estado, accion, pendiente] = useActionState(orientar, estadoInicial);
   const [paso, setPaso] = useState(0);
   const pregunta = useRef<HTMLTextAreaElement>(null);
   const resultado = estado.resultado;
@@ -129,6 +206,8 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
   const conPregunta = Boolean(estado.pregunta);
   const mensajes: MensajesMascota = {
     ...MENSAJES,
+    reposo: textos.reposo,
+    buscando: textos.buscando,
     listo: conPregunta
       ? "Listo, ahí está la respuesta a tu pregunta con sus fuentes"
       : MENSAJES.listo,
@@ -142,16 +221,12 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
       <MascotaIA fase={fase} mensajes={mensajes} />
 
       <FormularioConCarga action={accion} onSubmit={() => setPaso(0)} className="space-y-3">
+        {textos.sugerencias.length > 0 && (
         <fieldset disabled={pendiente} className="grid gap-2 sm:grid-cols-2">
           <legend className="mb-2 text-sm font-medium">
             Puedes comenzar con una de estas preguntas
           </legend>
-          {[
-            "¿Qué hechos están documentados en este caso?",
-            "¿Qué compromisos siguen pendientes?",
-            "¿Qué indica el reglamento para este caso?",
-            "¿Qué antecedentes conviene revisar antes del próximo seguimiento?",
-          ].map((texto) => (
+          {textos.sugerencias.map((texto) => (
             <button
               key={texto}
               type="button"
@@ -167,12 +242,13 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
             </button>
           ))}
         </fieldset>
+        )}
         <div>
           <label
             htmlFor="pregunta-orientacion"
             className="block text-sm font-medium"
           >
-            ¿Algo puntual que quieras saber? (opcional)
+            {textos.etiqueta}
           </label>
           <textarea
             ref={pregunta}
@@ -182,7 +258,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
             defaultValue={estado.pregunta}
             maxLength={LARGO_MAXIMO}
             rows={2}
-            placeholder="Por ejemplo: ¿a quién hay que citar primero?"
+            placeholder={textos.ejemplo}
             aria-invalid={estado.errores?.pregunta ? true : undefined}
             aria-describedby="pregunta-orientacion-ayuda"
             className={`mt-1.5 block w-full resize-y rounded-lg border bg-card px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-ring focus:ring-3 focus:ring-ring/15 ${
@@ -193,8 +269,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
             id="pregunta-orientacion-ayuda"
             className={`mt-1.5 text-sm ${estado.errores?.pregunta ? "text-destructive" : "text-muted-foreground"}`}
           >
-            {estado.errores?.pregunta ??
-              "La IA recibe el expediente con seudónimos, sin nombres, RUT ni datos de contacto, y no clasifica, predice ni diagnostica a estudiantes."}
+            {estado.errores?.pregunta ?? textos.ayuda}
           </p>
         </div>
         {estado.mensaje && !estado.errores && (
@@ -203,9 +278,9 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
         <div className="sm:w-64">
           <BotonEnviar
             pendiente={pendiente}
-            textoPendiente="Revisando el caso…"
+            textoPendiente={textos.pendiente}
           >
-            ¿Qué se debe hacer?
+            {textos.boton}
           </BotonEnviar>
         </div>
       </FormularioConCarga>
@@ -216,9 +291,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
           className="space-y-4 border-t border-border pt-4"
         >
           <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-            Orientación generada con IA a partir del expediente y la normativa
-            publicada: es un apoyo para revisar con sus fuentes, no decide
-            sanciones ni cambia el caso, y la decisión es del equipo.
+            {textos.aviso}
           </p>
 
           {resultado.fuera_de_limite ? (
@@ -260,7 +333,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
               {resultado.hechos.length > 0 && (
                 <details className="text-sm">
                   <summary className="cursor-pointer font-medium">
-                    Hechos del caso considerados
+                    {textos.hechos} considerados
                   </summary>
                   <Lista elementos={resultado.hechos} porId={porId} />
                 </details>
@@ -270,7 +343,7 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
             <>
               {resultado.hechos.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold">Hechos del caso</h3>
+                  <h3 className="text-sm font-semibold">{textos.hechos}</h3>
                   <Lista elementos={resultado.hechos} porId={porId} />
                 </div>
               )}
@@ -332,6 +405,25 @@ export function OrientacionCaso({ casoId }: { casoId: string }) {
               )}
             </>
           )}
+
+          {/* Revisión de una situación: la respuesta pasa al formulario de abajo. */}
+          {alUsar &&
+            !resultado.fuera_de_limite &&
+            (resultado.respuesta || resultado.pasos.length > 0) && (
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent-foreground/15 bg-accent px-4 py-3">
+                <p className="flex-1 text-sm text-accent-foreground">
+                  ¿Te sirve? Pásala a la revisión normativa, quedará marcada
+                  como asistida por IA y la revisas antes de guardar
+                </p>
+                <button
+                  type="button"
+                  onClick={() => alUsar(resultado)}
+                  className={claseBotonSecundario}
+                >
+                  Usar en la revisión normativa
+                </button>
+              </div>
+            )}
 
           {resultado.seudonimos.length > 0 && (
             <details className="text-sm">

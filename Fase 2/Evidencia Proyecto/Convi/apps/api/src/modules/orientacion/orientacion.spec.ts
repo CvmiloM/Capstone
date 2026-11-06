@@ -534,3 +534,130 @@ describe('PB-120 y PB-121: orientación con la base y la IA simuladas', () => {
     expect(cierre.valores?.[1]).toBe('FALLIDO');
   });
 });
+
+// Pregunta a CONVI IA desde la pestaña Revisión de una situación.
+describe('CONVI IA en la revisión de una situación', () => {
+  const SITUACION_ID = '55555555-5555-4555-8555-555555555555';
+  const situacion = {
+    id: SITUACION_ID,
+    codigo: 'SIT-2026-00002',
+    resumen: 'Tomás Alarcón empujó a Sofía en el patio',
+    estado_actual: 'EN_REVISION',
+    categoria: null,
+    fecha_inicio: '2026-11-05',
+    fecha_limite_cierre: null,
+    ambito: 'SITUACION' as const,
+    urgencia: 'URGENTE',
+    lugar: 'Patio',
+  };
+
+  beforeEach(() => {
+    vi.stubEnv('IA_EMBEDDINGS_URL', 'http://ia.test/api/embed');
+    vi.stubEnv('IA_GENERACION_URL', 'http://ia.test/api/chat');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  function prepararSituacion(existe = true, casoId: string | null = null) {
+    const consultas: { sql: string; valores?: unknown[] }[] = [];
+    const query = vi.fn(async (sql: string, valores?: unknown[]) => {
+      consultas.push({ sql, valores });
+      if (sql.includes('FROM convi.situaciones s'))
+        return { rows: existe ? [{ ...situacion, caso_id: casoId }] : [] };
+      if (sql.includes('FROM convi.participaciones pa'))
+        return { rows: personas.slice(0, 2) };
+      if (sql.includes('INSERT INTO convi.registros_solicitudes_ia'))
+        return { rows: [{ id: 'solicitud-2' }] };
+      if (sql.includes('buscar_fragmentos_normativa'))
+        return { rows: [fragmento] };
+      return { rows: [] };
+    });
+    const operar = vi.fn(
+      async (
+        _s: Sesion,
+        _a: unknown,
+        f: (db: PoolClient) => Promise<unknown>,
+      ) => f({ query } as unknown as PoolClient),
+    );
+    const servicio = new OrientacionService({
+      operar,
+    } as unknown as CuentaService);
+    return { consultas, operar, servicio };
+  }
+
+  it('el primer hecho es la situación y la pregunta general habla de ella', () => {
+    const { seudonimos, ocultar } = crearOcultador(personas);
+    const refs = construirReferencias(
+      { ...contexto, caso: situacion, situaciones: [], pasos: [], movimientos: [] },
+      [fragmento],
+      ocultar,
+    );
+    expect(refs[0]).toMatchObject({ id: 'H1', etiqueta: 'Situación SIT-2026-00002' });
+    expect(refs[0].contenido).toContain('urgencia urgente');
+    expect(refs[0].contenido).not.toContain('Tomás');
+    const [, usuario] = construirMensajes(refs, seudonimos, null);
+    expect(usuario.content).toContain('para esta situación');
+    expect(usuario.content).not.toContain('en este caso');
+  });
+
+  it('solo Convivencia, se registra como consulta del reglamento y sin nombres', async () => {
+    const { consultas, operar, servicio } = prepararSituacion(true, CASO_ID);
+    const llamadas = servicioIA({
+      respuesta: { texto: 'Se cita a los apoderados', citas: ['F1'] },
+      hechos: [{ texto: 'Estudiante 1 empujó a Estudiante 2', referencias: ['H1'] }],
+      pasos: [],
+      sin_disposicion: false,
+    });
+    const r = await servicio.orientarSituacion(sesion, SITUACION_ID, {
+      pregunta: '¿Qué dice el reglamento de lo que le pasó a Sofía?',
+    });
+    expect(r.solicitud_id).toBe('solicitud-2');
+    expect(r.respuesta?.texto).toBe('Se cita a los apoderados');
+    expect(
+      operar.mock.calls.every(
+        ([, a]) =>
+          JSON.stringify(a) ===
+          JSON.stringify({ tipo: 'establecimiento', perfiles: ['CONVIVENCIA'] }),
+      ),
+    ).toBe(true);
+    const registro = consultas.find((c) =>
+      c.sql.includes('INSERT INTO convi.registros_solicitudes_ia'),
+    )!;
+    expect(registro.sql).toContain("'CONSULTA_REGLAMENTO'");
+    expect(registro.valores?.[0]).toBe(CASO_ID);
+    const chat = llamadas.find((l) => l.url.endsWith('/api/chat'))!;
+    for (const nombre of ['Sofía', 'Tomás', 'Alarcón'])
+      expect(chat.cuerpo).not.toContain(nombre);
+  });
+
+  it('una situación sin caso se registra sin caso', async () => {
+    const { consultas, servicio } = prepararSituacion(true, null);
+    servicioIA({ respuesta: { texto: '', citas: [] }, hechos: [], pasos: [], sin_disposicion: true });
+    const r = await servicio.orientarSituacion(sesion, SITUACION_ID, {});
+    expect(r.sin_disposicion).toBe(true);
+    const registro = consultas.find((c) =>
+      c.sql.includes('INSERT INTO convi.registros_solicitudes_ia'),
+    )!;
+    expect(registro.valores?.[0]).toBeNull();
+  });
+
+  it('si la situación no existe responde 404 sin registrar nada', async () => {
+    const { consultas, servicio } = prepararSituacion(false);
+    await expect(
+      servicio.orientarSituacion(sesion, SITUACION_ID, {}),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(
+      consultas.some((c) => c.sql.includes('registros_solicitudes_ia')),
+    ).toBe(false);
+  });
+
+  it('si la IA falla avisa que la revisión manual sigue disponible', async () => {
+    const { servicio } = prepararSituacion();
+    servicioIA({}, 500);
+    await expect(
+      servicio.orientarSituacion(sesion, SITUACION_ID, {}),
+    ).rejects.toThrow('revisión normativa manual');
+  });
+});

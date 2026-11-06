@@ -64,6 +64,36 @@ export async function orientarCaso(
       pregunta,
       mensaje: "El caso no es válido. Vuelve a la lista de casos.",
     };
+  return pedirOrientacion(
+    `/convivencia/casos/${encodeURIComponent(casoId)}/orientacion`,
+    pregunta,
+  );
+}
+
+// Pregunta a CONVI IA desde la pestaña Revisión de una situación, con la misma
+// respuesta que la orientación del caso.
+export async function orientarSituacion(
+  situacionId: string,
+  _anterior: EstadoOrientacion,
+  formData: FormData,
+): Promise<EstadoOrientacion> {
+  const valor = formData.get("pregunta");
+  const pregunta = typeof valor === "string" ? valor.trim() : "";
+  if (!UUID.test(situacionId))
+    return {
+      pregunta,
+      mensaje: "La situación no es válida. Vuelve a la bandeja.",
+    };
+  return pedirOrientacion(
+    `/convivencia/situaciones/${encodeURIComponent(situacionId)}/orientacion`,
+    pregunta,
+  );
+}
+
+async function pedirOrientacion(
+  ruta: string,
+  pregunta: string,
+): Promise<EstadoOrientacion> {
   const supabase = await crearClienteServidor();
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -72,7 +102,7 @@ export async function orientarCaso(
   let respuesta: Response;
   try {
     respuesta = await fetch(
-      `${URL_API}/convivencia/casos/${encodeURIComponent(casoId)}/orientacion`,
+      `${URL_API}${ruta}`,
       {
         method: "POST",
         headers: {
