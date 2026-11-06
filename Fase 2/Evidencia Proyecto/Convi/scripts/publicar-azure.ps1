@@ -89,6 +89,15 @@ try {
             throw "$iaVariable requiere HTTPS, sin credenciales en la URL y con IA_EMBEDDINGS_TOKEN privado."
         }
     }
+    if ($cloud['BREVO_API_KEY']) {
+        try { $remitente = [System.Net.Mail.MailAddress]::new([string]$cloud['CORREO_REMITENTE']) }
+        catch { throw 'BREVO_API_KEY requiere CORREO_REMITENTE con una direccion de correo valida y verificada en Brevo.' }
+        if ($remitente.Address -ne $cloud['CORREO_REMITENTE']) {
+            throw 'CORREO_REMITENTE debe contener solo la direccion de correo, sin nombre ni formato adicional.'
+        }
+    } elseif ($cloud['CORREO_REMITENTE'] -or $cloud['CORREO_DESTINOS_PERMITIDOS']) {
+        throw 'Completa BREVO_API_KEY para configurar el correo cloud; no se muestran valores privados.'
+    }
     $registro = $base.registryServer.value
     $apiImage = "$registro/convi-api:$Version"
     $webImage = "$registro/convi-web:$Version"
@@ -129,6 +138,9 @@ try {
         iaEmbeddingsUrl = [string]$cloud['IA_EMBEDDINGS_URL']
         iaGeneracionUrl = [string]$cloud['IA_GENERACION_URL']
         iaEmbeddingsToken = [string]$cloud['IA_EMBEDDINGS_TOKEN']
+        brevoApiKey = [string]$cloud['BREVO_API_KEY']
+        correoRemitente = [string]$cloud['CORREO_REMITENTE']
+        correoDestinosPermitidos = [string]$cloud['CORREO_DESTINOS_PERMITIDOS']
         webCustomDomains = $dominios
     }
     $parametros = @{}

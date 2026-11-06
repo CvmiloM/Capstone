@@ -16,6 +16,10 @@ param iaEmbeddingsUrl string = ''
 param iaGeneracionUrl string = ''
 @secure()
 param iaEmbeddingsToken string = ''
+@secure()
+param brevoApiKey string = ''
+param correoRemitente string = ''
+param correoDestinosPermitidos string = ''
 // Conserva certificados y dominios existentes al repetir la instalación inicial.
 param webCustomDomains array = []
 
@@ -46,7 +50,8 @@ resource api 'Microsoft.App/containerApps@2025-07-01' = {
         { name: 'supabase-secret', value: supabaseSecretKey }
         { name: 'supabase-db', value: supabaseDbUrl }
         { name: 'redis-url', value: redisUrl }
-      ], empty(iaEmbeddingsToken) ? [] : [{ name: 'ia-embeddings-token', value: iaEmbeddingsToken }])
+      ], empty(iaEmbeddingsToken) ? [] : [{ name: 'ia-embeddings-token', value: iaEmbeddingsToken }],
+        empty(brevoApiKey) ? [] : [{ name: 'brevo-api-key', value: brevoApiKey }])
     }
     template: {
       containers: [{
@@ -61,7 +66,12 @@ resource api 'Microsoft.App/containerApps@2025-07-01' = {
           { name: 'REDIS_URL', secretRef: 'redis-url' }
         ], empty(iaEmbeddingsUrl) ? [] : [{ name: 'IA_EMBEDDINGS_URL', value: iaEmbeddingsUrl }],
           empty(iaGeneracionUrl) ? [] : [{ name: 'IA_GENERACION_URL', value: iaGeneracionUrl }],
-          empty(iaEmbeddingsToken) ? [] : [{ name: 'IA_EMBEDDINGS_TOKEN', secretRef: 'ia-embeddings-token' }])
+          empty(iaEmbeddingsToken) ? [] : [{ name: 'IA_EMBEDDINGS_TOKEN', secretRef: 'ia-embeddings-token' }],
+          empty(brevoApiKey) ? [] : [
+            { name: 'BREVO_API_KEY', secretRef: 'brevo-api-key' }
+            { name: 'CORREO_REMITENTE', value: correoRemitente }
+            { name: 'CORREO_DESTINOS_PERMITIDOS', value: correoDestinosPermitidos }
+          ])
         probes: [
           { type: 'Startup', tcpSocket: { port: 3001 }, periodSeconds: 2, failureThreshold: 60 }
           { type: 'Readiness', httpGet: { path: '/', port: 3001 }, periodSeconds: 10, timeoutSeconds: 5 }
