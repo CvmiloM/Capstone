@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { DetalleCaso } from "../datos";
-import { BotonCopiarCorreo, BotonEnviarCorreo } from "./envio-correo";
+import {
+  BotonCopiarCorreo,
+  BotonEnviarCorreo,
+  BotonRevisarEntrega,
+} from "./envio-correo";
 import { BotonDescartarCorreo, FormularioCorreo } from "./formulario-correo";
 import { FormularioCorreoIA } from "./formulario-correo-ia";
 import { NOMBRE_ESTADO_CORREO } from "./opciones";
@@ -9,6 +13,8 @@ import { NOMBRE_ESTADO_CORREO } from "./opciones";
 // reciente al más antiguo. Se redactan a mano o con IA y se editan mientras
 // sean borradores. PB-087 (HU-076): Convivencia confirma y se envía; lo
 // enviado no cambia y se copia en un borrador nuevo para corregirlo.
+// PB-088 (HU-077): el estado de entrega lo informa el servicio de correo, y un
+// rebote o un fallo muestran su detalle con la referencia.
 export function Correos({
   caso,
   formatearFecha,
@@ -37,10 +43,23 @@ export function Correos({
               caso.destinatarios_correo.find(
                 (d) => d.persona_id === c.persona_destinataria_id,
               )?.no_contactable ?? false;
+            // Un rebote temporal puede terminar entregado: se vuelve a revisar.
+            const revisable =
+              (c.estado === "ENVIADO" || c.estado === "REBOTADO") &&
+              Boolean(c.referencia);
+            const problema = c.estado === "REBOTADO" || c.estado === "FALLIDO";
             return (
             <li key={c.id} className="py-3">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    problema
+                      ? "bg-destructive/10 text-destructive"
+                      : c.estado === "ENTREGADO"
+                        ? "bg-verde/15 text-foreground"
+                        : "bg-accent text-accent-foreground"
+                  }`}
+                >
                   {NOMBRE_ESTADO_CORREO[c.estado] ?? c.estado}
                 </span>
                 {c.generado_por_ia && (
@@ -69,9 +88,36 @@ export function Correos({
                   {c.referencia ? ` · referencia ${c.referencia}` : ""}
                 </p>
               )}
-              {!c.editable && abierto && (
-                <div className="mt-3">
-                  <BotonCopiarCorreo casoId={caso.id} correoId={c.id} />
+              {c.estado === "ENVIADO" && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  El servicio de correo aún no confirma la entrega.
+                </p>
+              )}
+              {problema && (
+                <div className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-xs">
+                  <p className="font-medium text-destructive">
+                    {c.estado === "FALLIDO"
+                      ? "El servicio de correo no pudo entregarlo"
+                      : "El correo rebotó"}
+                  </p>
+                  {c.detalle_error && (
+                    <p className="mt-1 text-foreground">{c.detalle_error}</p>
+                  )}
+                  {c.referencia && (
+                    <p className="mt-1 text-muted-foreground">
+                      Referencia del proveedor: {c.referencia}
+                    </p>
+                  )}
+                </div>
+              )}
+              {!c.editable && (revisable || abierto) && (
+                <div className="mt-3 flex flex-wrap items-start gap-2">
+                  {revisable && (
+                    <BotonRevisarEntrega casoId={caso.id} correoId={c.id} />
+                  )}
+                  {abierto && (
+                    <BotonCopiarCorreo casoId={caso.id} correoId={c.id} />
+                  )}
                 </div>
               )}
               {c.editable && abierto && (

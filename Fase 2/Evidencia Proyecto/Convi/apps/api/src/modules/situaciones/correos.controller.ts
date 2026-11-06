@@ -14,7 +14,7 @@ import { CorreosService } from './correos.service.js';
 // PB-151 (HU-130) y PB-086 (HU-075): borradores de correo al apoderado. Como
 // en las comunicaciones, solo entra Convivencia activa con segundo factor. Se
 // ven en GET /convivencia/casos/:id (sección comunicaciones). PB-087 (HU-076):
-// el envío con confirmación.
+// el envío con confirmación. PB-088 (HU-077): la revisión de la entrega.
 @Controller('convivencia')
 @PerfilesPermitidos('CONVIVENCIA')
 export class CorreosController {
@@ -63,6 +63,16 @@ export class CorreosController {
     @Body() cuerpo: unknown,
   ) {
     return this.correos.enviar(peticion.sesion, id, cuerpo);
+  }
+
+  // PB-088 (HU-077): pregunta al servicio de correo si un correo enviado llegó.
+  // 201 con id y estado; 409 con el mensaje si no se pudo consultar.
+  @Post('correos/:id/entrega')
+  revisarEntrega(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.correos.revisarEntrega(peticion.sesion, id);
   }
 
   // PB-087 (HU-076 CA2): copia un correo en un borrador nuevo. 201 con el id.

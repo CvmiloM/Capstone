@@ -31,15 +31,19 @@ import {
   type BorradorCorreo,
 } from './correos.js';
 import {
+  CONSULTA_ENTREGA,
   ENVIO_CORREO,
   ErrorEnvio,
+  type ConsultarEntrega,
   type EnviarCorreo,
   type MotivoErrorEnvio,
+  type ResultadoEntrega,
 } from './envio-correo.js';
 
 // PB-151 (HU-130) y PB-086 (HU-075): borradores de correo al apoderado. Solo
 // Convivencia activa con segundo factor; la seguridad por fila separa por
 // escuela. PB-087 (HU-076): el envío, con la confirmación de Convivencia.
+// PB-088 (HU-077): la entrega, según lo que informe el servicio de correo.
 const PERFILES: Perfil[] = ['CONVIVENCIA'];
 const NO_GUARDADO = 'Revisa los datos marcados. No se guardó el borrador.';
 const NO_EXISTE = 'El correo no existe.';
@@ -61,12 +65,27 @@ const NO_ENVIADO: Record<MotivoErrorEnvio, string> = {
     'El servicio de correo no respondió. El correo sigue en borrador: inténtalo nuevamente en unos minutos.',
 };
 
+// PB-088: lo que se responde si no se pudo revisar la entrega. El estado no cambia.
+const SIN_REVISION: Record<MotivoErrorEnvio, string> = {
+  NO_CONFIGURADO:
+    'En este ambiente no se puede revisar la entrega de este correo: se envió con otro servicio de correo o el servicio no está configurado. El estado no cambió.',
+  NO_PERMITIDO:
+    'En este ambiente no se puede revisar la entrega de este correo. El estado no cambió.',
+  RECHAZADO:
+    'El servicio de correo no entregó información de este envío. El estado no cambió: inténtalo nuevamente más tarde.',
+  SIN_RESPUESTA:
+    'El servicio de correo no respondió. El estado no cambió: inténtalo nuevamente en unos minutos.',
+};
+/** Se revisa mientras no haya un resultado final; un rebote temporal puede llegar a entregarse. */
+const REVISABLES = ['ENVIADO', 'REBOTADO'];
+
 @Injectable()
 export class CorreosService {
   private readonly logger = new Logger(CorreosService.name);
   constructor(
     @Inject(CuentaService) private readonly cuentas: CuentaService,
     @Inject(ENVIO_CORREO) private readonly entregar: EnviarCorreo,
+    @Inject(CONSULTA_ENTREGA) private readonly consultar: ConsultarEntrega,
   ) {}
 
   private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
@@ -268,6 +287,84 @@ export class CorreosService {
       },
       'READ COMMITTED',
     );
+  }
+
+  /**
+   * PB-088 (HU-077): pregunta al servicio de correo qué pasó con un correo
+   * enviado y guarda la respuesta. Solo un aviso de entrega lo deja Entregado
+   * (CA2); un rebote o un fallo guardan su detalle, que se muestra junto a la
+   * referencia (CA3). Sirve también con el caso cerrado porque no cambia el
+   * contenido, y la consulta va fuera de la transacción para no bloquear el
+   * correo mientras el servicio responde. Entregado y Fallido son finales.
+   */
+  async revisarEntrega(
+    sesion: Sesion,
+    correoId: string,
+  ): Promise<{ id: string; estado: string }> {
+    const leer = (db: PoolClient) =>
+      db
+        .query<{ estado: string; referencia: string | null }>(
+          `SELECT estado_entrega AS estado, referencia_externa AS referencia
+           FROM convi.comunicaciones
+           WHERE id = $1 AND tipo_comunicacion = 'CORREO'`,
+          [correoId],
+        )
+        .then((r) => r.rows[0]);
+    const correo = await this.operar(sesion, leer);
+    if (!correo) throw new NotFoundException(NO_EXISTE);
+    if (correo.estado === 'ENTREGADO' || correo.estado === 'FALLIDO')
+      return { id: correoId, estado: correo.estado };
+    if (!REVISABLES.includes(correo.estado) || !correo.referencia)
+      throw new ConflictException(
+        'Este correo todavía no se envía: no hay entrega que revisar.',
+      );
+    let resultado: ResultadoEntrega;
+    try {
+      resultado = await this.consultar(correo.referencia);
+    } catch (error) {
+      if (!(error instanceof ErrorEnvio)) throw error;
+      this.logger.warn(`No se revisó la entrega de un correo: ${error.motivo}`);
+      throw new ConflictException(SIN_REVISION[error.motivo]);
+    }
+    // Sin novedades del servicio, el correo queda como estaba.
+    if (resultado.estado === 'ENVIADO')
+      return { id: correoId, estado: correo.estado };
+    const referencia = correo.referencia;
+    return this.operar(sesion, async (db) => {
+      const fila = await db
+        .query<{ estado: string }>(
+          `UPDATE convi.comunicaciones
+           SET estado_entrega = $2, detalle_error = $3
+           WHERE id = $1 AND estado_entrega = ANY($4::text[])
+             AND referencia_externa = $5
+           RETURNING estado_entrega AS estado`,
+          [
+            correoId,
+            resultado.estado,
+            resultado.detalle,
+            REVISABLES,
+            referencia,
+          ],
+        )
+        .catch((error: unknown) => {
+          // La base exige que quien confirmó el envío siga activo en Convivencia.
+          const { code, message } = error as {
+            code?: string;
+            message?: string;
+          };
+          if (
+            code === 'P0001' &&
+            message === 'Confirmación requiere Convivencia'
+          )
+            throw new ConflictException(
+              'No se pudo guardar el estado: quien confirmó el envío ya no está activo en Convivencia.',
+            );
+          throw error;
+        });
+      // Otra revisión simultánea ya lo dejó en su estado final.
+      const estado = fila.rows[0]?.estado ?? (await leer(db))?.estado;
+      return { id: correoId, estado: estado ?? resultado.estado };
+    });
   }
 
   // HU-076 CA2: lo confirmado o enviado no cambia; para corregirlo se copia
