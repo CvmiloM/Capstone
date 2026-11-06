@@ -4,6 +4,7 @@ import { AppService } from './app.service.js';
 import { AcademicoModule } from './modules/academico/academico.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { CalendarioModule } from './modules/calendario/calendario.module.js';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module.js';
 import { CategoriasModule } from './modules/categorias/categorias.module.js';
 import { CuentasModule } from './modules/cuentas/cuentas.module.js';
@@ -21,6 +22,7 @@ import { SituacionesModule } from './modules/situaciones/situaciones.module.js';
     AcademicoModule,
     AdminModule,
     AuthModule,
+    CalendarioModule,
     AuditoriaModule,
     CategoriasModule,
     CuentasModule,
