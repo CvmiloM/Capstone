@@ -1,3 +1,4 @@
+import { PestanasGrupo } from "../pestanas-grupo";
 import type { Metadata } from "next";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseEnlace, Encabezado } from "@/app/components/formulario";
@@ -28,6 +29,7 @@ export default async function PaginaRegistroHistorico({
 
   return (
     <>
+      <PestanasGrupo grupo="expedientes" />
       <Encabezado
         titulo="Registro histórico"
         descripcion="Para incorporar situaciones de años anteriores con su fecha real, quedan como antecedente con su conclusión y marcadas como registro histórico."

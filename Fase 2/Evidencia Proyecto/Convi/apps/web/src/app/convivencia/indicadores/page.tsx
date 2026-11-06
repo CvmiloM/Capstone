@@ -1,3 +1,4 @@
+import { PestanasGrupo } from "../pestanas-grupo";
 
 import type { Metadata } from "next";
 import { Encabezado } from "@/app/components/formulario";
@@ -61,6 +62,7 @@ export default async function PaginaIndicadores({ searchParams }: {
   const datos = "total_situaciones" in respuesta.datos ? respuesta.datos : null;
 
   return <div className="space-y-6">
+    <PestanasGrupo grupo="consultas" className="" />
     <Encabezado titulo="Indicadores de Convivencia"
       descripcion="Consulta situaciones, compromisos, seguimientos y cierres de tu escuela según el período que elijas" />
     <FiltrosIndicadores key={JSON.stringify(inicial)} inicial={inicial} opciones={respuesta.datos.opciones}
