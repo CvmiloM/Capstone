@@ -777,3 +777,67 @@ Antes de consultar el reglamento se aplica una sola vez la migración
 el servicio y los modelos del equipo de Camilo deben estar encendidos y accesibles
 desde Azure, los documentos locales no se copian a la nube, para probar se sube y
 publica un reglamento de prueba en la escuela cloud y se espera su preparación
+
+### Correos de casos con Brevo (PB-087)
+
+El envío confirmado de Convivencia usa la API HTTPS de Brevo. Configurar solo en
+el archivo privado `.env.cloud`, sin subirlo al repositorio ni compartir su contenido:
+
+```dotenv
+BREVO_API_KEY=<clave de API privada de Brevo, no una clave SMTP>
+CORREO_REMITENTE=notificaciones@convi.tech
+CORREO_DESTINOS_PERMITIDOS=
+```
+
+`CORREO_DESTINOS_PERMITIDOS` vacío permite enviar a cualquier destinatario del
+correo confirmado. Sebastián eligió ese comportamiento para este despliegue.
+Para restringir pruebas puede contener direcciones completas o dominios separados
+por comas, como ya admite el servicio. No modifica cuentas ni acceso al portal.
+
+El remitente debe estar Verified en Brevo, con el dominio autenticado mediante
+los registros que indique Brevo (código de verificación, DKIM y DMARC). Conservar
+los registros DNS que conectan y verifican la web en Azure. Autenticar el dominio
+no crea un buzón de entrada; las respuestas usan el correo de contacto de la
+escuela cuando está configurado.
+
+La etapa Aplicaciones de `scripts/publicar-azure.ps1` lee estas variables y
+`infra/azure/aplicaciones.bicep` recibe la clave como parámetro seguro, la guarda
+en el secreto `brevo-api-key` y entrega `BREVO_API_KEY` mediante `secretRef` solo
+a la API. El remitente y la lista también quedan solo en la API; la clave no pasa
+a la web ni a los argumentos de construcción. Sin configuración de correo, el
+despliegue sigue siendo válido y el servicio informa que el envío no está configurado.
+
+Un merge mediante GitHub actualiza las imágenes y conserva la configuración de
+Azure, pero no lee el `.env.cloud` del equipo ni crea este secreto. La configuración
+inicial de Brevo se aplica mediante la etapa Aplicaciones del script habitual, o
+actualizando de forma equivalente el secreto y las variables de la API; después
+las siguientes publicaciones conservan esos valores. Nunca imprimir valores de
+secretos al verificar el despliegue.
+
+En Brevo, revisar Settings > Security > Authorized IPs. Las IP públicas de salida
+de Container Apps pueden cambiar y no son la IP de entrada del dominio web.
+Comprobar la IP observada por Brevo para las llamadas de esta API y autorizarla
+si el bloqueo está activo; una autorización no garantiza que nunca cambie.
+Para evitar bloqueos tras cambiar de revisión, consultar también
+`az containerapp show -g rg-convi-pruebas -n ca-convi-api-estandar --query properties.outboundIpAddresses -o json`.
+Brevo admite importar las direcciones actuales en Settings > Security >
+Authorized IPs > Authorize IP addresses > Upload file, mediante un CSV con
+cabecera `ip_address` y una dirección por fila. Excluir las ya autorizadas y
+revisar duplicados que señale Brevo. Son IP posibles de salida, compartidas de
+Azure; autorizar el listado permite más orígenes que una sola dirección y
+no sustituye proteger la clave ni revisar el listado si cambia la infraestructura.
+No desactivar el bloqueo global para resolver un rechazo de una IP nueva.
+No habilitar una IP dedicada de Brevo ni crear infraestructura NAT como parte
+de este cambio: una salida fija de Azure requiere una evaluación separada.
+
+Para comprobar PB-087, iniciar sesión como Convivencia en la escuela de prueba,
+crear un borrador dirigido a un correo propio y usar Confirmar y enviar una sola
+vez. Comprobar la referencia de Brevo, la confirmación conservada, el estado
+Enviado y la llegada al buzón. Enviado significa que Brevo aceptó el envío;
+los estados de entrega, fallos y rebotes corresponden a PB-088. Si el resultado
+del envío es incierto, comprobar el historial de Brevo antes de repetirlo.
+
+Referencias: [secretos de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/manage-secrets),
+[IP de salida de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/networking),
+[autenticación del dominio](https://help.brevo.com/hc/en-us/articles/12163873383186)
+y [autorización de IP en Brevo](https://help.brevo.com/hc/en-us/articles/5740111683858).
