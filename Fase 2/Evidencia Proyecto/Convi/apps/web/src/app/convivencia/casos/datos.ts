@@ -138,6 +138,8 @@ export type CorreoCaso = {
   enviado_en: string | null;
   /** PB-087: referencia del servicio de correo. */
   referencia: string | null;
+  /** PB-088: por qué rebotó o falló, según el servicio de correo. */
+  detalle_error: string | null;
   /** Borrador que nadie confirmó: se puede editar o descartar. */
   editable: boolean;
 };

@@ -116,6 +116,9 @@ const AVISOS: Record<string, string> = {
     "Enviaste el correo: quedó guardado quién lo confirmó, cuándo y su contenido, y ya no se puede editar. Enviado no significa que ya fue entregado.",
   "correo-copiado":
     "Copiaste el correo en un borrador nuevo: revísalo antes de enviarlo. El original no cambió.",
+  // PB-088 (HU-077): estado de entrega según el servicio de correo.
+  "entrega-revisada":
+    "Revisaste la entrega: el correo muestra lo último que informó el servicio de correo. Si sigue Enviado, todavía no confirma que llegó.",
   // PB-125 y PB-126 (HU-106 y HU-107): borradores de acta e informe con IA.
   "borrador-ia":
     "La IA preparó el borrador y quedó marcado como generado con IA y pendiente de revisión: no es un acta firmada ni un informe publicado",
