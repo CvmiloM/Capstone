@@ -18,6 +18,8 @@ const SECCIONES: SeccionMenu[] = [
       },
 
       { href: "/convivencia/seguimientos", texto: "Agenda de seguimientos", icono: "anios" },
+      // PB-085 (HU-074): fechas de casos, protocolos, planes y Plan de Gestión en un mes
+      { href: "/convivencia/calendario", texto: "Calendario", icono: "anios" },
       { href: "/convivencia/indicadores", texto: "Indicadores", icono: "categorias" },
       { href: "/convivencia/informes", texto: "Informes", icono: "documentos" },
       // PB-093 (HU-080): alertas del motor de reglas (/convivencia/alertas/...)
