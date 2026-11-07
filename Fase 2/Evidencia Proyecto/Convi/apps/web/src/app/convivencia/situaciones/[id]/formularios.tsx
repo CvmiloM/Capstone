@@ -378,18 +378,21 @@ export function FormularioRevisionNormativa({
   casoId,
   protocolos,
   documentos,
+  inicial,
 }: {
   situacionId?: string;
   /** PB-082 (HU-071 CA2): revisión de un caso que sigue sin protocolo. */
   casoId?: string;
   protocolos: { id: string; nombre: string }[];
   documentos: { id: string; nombre: string }[];
+  /** Respuesta de CONVI IA copiada al formulario, que la persona revisa y guarda. */
+  inicial?: Record<string, string>;
 }) {
   const [estado, accion, pendiente] = useActionState(
     registrarRevisionNormativa,
     estadoInicial,
   );
-  const valores = estado.valores ?? {};
+  const valores = estado.valores ?? inicial ?? {};
   const errores = estado.errores ?? {};
   // Si hubo un error se conservan las filas que se habían agregado.
   const filasEnviadas = Object.keys(valores).filter((campo) =>

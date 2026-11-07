@@ -9,7 +9,11 @@ import {
   claseBotonSecundario,
 } from "@/app/components/formulario";
 import type { EstadoAccion } from "./acciones";
-import { copiarCorreo, enviarCorreo } from "./acciones-correos";
+import {
+  copiarCorreo,
+  enviarCorreo,
+  revisarEntrega,
+} from "./acciones-correos";
 
 const estadoInicial: EstadoAccion = {};
 
@@ -103,6 +107,35 @@ export function BotonEnviarCorreo({
         className={claseBotonPrimario}
       >
         {pendiente ? "Enviando…" : "Confirmar y enviar"}
+      </button>
+    </FormularioConCarga>
+  );
+}
+
+// PB-088 (HU-077): pregunta al servicio de correo si el correo llegó. Funciona
+// también con el caso cerrado, porque no cambia el contenido.
+export function BotonRevisarEntrega({
+  casoId,
+  correoId,
+}: {
+  casoId: string;
+  correoId: string;
+}) {
+  const [estado, accion, pendiente] = useActionState(
+    revisarEntrega,
+    estadoInicial,
+  );
+  return (
+    <FormularioConCarga action={accion} className="space-y-2">
+      <input type="hidden" name="caso_id" value={casoId} />
+      <input type="hidden" name="correo_id" value={correoId} />
+      {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
+      <button
+        type="submit"
+        disabled={pendiente}
+        className={claseBotonSecundario}
+      >
+        {pendiente ? "Revisando…" : "Revisar entrega"}
       </button>
     </FormularioConCarga>
   );

@@ -11,6 +11,8 @@ import { ComunicacionesService } from './comunicaciones.service.js';
 import { CorreosController } from './correos.controller.js';
 import { CorreosService } from './correos.service.js';
 import {
+  CONSULTA_ENTREGA,
+  crearConsultaEntrega,
   crearEnvioCorreo,
   ENVIO_CORREO,
   leerConfiguracion,
@@ -95,6 +97,11 @@ import { ProfesorService } from './profesor.service.js';
     {
       provide: ENVIO_CORREO,
       useFactory: () => crearEnvioCorreo(leerConfiguracion(process.env)),
+    },
+    // PB-088: el mismo servicio responde el estado de entrega.
+    {
+      provide: CONSULTA_ENTREGA,
+      useFactory: () => crearConsultaEntrega(leerConfiguracion(process.env)),
     },
     {
       provide: ALMACENAMIENTO,

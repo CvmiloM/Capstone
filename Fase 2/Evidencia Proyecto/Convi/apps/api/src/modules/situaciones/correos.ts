@@ -149,6 +149,8 @@ export type CorreoCaso = {
   enviado_en: Date | null;
   /** PB-087: referencia del servicio de correo, por ejemplo mailpit:abc. */
   referencia: string | null;
+  /** PB-088 (HU-077 CA3): por qué rebotó o falló, según el servicio de correo. */
+  detalle_error: string | null;
   /** Se puede editar o descartar: borrador que nadie confirmó. */
   editable: boolean;
 };
@@ -165,7 +167,7 @@ export async function correosDelCaso(
             co.generado_por_ia, pc.nombres || ' ' || pc.apellidos AS creado_por,
             co.creado_en, co.confirmado_en,
             pf.nombres || ' ' || pf.apellidos AS confirmado_por,
-            co.enviado_en, co.referencia_externa AS referencia,
+            co.enviado_en, co.referencia_externa AS referencia, co.detalle_error,
             (co.estado_entrega = 'BORRADOR' AND co.confirmado_en IS NULL
              AND co.enviado_en IS NULL) AS editable
      FROM convi.comunicaciones co

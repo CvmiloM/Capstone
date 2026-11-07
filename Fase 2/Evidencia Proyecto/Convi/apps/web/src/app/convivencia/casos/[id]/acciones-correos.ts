@@ -7,7 +7,8 @@ import type { EstadoAccion } from "./acciones";
 
 // PB-151 (HU-130) y PB-086 (HU-075): borradores de correo al apoderado. La API
 // vuelve a validar todo. PB-087 (HU-076): solo enviarCorreo envía, con la
-// confirmación del profesional.
+// confirmación del profesional. PB-088 (HU-077): revisarEntrega pregunta si
+// llegó.
 const URL_API =
   process.env.API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
@@ -100,6 +101,24 @@ export async function enviarCorreo(
   if (!resultado.ok)
     return { mensaje: resultado.mensaje, errores: resultado.errores };
   volver(casoId, "correo-enviado");
+  return {};
+}
+
+// PB-088 (HU-077): pregunta al servicio de correo si un correo enviado llegó.
+// Si no se pudo consultar, la API responde por qué y el estado no cambia.
+export async function revisarEntrega(
+  _anterior: EstadoAccion,
+  formData: FormData,
+): Promise<EstadoAccion> {
+  const casoId = leerTexto(formData, "caso_id");
+  const correoId = leerTexto(formData, "correo_id");
+  if (!UUID.test(casoId) || !UUID.test(correoId)) return { mensaje: NO_VALIDO };
+  const resultado = await enviar(
+    "POST",
+    `/convivencia/correos/${correoId}/entrega`,
+  );
+  if (!resultado.ok) return { mensaje: resultado.mensaje };
+  volver(casoId, "entrega-revisada");
   return {};
 }
 
