@@ -18,6 +18,11 @@ const SECCIONES: SeccionMenu[] = [
       },
       // PB-053: casos abiertos desde una situación (/convivencia/casos/...)
       { href: "/convivencia/casos", texto: "Casos", icono: "escudo" },
+      {
+        href: "/convivencia/plan-gestion",
+        texto: "Plan de Gestión",
+        icono: "documentos",
+      },
       // PB-085 (HU-074): calendario, con la agenda de seguimientos en otra pestaña
       {
         href: "/convivencia/calendario",
@@ -51,7 +56,11 @@ const SECCIONES: SeccionMenu[] = [
     titulo: "Normativa",
     enlaces: [
       // PB-081 y PB-083: protocolos de la escuela, que se aplican en los casos (PB-082)
-      { href: "/convivencia/protocolos", texto: "Protocolos", icono: "protocolos" },
+      {
+        href: "/convivencia/protocolos",
+        texto: "Protocolos",
+        icono: "protocolos",
+      },
       // PB-117 a PB-119 (Camilo): consulta del reglamento con IA, solo para Convivencia
       {
         href: "/convivencia/reglamento",
@@ -69,9 +78,17 @@ const SECCIONES: SeccionMenu[] = [
     titulo: "Configuración",
     enlaces: [
       // PB-030 (Camilo): catálogo de categorías, el mismo del portal de administración
-      { href: "/convivencia/categorias", texto: "Categorías", icono: "categorias" },
+      {
+        href: "/convivencia/categorias",
+        texto: "Categorías",
+        icono: "categorias",
+      },
       // PB-089 (Camilo): reglas de aviso, las mismas del portal de administración
-      { href: "/convivencia/reglas", texto: "Reglas de aviso", icono: "reglas" },
+      {
+        href: "/convivencia/reglas",
+        texto: "Reglas de aviso",
+        icono: "reglas",
+      },
     ],
   },
 ];

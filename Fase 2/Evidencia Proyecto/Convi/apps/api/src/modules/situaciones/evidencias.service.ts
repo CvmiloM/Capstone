@@ -8,6 +8,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { contextoGestion } from '../gestion/gestion.service.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
@@ -132,7 +133,9 @@ type Origen = {
     | 'caso_id'
     | 'actuacion_id'
     | 'compromiso_id'
-    | 'aclaracion_id';
+    | 'aclaracion_id'
+    | 'accion_plan_id'
+    | 'actividad_plan_id';
   id: string;
   /** PB-055 (HU-048 CA3): paso del protocolo del caso al que respalda. */
   paso_caso_id?: string;
@@ -152,6 +155,33 @@ export class EvidenciasService {
     @Inject(CuentaService) private readonly cuentas: CuentaService,
     @Inject(ALMACENAMIENTO) private readonly supabase: SupabaseClient,
   ) {}
+
+  adjuntarAGestion(
+    sesion: Sesion,
+    tipo: string,
+    id: string,
+    cuerpo: unknown,
+    archivo: ArchivoSubido | undefined,
+  ) {
+    if (tipo !== 'acciones' && tipo !== 'actividades')
+      throw new BadRequestException(
+        'La evidencia debe respaldar una acción o una actividad del Plan.',
+      );
+    const datos = validarEvidencia(cuerpo, archivo);
+    return this.guardar(
+      sesion,
+      ['CONVIVENCIA'],
+      datos,
+      archivo!,
+      async (db) => {
+        await contextoGestion(db, tipo, id, true);
+        return {
+          columna: tipo === 'acciones' ? 'accion_plan_id' : 'actividad_plan_id',
+          id,
+        };
+      },
+    );
+  }
 
   // El profesor solo adjunta a las situaciones que registró; si es de otra
   // persona se responde igual que si no existiera (como su detalle, PB-041).

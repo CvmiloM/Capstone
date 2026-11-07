@@ -28,6 +28,8 @@ type Evento = {
   caso_codigo: string | null;
   tipo_actuacion: string | null;
   accion_plan: string | null;
+  plan_nombre: string | null;
+  objetivo_plan: string | null;
   titulo: string;
   estado: string;
   dia: string;
@@ -90,6 +92,7 @@ const POR_DIA = 3;
 
 /** Registro de origen de cada evento, en el detalle de su caso. */
 function enlaceOrigen(e: Evento): string | null {
+  if (e.tipo === 'PLAN_GESTION') return `/convivencia/plan-gestion/actividades/${e.origen_id}`;
   if (!e.caso_id) return null;
   const caso = `/convivencia/casos/${e.caso_id}`;
   switch (e.tipo) {
@@ -420,7 +423,9 @@ function Fila({ evento: e }: { evento: Evento }) {
         {e.hora_fin &&
           (e.dia_fin === e.dia ? ` a ${e.hora_fin}` : ` hasta el ${e.dia_fin} ${e.hora_fin}`)}
         {e.caso_codigo && `, caso ${e.caso_codigo}`}
-        {e.accion_plan && `, acción del Plan: ${e.accion_plan}`}
+        {e.plan_nombre && `, Plan ${e.plan_nombre}`}
+        {e.objetivo_plan && `, objetivo ${e.objetivo_plan}`}
+        {e.accion_plan && `, acción ${e.accion_plan}`}
       </p>
     </>
   );
