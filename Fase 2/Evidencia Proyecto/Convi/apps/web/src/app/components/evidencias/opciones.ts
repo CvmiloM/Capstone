@@ -53,6 +53,8 @@ export const LARGO_MOTIVO_CORRECCION = { minimo: 10, maximo: 500 } as const;
 
 /** Dónde se adjunta: decide la ruta de la API y a qué página se vuelve. */
 export type DestinoEvidencia =
+  | "convivencia-accion-gestion"
+  | "convivencia-actividad-gestion"
   | "convivencia-situacion"
   | "convivencia-caso"
   // PB-055 (HU-048 CA3): evidencia del caso que respalda un paso del protocolo.

@@ -49,6 +49,24 @@ export class EvidenciasConvivenciaController {
     @Inject(EvidenciasService) private readonly evidencias: EvidenciasService,
   ) {}
 
+  @Post('gestion/:tipo/:id/evidencias')
+  @UseInterceptors(CARGA)
+  adjuntarAGestion(
+    @Req() peticion: PeticionConSesion,
+    @Param('tipo') tipo: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cuerpo: unknown,
+    @UploadedFile() archivo: ArchivoSubido | undefined,
+  ) {
+    return this.evidencias.adjuntarAGestion(
+      peticion.sesion,
+      tipo,
+      id,
+      cuerpo,
+      archivo,
+    );
+  }
+
   // Responde 201 con el id de la evidencia.
   @Post('situaciones/:id/evidencias')
   @UseInterceptors(CARGA)

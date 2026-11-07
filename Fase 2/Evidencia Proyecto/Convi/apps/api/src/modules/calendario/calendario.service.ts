@@ -17,6 +17,8 @@ export type EventoCalendario = {
   tipo_actuacion: string | null;
   /** Acción del Plan de Gestión a la que pertenece la actividad (CA3). */
   accion_plan: string | null;
+  plan_nombre: string | null;
+  objetivo_plan: string | null;
   titulo: string;
   estado: string;
   /** AAAA-MM-DD y HH:MI en la zona horaria de la escuela. */
@@ -73,7 +75,8 @@ export class CalendarioService {
              FROM m
            ), eventos AS (
              SELECT v.tipo, v.origen_id, v.caso_id, c.codigo AS caso_codigo,
-               a.tipo_actuacion, ap.titulo AS accion_plan, v.titulo, v.estado, v.inicio,
+               a.tipo_actuacion, ap.titulo AS accion_plan, pg.nombre AS plan_nombre,
+               og.titulo AS objetivo_plan, v.titulo, v.estado, v.inicio,
                to_char(v.inicio, 'YYYY-MM-DD') AS dia, to_char(v.inicio, 'HH24:MI') AS hora,
                to_char(v.fin, 'YYYY-MM-DD') AS dia_fin, to_char(v.fin, 'HH24:MI') AS hora_fin,
                v.estado = ANY($3::text[]) AS terminado,
@@ -85,6 +88,8 @@ export class CalendarioService {
              LEFT JOIN convi.actividades_plan_gestion g
                ON v.tipo = 'PLAN_GESTION' AND g.id = v.origen_id
              LEFT JOIN convi.acciones_plan_gestion ap ON ap.id = g.accion_plan_id
+             LEFT JOIN convi.objetivos_plan_gestion og ON og.id = ap.objetivo_id
+             LEFT JOIN convi.planes_gestion pg ON pg.id = og.plan_gestion_id
              WHERE v.inicio >= r.desde::timestamptz
                AND v.inicio < (r.hasta + 1)::timestamptz
                AND ($2::text[] IS NULL OR v.tipo = ANY($2::text[]))

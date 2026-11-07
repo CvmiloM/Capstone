@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { GestionModule } from './modules/gestion/gestion.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AcademicoModule } from './modules/academico/academico.module.js';
@@ -19,6 +20,7 @@ import { SituacionesModule } from './modules/situaciones/situaciones.module.js';
 
 @Module({
   imports: [
+    GestionModule,
     AcademicoModule,
     AdminModule,
     AuthModule,

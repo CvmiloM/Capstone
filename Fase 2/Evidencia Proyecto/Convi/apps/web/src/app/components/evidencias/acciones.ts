@@ -13,6 +13,14 @@ const DESTINOS: Record<
   DestinoEvidencia,
   (id: string, detalle: string) => { api: string; volver: string }
 > = {
+  "convivencia-accion-gestion": (id) => ({
+    api: `/convivencia/gestion/acciones/${id}/evidencias`,
+    volver: `/convivencia/plan-gestion/acciones/${id}?seccion=resultados&guardado=1`,
+  }),
+  "convivencia-actividad-gestion": (id) => ({
+    api: `/convivencia/gestion/actividades/${id}/evidencias`,
+    volver: `/convivencia/plan-gestion/actividades/${id}?seccion=resultados&guardado=1`,
+  }),
   "convivencia-situacion": (id) => ({
     api: `/convivencia/situaciones/${id}/evidencias`,
     volver: `/convivencia/situaciones/${id}?seccion=evidencias&aviso=evidencia`,
