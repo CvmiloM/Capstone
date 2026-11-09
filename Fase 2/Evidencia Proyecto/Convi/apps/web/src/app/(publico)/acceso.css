@@ -1,0 +1,219 @@
+/*
+ * Estilos de las páginas de acceso ((publico)/layout.tsx): inicio de sesión,
+ * registro, activación, recuperación y segundo factor. Continúan la landing,
+ * con la misma pila de carpetas: al entrar no cambia el fondo y las carpetas
+ * suben igual que en la primera pantalla. Van con el prefijo acc- porque
+ * next.config.ts trata todo archivo .css como global.
+ *
+ * Solo usa los colores con nombre de globals.css.
+ */
+.acc-pagina {
+  --margen: clamp(16px, 4vw, 56px);
+  --acc-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Los formularios son los mismos de toda la app: aquí adentro sus colores
+     comunes toman la paleta de la landing, sin tocar el resto de los portales. */
+  --background: var(--crema);
+  --foreground: var(--tinta);
+  --card-foreground: var(--tinta);
+  --primary: var(--tinta);
+  --primary-foreground: var(--crema);
+  --muted: color-mix(in oklab, var(--tinta) 7%, var(--crema));
+  --muted-foreground: var(--pizarra);
+  --accent: color-mix(in oklab, var(--menta) 24%, var(--crema));
+  --accent-foreground: var(--tinta);
+  --border: color-mix(in oklab, var(--tinta) 14%, var(--crema));
+  --input: color-mix(in oklab, var(--tinta) 50%, var(--crema));
+  --ring: var(--verde);
+
+  background: var(--tinta);
+  color: var(--tinta);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* La franja reservada para la barra de desplazamiento también va en tinta.
+   Next deja las páginas visitadas ocultas con display: none, por eso se pide
+   que esta siga a la vista: si no, el fondo pasaría a los portales. */
+html:has(.acc-pagina:not([style*="none"])) {
+  background: var(--tinta);
+}
+
+/* ---------- Barra: la misma de la landing ---------- */
+.acc-barra {
+  position: relative;
+  display: flex;
+  height: 72px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--margen);
+  color: var(--crema);
+}
+
+.acc-barra a:focus-visible {
+  outline-color: var(--crema);
+}
+
+.acc-volver {
+  position: absolute;
+  right: var(--margen);
+  font-weight: 600;
+}
+
+.acc-nombre {
+  color: var(--crema);
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(56px, 6vw, 96px);
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  text-align: center;
+  animation: acc-aparece 800ms var(--acc-expo) both;
+}
+
+/* ---------- La pila de carpetas ---------- */
+.acc-carpetas {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  /* Deja lugar a la primera pestaña; lo que sube desde abajo no crea barra. */
+  padding-top: clamp(40px, 6svh, 60px);
+  padding-inline: var(--margen);
+  overflow: clip;
+}
+
+.acc-carpeta {
+  --alto-pestana: 24px;
+  position: relative;
+  height: 34px;
+  flex-shrink: 0;
+  background: var(--fondo);
+  animation: acc-sube 900ms var(--acc-expo) calc(100ms + var(--i) * 70ms) both;
+}
+
+.acc-pestana {
+  position: absolute;
+  top: calc(-1 * var(--alto-pestana) + 1px);
+  left: var(--x);
+  height: var(--alto-pestana);
+  min-width: 11rem;
+  background: var(--fondo);
+  clip-path: polygon(12% 0, 88% 0, 100% 100%, 0 100%);
+}
+
+.acc-frente {
+  --alto-pestana: 34px;
+  display: flex;
+  height: auto;
+  flex: 1;
+  justify-content: center;
+  padding-inline: 16px;
+  padding-bottom: 48px;
+}
+
+.acc-frente .acc-pestana {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.acc-contenido {
+  width: 100%;
+  max-width: 27rem;
+  padding-top: clamp(28px, 4svh, 44px);
+}
+
+/* ---------- Los formularios dentro de la carpeta ---------- */
+.acc-frente h1,
+.acc-frente h2 {
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.acc-frente h1 {
+  font-size: clamp(28px, 2.4vw, 34px);
+  line-height: 1.1;
+}
+
+/* Las esquinas rectas de las carpetas y las tarjetas de la landing. */
+.acc-frente .rounded-lg,
+.acc-frente .rounded-xl,
+.acc-frente .rounded-md,
+.acc-frente .rounded {
+  border-radius: 0;
+}
+
+/* El botón principal de la landing. */
+.acc-frente .bg-primary {
+  min-height: 3.5rem;
+  background-color: var(--naranjo);
+  color: var(--tinta);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.acc-frente .bg-primary:hover:not(:disabled),
+.acc-frente .bg-primary:active:not(:disabled) {
+  background-color: var(--amarillo);
+}
+
+.acc-frente a.text-primary {
+  font-weight: 600;
+  text-decoration-line: underline;
+}
+
+@keyframes acc-aparece {
+  from {
+    opacity: 0;
+    translate: 0 24px;
+  }
+}
+
+@keyframes acc-sube {
+  from {
+    translate: 0 120px;
+  }
+}
+
+@media (max-width: 767px) {
+  .acc-carpetas {
+    padding-inline: 0;
+  }
+
+  .acc-carpeta {
+    --alto-pestana: 20px;
+    height: 28px;
+  }
+
+  .acc-pestana {
+    left: var(--x-telefono);
+    min-width: 7rem;
+  }
+
+  .acc-frente {
+    --alto-pestana: 30px;
+  }
+}
+
+/* En pantallas bajas se achica la cabecera para que el formulario quepa. */
+@media (min-width: 768px) and (max-height: 840px) {
+  .acc-nombre {
+    font-size: 52px;
+  }
+
+  .acc-carpetas {
+    padding-top: 32px;
+  }
+
+  .acc-carpeta {
+    --alto-pestana: 18px;
+    height: 24px;
+  }
+
+  .acc-frente {
+    --alto-pestana: 30px;
+  }
+}
