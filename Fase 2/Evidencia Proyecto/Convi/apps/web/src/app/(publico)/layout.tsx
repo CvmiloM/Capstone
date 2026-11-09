@@ -1,51 +1,69 @@
-import type { ReactNode } from "react";
+import Image from "next/image";
+import type { CSSProperties, ReactNode } from "react";
+import mascota from "@/assets/convi-favicon.png";
+import { EnlaceConCarga } from "@/app/components/actividad";
+import "./acceso.css";
 
-function Marca() {
-  return (
-    <div className="flex flex-col items-center text-center">
-      <span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-tarjeta ring-4 ring-card">
-        {/* Libro abierto */}
-        <svg
-          viewBox="0 0 24 24"
-          className="size-6"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 6.5C9.5 5 6 4.5 3 5.5v13c3-1 6.5-.5 9 1 2.5-1.5 6-2 9-1v-13c-3-1-6.5-.5-9 1Z" />
-          <path d="M12 6.5v13" />
-        </svg>
-      </span>
-      <p className="mt-4 font-serif text-2xl font-semibold tracking-[0.2em] text-primary">
-        CONVI
-      </p>
-      <span aria-hidden="true" className="mt-2 h-0.5 w-8 rounded-full bg-highlight" />
-      <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-        Convivencia escolar
-      </p>
-    </div>
-  );
-}
+// Las páginas de acceso continúan la landing: el mismo fondo, la misma barra y
+// la misma pila de carpetas, con el formulario en la carpeta de adelante.
+const CARPETAS = [
+  { fondo: "var(--pizarra)", x: "4%", xTelefono: "4%" },
+  { fondo: "var(--menta)", x: "25%", xTelefono: "34%" },
+  { fondo: "var(--amarillo)", x: "47%", xTelefono: "62%" },
+  { fondo: "var(--niebla)", x: "70%", xTelefono: "10%" },
+];
+
+const estiloCarpeta = (
+  i: number,
+  fondo: string,
+  x: string,
+  xTelefono: string,
+) =>
+  ({
+    "--i": i,
+    "--fondo": fondo,
+    "--x": x,
+    "--x-telefono": xTelefono,
+  }) as CSSProperties;
 
 export default function LayoutPublico({ children }: { children: ReactNode }) {
   return (
-    <main className="relative isolate flex flex-1 items-center justify-center px-4 py-12">
-      <div aria-hidden="true" className="fondo-cuaderno absolute inset-0 -z-10" />
-
-      <div className="w-full max-w-md">
-        <Marca />
-        <div className="relative mt-8 overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-tarjeta sm:p-8">
-          {/* Franja superior, como membrete */}
+    <div className="acc-pagina flex flex-1 flex-col font-cuerpo">
+      <nav aria-label="Principal" className="acc-barra">
+        <EnlaceConCarga href="/" aria-label="Convi, inicio" className="rounded-full">
+          <Image src={mascota} alt="" priority className="block size-12" />
+        </EnlaceConCarga>
+        <EnlaceConCarga
+          href="/"
+          className="acc-volver underline decoration-transparent underline-offset-4 transition-colors duration-200 hover:decoration-current"
+        >
+          Volver al inicio
+        </EnlaceConCarga>
+      </nav>
+      <main className="flex flex-1 flex-col">
+        <p className="acc-nombre">Convi</p>
+        <div className="acc-carpetas">
+          {CARPETAS.map(({ fondo, x, xTelefono }, i) => (
+            <div
+              key={fondo}
+              aria-hidden="true"
+              className="acc-carpeta"
+              style={estiloCarpeta(i, fondo, x, xTelefono)}
+            >
+              <span className="acc-pestana" />
+            </div>
+          ))}
           <div
-            aria-hidden="true"
-            className="absolute inset-x-0 top-0 h-1 bg-primary"
-          />
-          {children}
+            className="acc-carpeta acc-frente"
+            style={estiloCarpeta(CARPETAS.length, "var(--crema)", "8%", "58%")}
+          >
+            <span aria-hidden="true" className="acc-pestana">
+              Acceso
+            </span>
+            <div className="acc-contenido">{children}</div>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
