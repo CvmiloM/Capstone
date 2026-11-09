@@ -256,7 +256,6 @@ export default async function Calendario({
             <Link
               key={t.tipo}
               href={alternar(t.tipo)}
-              aria-pressed={activo}
               className={`presion inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
                 activo
                   ? "border-primary/30 bg-accent text-accent-foreground"
@@ -265,6 +264,10 @@ export default async function Calendario({
             >
               <span aria-hidden className={`size-2.5 rounded-full ${t.color}`} />
               {t.texto}
+              {/* PB-136: aria-pressed no vale en un enlace, el estado va en texto. */}
+              <span className="sr-only">
+                {activo ? ", se muestran" : ", ocultos"}
+              </span>
             </Link>
           );
         })}
@@ -311,18 +314,24 @@ export default async function Calendario({
                           ? "text-muted-foreground/60"
                           : "text-foreground"
                     }`}
-                    aria-label={hoy ? `Hoy, ${nombreDia(dia)}` : nombreDia(dia)}
                   >
-                    {Number(dia.slice(8))}
+                    {/* Un span sin rol ignora aria-label: el nombre del día va en texto oculto. */}
+                    <span aria-hidden="true">{Number(dia.slice(8))}</span>
+                    <span className="sr-only">
+                      {hoy ? `Hoy, ${nombreDia(dia)}` : nombreDia(dia)}
+                    </span>
                   </span>
                 </div>
-                <ul className="space-y-1">
-                  {eventos.slice(0, POR_DIA).map((e) => (
-                    <li key={`${e.tipo}-${e.origen_id}`}>
-                      <Chip evento={e} />
-                    </li>
-                  ))}
-                </ul>
+                {/* PB-136: sin eventos no hay lista, así el lector no anuncia 42 listas vacías. */}
+                {eventos.length > 0 && (
+                  <ul className="space-y-1">
+                    {eventos.slice(0, POR_DIA).map((e) => (
+                      <li key={`${e.tipo}-${e.origen_id}`}>
+                        <Chip evento={e} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {eventos.length > POR_DIA && (
                   <a
                     href={`#dia-${dia}`}

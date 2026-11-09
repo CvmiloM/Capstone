@@ -181,7 +181,14 @@ function OrientacionIA({
   const [estado, accion, pendiente] = useActionState(orientar, estadoInicial);
   const [paso, setPaso] = useState(0);
   const pregunta = useRef<HTMLTextAreaElement>(null);
+  const respuesta = useRef<HTMLDivElement>(null);
   const resultado = estado.resultado;
+
+  // PB-136: el botón se desactiva mientras la IA responde y el foco se
+  // perdía, al llegar la respuesta el foco va a ella y el lector la anuncia.
+  useEffect(() => {
+    if (resultado && !pendiente) respuesta.current?.focus();
+  }, [resultado, pendiente]);
 
   useEffect(() => {
     if (!pendiente) return;
@@ -287,8 +294,11 @@ function OrientacionIA({
 
       {resultado && !pendiente && (
         <div
-          aria-live="polite"
-          className="space-y-4 border-t border-border pt-4"
+          ref={respuesta}
+          role="region"
+          aria-label="Respuesta de CONVI IA"
+          tabIndex={-1}
+          className="space-y-4 border-t border-border pt-4 outline-none"
         >
           <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
             {textos.aviso}
