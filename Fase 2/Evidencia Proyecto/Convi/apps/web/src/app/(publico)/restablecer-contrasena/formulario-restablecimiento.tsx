@@ -1,5 +1,6 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
 import Link from "next/link";
 import { useActionState } from "react";
 import { CampoContrasena } from "@/app/components/campo-contrasena";
@@ -32,7 +33,7 @@ export function FormularioRestablecimiento({
     estadoInicial,
   );
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.paso !== "invalido" &&
         (tokenHash ? (
@@ -85,6 +86,6 @@ export function FormularioRestablecimiento({
           Solicitar otro enlace
         </Link>
       </p>
-    </form>
+    </FormularioConCarga>
   );
 }

@@ -13,7 +13,7 @@ export default async function PaginaCaso({ params, searchParams }: { params: Pro
   const ruta = `/apoderado/estudiantes/${id}/casos/${casoId}`;
   const fecha = (valor: string) => new Intl.DateTimeFormat("es-CL", { timeZone: datos!.zona_horaria, dateStyle: "medium", timeStyle: "short" }).format(new Date(valor));
   return <>
-    <Link href={`/apoderado/estudiantes/${id}`} prefetch={false} className={`text-sm ${claseEnlace}`}>← Volver a los casos del pupilo</Link>
+    <Link href={`/apoderado/estudiantes/${id}`} prefetch={false} className={`text-sm ${claseEnlace}`}><span aria-hidden="true">← </span>Volver a los casos del pupilo</Link>
     {!datos ? <div className="mt-5"><AvisoError>El caso no está disponible o tu permiso ya no está vigente, pide al administrador que revise tu acceso</AvisoError></div> : <>
       <div className="mt-5"><Encabezado titulo={datos.caso.titulo} descripcion={`${datos.estudiante.nombre} · ${datos.caso.codigo}`} /></div>
       <section aria-label="Resumen del caso" className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-tarjeta">

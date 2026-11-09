@@ -1,5 +1,6 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
 import { useActionState, type ReactNode } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
 import { crearEscuela, type EstadoEscuela } from "./acciones";
@@ -68,7 +69,7 @@ export function FormularioEscuela() {
   const errores = estado.errores ?? {};
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
 
       <Campo
@@ -155,6 +156,6 @@ export function FormularioEscuela() {
       <BotonEnviar pendiente={pendiente} textoPendiente="Creando establecimiento…">
         Crear establecimiento
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

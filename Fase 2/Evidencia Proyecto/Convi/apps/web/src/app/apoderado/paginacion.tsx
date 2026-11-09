@@ -6,9 +6,9 @@ export function Paginacion({ total, pagina, ruta }: { total: number; pagina: num
   return <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
     <p>{total} {total === 1 ? "registro" : "registros"}, hasta 50 por página</p>
     {paginas > 1 && <nav aria-label="Páginas" className="flex items-center gap-4">
-      {pagina > 1 && <Link href={`${ruta}?pagina=${pagina - 1}`} prefetch={false} className={claseEnlace}>← Anterior</Link>}
+      {pagina > 1 && <Link href={`${ruta}?pagina=${pagina - 1}`} prefetch={false} className={claseEnlace}><span aria-hidden="true">← </span>Anterior</Link>}
       <span>Página {pagina} de {paginas}</span>
-      {pagina < paginas && <Link href={`${ruta}?pagina=${pagina + 1}`} prefetch={false} className={claseEnlace}>Siguiente →</Link>}
+      {pagina < paginas && <Link href={`${ruta}?pagina=${pagina + 1}`} prefetch={false} className={claseEnlace}>Siguiente<span aria-hidden="true"> →</span></Link>}
     </nav>}
   </div>;
 }

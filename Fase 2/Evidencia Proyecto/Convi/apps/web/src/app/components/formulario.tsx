@@ -100,7 +100,8 @@ export function AvisoError({ children }: { children: ReactNode }) {
   return (
     <div
       role="alert"
-      className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+      tabIndex={-1}
+      className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-sm text-destructive outline-none"
     >
       {children}
     </div>

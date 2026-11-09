@@ -3,6 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { PasoConFoco } from "@/app/components/paso-con-foco";
 import {
   configurarSegundoFactor,
   consultarSegundoFactor,
@@ -61,6 +62,7 @@ export function FormularioSegundoFactor({
     enviar("confirmar");
   }
 
+  const vista = (() => {
   if (paso === "bloqueado" || paso === "sin-sesion") {
     return (
       <div className="space-y-5">
@@ -264,4 +266,7 @@ export function FormularioSegundoFactor({
       </button>
     </form>
   );
+  })();
+
+  return <PasoConFoco clave={estado}>{vista}</PasoConFoco>;
 }
