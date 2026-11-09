@@ -1,5 +1,6 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
 import { useActionState } from "react";
 import { BotonEnviar, Campo } from "@/app/components/formulario";
 import { LARGO_MAXIMO } from "../limites";
@@ -21,7 +22,7 @@ export function FormularioRecuperacion() {
       </p>
     );
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       <Campo
         name="correo"
         etiqueta="Correo"
@@ -35,6 +36,6 @@ export function FormularioRecuperacion() {
       <BotonEnviar pendiente={pendiente} textoPendiente="Solicitando…">
         Enviar enlace
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

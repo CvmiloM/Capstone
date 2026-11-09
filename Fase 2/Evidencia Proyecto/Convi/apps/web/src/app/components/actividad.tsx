@@ -10,6 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { createPortal, useFormStatus } from "react-dom";
+import { enfocarPrimerError } from "./foco-error";
 
 const operaciones = new Map<symbol, "navegacion" | "envio">();
 const observadores = new Set<() => void>();
@@ -129,7 +130,22 @@ export function EnlaceConCarga({
 
 function EstadoFormulario() {
   const { pending } = useFormStatus();
-  return <CargaActiva activa={pending} envio />;
+  // PB-136: al terminar un envío, el foco va al primer error del formulario.
+  const marca = useRef<HTMLSpanElement>(null);
+  const enviando = useRef(false);
+  useEffect(() => {
+    if (enviando.current && !pending) {
+      const formulario = marca.current?.closest("form");
+      if (formulario) enfocarPrimerError(formulario);
+    }
+    enviando.current = pending;
+  }, [pending]);
+  return (
+    <>
+      <span ref={marca} hidden />
+      <CargaActiva activa={pending} envio />
+    </>
+  );
 }
 
 export function FormularioConCarga({

@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
+import { PasoConFoco } from "@/app/components/paso-con-foco";
 import {
   AvisoError,
   BotonEnviar,
@@ -43,6 +44,7 @@ export function FormularioVerificacion({
     });
   }
 
+  const vista = (() => {
   if (estado.paso === "codigo") {
     return (
       <form onSubmit={confirmar} noValidate className="space-y-5">
@@ -162,4 +164,7 @@ export function FormularioVerificacion({
       </Link>
     </div>
   );
+  })();
+
+  return <PasoConFoco clave={estado}>{vista}</PasoConFoco>;
 }

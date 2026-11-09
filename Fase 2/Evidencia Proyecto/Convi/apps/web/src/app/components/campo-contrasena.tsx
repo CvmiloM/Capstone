@@ -20,6 +20,7 @@ export function CampoContrasena(
           className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         >
           {visible ? "Ocultar" : "Mostrar"}
+          <span className="sr-only"> contraseña</span>
         </button>
       }
     />

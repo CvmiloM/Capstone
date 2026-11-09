@@ -1,5 +1,6 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
 import { useActionState } from "react";
 import { iniciarSesion, type EstadoFormulario } from "../acciones";
 import { CampoContrasena } from "@/app/components/campo-contrasena";
@@ -12,7 +13,7 @@ export function FormularioLogin() {
   const [estado, accion, pendiente] = useActionState(iniciarSesion, estadoInicial);
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
 
       <Campo
@@ -36,6 +37,6 @@ export function FormularioLogin() {
       <BotonEnviar pendiente={pendiente} textoPendiente="Ingresando…">
         Iniciar sesión
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

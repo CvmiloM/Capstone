@@ -25,6 +25,7 @@ export function BuscarEstudiantes({
 }) {
   const id = useId();
   const solicitud = useRef(0);
+  const campoBuscar = useRef<HTMLInputElement>(null);
   const [buscar, setBuscar] = useState("");
   const [curso, setCurso] = useState("");
   const [estado, setEstado] = useState("");
@@ -65,6 +66,13 @@ export function BuscarEstudiantes({
     }
   }
   function agregar(e: Estudiante) {
+    // PB-136: el lector de pantalla confirma qué pasó, y el botón no se
+    // desactiva para que el foco no se pierda.
+    setEstado(
+      informante
+        ? `Elegiste a ${e.nombres} ${e.apellidos} como persona que informó`
+        : `Agregaste a ${e.nombres} ${e.apellidos}, elige su rol en la lista de participantes`,
+    );
     setSeleccion((prev) =>
       informante
         ? [{ ...e, rol: "" }]
@@ -87,6 +95,7 @@ export function BuscarEstudiantes({
         <label htmlFor={id} className="text-sm font-medium">
           Nombre, apellido o RUT
           <input
+            ref={campoBuscar}
             id={id}
             type="search"
             maxLength={100}
@@ -141,13 +150,19 @@ export function BuscarEstudiantes({
               </div>
               <button
                 type="button"
-                disabled={seleccion.some((x) => x.id === e.id)}
-                onClick={() => agregar(e)}
-                className={claseBotonSecundario}
+                aria-disabled={seleccion.some((x) => x.id === e.id) || undefined}
+                onClick={() => {
+                  if (!seleccion.some((x) => x.id === e.id)) agregar(e);
+                }}
+                className={`${claseBotonSecundario} aria-disabled:cursor-not-allowed aria-disabled:opacity-60`}
               >
                 {seleccion.some((x) => x.id === e.id)
                   ? "Seleccionado"
                   : "Seleccionar"}
+                <span className="sr-only">
+                  {" "}
+                  a {e.nombres} {e.apellidos}
+                </span>
               </button>
             </li>
           ))}
@@ -189,9 +204,12 @@ export function BuscarEstudiantes({
               )}
               <button
                 type="button"
-                onClick={() =>
-                  setSeleccion((prev) => prev.filter((x) => x.id !== e.id))
-                }
+                onClick={() => {
+                  setSeleccion((prev) => prev.filter((x) => x.id !== e.id));
+                  // El botón desaparece: el foco vuelve a la búsqueda.
+                  setEstado(`Quitaste a ${e.nombres} ${e.apellidos}`);
+                  campoBuscar.current?.focus();
+                }}
                 className="rounded-lg px-3 py-2 text-sm text-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
               >
                 Quitar<span className="sr-only"> a {e.nombres}</span>

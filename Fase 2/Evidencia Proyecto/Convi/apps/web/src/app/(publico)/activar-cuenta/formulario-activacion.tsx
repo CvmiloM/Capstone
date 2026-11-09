@@ -1,5 +1,6 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
 import { useActionState } from "react";
 import { activarCuenta, type EstadoFormulario } from "../acciones";
 import { CampoContrasena } from "@/app/components/campo-contrasena";
@@ -23,7 +24,7 @@ export function FormularioActivacion({
   );
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
 
       <input type="hidden" name="token_hash" value={tokenHash} />
@@ -49,6 +50,6 @@ export function FormularioActivacion({
       <BotonEnviar pendiente={pendiente} textoPendiente="Activando…">
         Activar cuenta
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }

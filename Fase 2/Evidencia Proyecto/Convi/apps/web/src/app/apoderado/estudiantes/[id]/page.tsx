@@ -9,7 +9,7 @@ export default async function PaginaEstudiante({ params, searchParams }: { param
   const { id } = await params;
   const datos = await obtenerCasos(id, numeroPagina((await searchParams).pagina));
   return <>
-    <Link href="/apoderado" prefetch={false} className={`text-sm ${claseEnlace}`}>← Volver a mis pupilos</Link>
+    <Link href="/apoderado" prefetch={false} className={`text-sm ${claseEnlace}`}><span aria-hidden="true">← </span>Volver a mis pupilos</Link>
     {!datos ? <div className="mt-5"><AvisoError>No tienes acceso disponible a este pupilo, pide al administrador que revise tu permiso</AvisoError></div> : <>
       <div className="mt-5"><Encabezado titulo={datos.estudiante.nombre} descripcion={<>Casos relacionados con tu pupilo, incluidos los cerrados{datos.casos.length > 0 && <span className="mt-2 block">Pulsa sobre cualquiera de los casos para ver más detalles</span>}</>} /></div>
       {!datos.casos.length && <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">No hay casos registrados para este pupilo</p>}

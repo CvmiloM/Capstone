@@ -1,5 +1,6 @@
 "use client";
 
+import { FormularioConCarga } from "@/app/components/actividad";
 import { useActionState } from "react";
 import { registrarAdministrador, type EstadoFormulario } from "../acciones";
 import { CampoContrasena } from "@/app/components/campo-contrasena";
@@ -33,7 +34,7 @@ export function FormularioRegistro() {
   }
 
   return (
-    <form action={accion} noValidate className="space-y-5">
+    <FormularioConCarga action={accion} noValidate className="space-y-5">
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
 
       <div className="grid gap-5 sm:grid-cols-2">
@@ -96,6 +97,6 @@ export function FormularioRegistro() {
       <BotonEnviar pendiente={pendiente} textoPendiente="Creando cuenta…">
         Crear cuenta
       </BotonEnviar>
-    </form>
+    </FormularioConCarga>
   );
 }
