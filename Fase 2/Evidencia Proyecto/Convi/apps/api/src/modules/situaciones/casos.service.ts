@@ -259,19 +259,26 @@ export class CasosService {
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
+        // La última actividad ordena la lista, así que se necesita la de todos
+        // los casos filtrados: se lee la cronología una sola vez, agrupada por
+        // caso. Consultarla caso por caso tardaba más de un minuto con 1.156
+        // casos y la API cortaba la consulta a los 5 s; agrupada tarda menos
+        // de medio segundo y da las mismas fechas.
         const resultado = await db.query<PaginaCasos>(
           `WITH filtrados AS MATERIALIZED (
              SELECT c.id, c.registrado_en FROM convi.casos c WHERE ${CONDICIONES_CASOS}
            ), cuenta AS (
              SELECT count(*)::int AS total,
                least($8::int, greatest(1, ceil(count(*)::numeric / $9)::int)) AS pagina FROM filtrados
+           ), ultima AS MATERIALIZED (
+             SELECT v.caso_id, max(v.fecha_registro) AS fecha
+             FROM convi.vw_cronologia_caso v
+             WHERE v.establecimiento_id = $10::uuid
+             GROUP BY v.caso_id
            ), elegidos AS MATERIALIZED (
              SELECT f.id, coalesce(u.fecha, f.registrado_en) AS ultima_actividad
              FROM filtrados f
-             LEFT JOIN LATERAL (
-               SELECT max(v.fecha_registro) AS fecha FROM convi.vw_cronologia_caso v
-               WHERE v.caso_id = f.id AND v.establecimiento_id = $10::uuid
-             ) u ON true
+             LEFT JOIN ultima u ON u.caso_id = f.id
              ORDER BY ultima_actividad DESC, f.id DESC
              LIMIT $9 OFFSET (SELECT (pagina - 1) * $9 FROM cuenta)
            )
