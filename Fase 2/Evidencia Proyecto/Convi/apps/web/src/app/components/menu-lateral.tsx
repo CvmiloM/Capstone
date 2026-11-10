@@ -37,7 +37,9 @@ function direccionPorRuta(desde: string, hacia: string) {
 }
 
 /**
- * Menú lateral común de los portales, al estilo de Apple:
+ * Menú lateral común de los portales, al estilo de Apple. Siempre en vertical
+ * y con sus grupos: en el celular se abre en un cajón con el botón Menú (menu-portal.tsx).
+ * Al estilo de Apple:
  * - El resaltado azul es un solo elemento que se desliza con un resorte
  *   (--resorte, en globals.css) hasta la sección que corresponde a la ruta actual.
  * - Marca en <html data-navegacion> hacia dónde va cada navegación, para que
@@ -124,7 +126,7 @@ export function MenuLateral({
     <nav
       ref={menu}
       aria-label={etiqueta}
-      className="group relative flex gap-1 overflow-x-auto px-3 pb-3 [view-transition-name:menu-lateral] lg:flex-col lg:gap-5 lg:overflow-visible lg:py-4"
+      className="group relative flex flex-col gap-5 px-3 py-4 [view-transition-name:menu-lateral]"
     >
       {/* Un solo resaltado que se desliza, detrás del texto de los enlaces. */}
       <span
@@ -133,13 +135,13 @@ export function MenuLateral({
         className="pointer-events-none absolute top-0 left-0 rounded-lg bg-primary opacity-0 group-data-[resaltado=listo]:transition-[translate,width,height,opacity] group-data-[resaltado=listo]:duration-[420ms] group-data-[resaltado=listo]:ease-resorte"
       />
       {secciones.map(({ titulo, enlaces: grupo }) => (
-        <div key={titulo ?? "secciones"} className="flex lg:block">
+        <div key={titulo ?? "secciones"}>
           {titulo && (
-            <p className="hidden px-2.5 pb-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground lg:block">
+            <p className="px-2.5 pb-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               {titulo}
             </p>
           )}
-          <ul className="flex gap-1 lg:flex-col lg:gap-0.5">
+          <ul className="flex flex-col gap-0.5">
             {grupo.map((enlace) => {
               const indice = enlaces.indexOf(enlace);
               const marcado = indice === resaltado;

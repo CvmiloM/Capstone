@@ -7,6 +7,7 @@ import {
   UsuarioPortal,
 } from "@/app/components/usuario-portal";
 import { SaltarContenido } from "@/app/components/saltar-contenido";
+import { MenuPortal } from "@/app/components/menu-portal";
 import { Navegacion } from "./navegacion";
 
 // Portal del perfil CONVIVENCIA (PB-044). El proxy de PB-009 exige sesión,
@@ -21,36 +22,47 @@ export default function LayoutConvivencia({
     <div className="flex flex-1 flex-col lg:flex-row">
       <SaltarContenido />
       <aside className="border-b border-border material-menu lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:shrink-0 lg:border-r lg:border-b-0">
-        <div className="flex items-center gap-2 px-4 pt-4 pb-3">
-          <Link
-            href="/convivencia"
-            className="rounded-lg focus-visible:outline-2 focus-visible:outline-ring"
-          >
-            <MarcaCompacta />
-          </Link>
-          <span className="rounded bg-accent px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-accent-foreground">
-            Convivencia
-          </span>
-        </div>
-
-        {/* Con cacheComponents, usePathname necesita un Suspense cuando la ruta
-            tiene partes dinámicas, como /convivencia/situaciones/[id]. */}
-        <Suspense
-          fallback={
-            <div
-              aria-hidden="true"
-              className="mx-3 my-3 h-9 animate-pulse rounded-lg bg-muted"
-            />
+        {/* En el celular, la marca y la persona quedan en una barra corta y
+            el menú se abre en un cajón con el botón Menú (menu-portal.tsx). */}
+        <MenuPortal
+          marca={
+            <>
+              <Link
+                href="/convivencia"
+                className="rounded-lg focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <MarcaCompacta />
+              </Link>
+              <span className="rounded bg-accent px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-accent-foreground">
+                Convivencia
+              </span>
+            </>
+          }
+          accesos={
+            <Suspense fallback={<EsqueletoUsuarioPortal compacto />}>
+              <UsuarioPortal compacto />
+            </Suspense>
           }
         >
-          <Navegacion />
-        </Suspense>
-        <div className="border-t border-border px-4 py-3">
-          <Suspense fallback={<EsqueletoUsuarioPortal />}>
-            <UsuarioPortal />
+          {/* Con cacheComponents, usePathname necesita un Suspense cuando la ruta
+              tiene partes dinámicas, como /convivencia/situaciones/[id]. */}
+          <Suspense
+            fallback={
+              <div
+                aria-hidden="true"
+                className="mx-3 my-3 h-9 animate-pulse rounded-lg bg-muted"
+              />
+            }
+          >
+            <Navegacion />
           </Suspense>
-          <BotonCerrarSesion />
-        </div>
+          <div className="border-t border-border px-4 py-3">
+            <Suspense fallback={<EsqueletoUsuarioPortal />}>
+              <UsuarioPortal />
+            </Suspense>
+            <BotonCerrarSesion />
+          </div>
+        </MenuPortal>
       </aside>
 
       <main
