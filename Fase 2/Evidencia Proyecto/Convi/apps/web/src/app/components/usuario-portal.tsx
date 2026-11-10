@@ -1,14 +1,20 @@
+import { cache } from "react";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { Icono } from "./icono";
 import { AvatarUsuario } from "./avatar-usuario";
 
-/** Identidad de la sesión y avisos propios, consultados solo en el servidor. */
-export async function UsuarioPortal({
-  compacto = false,
-}: {
-  compacto?: boolean;
-}) {
+type PerfilPortal = {
+  nombres: string;
+  apellidos: string;
+  codigo_perfil: string;
+  avisos_no_leidos: number;
+};
+
+// En el celular la persona aparece en la barra de arriba y en el computador
+// en el menú lateral: con cache, la sesión y el perfil se leen una sola vez
+// por página aunque el bloque se muestre en los dos lugares.
+const leerUsuarioPortal = cache(async () => {
   const supabase = await crearClienteServidor();
   // getClaims valida la firma del token antes de usar el correo.
   const { data } = await supabase.auth.getClaims();
@@ -24,12 +30,21 @@ export async function UsuarioPortal({
       signal: AbortSignal.timeout(10000),
     },
   ).catch(() => null);
-  const perfil: {
-    nombres: string;
-    apellidos: string;
-    codigo_perfil: string;
-    avisos_no_leidos: number;
-  } | null = respuesta?.ok ? await respuesta.json() : null;
+  const perfil: PerfilPortal | null = respuesta?.ok
+    ? await respuesta.json()
+    : null;
+  return { correo, perfil };
+});
+
+/** Identidad de la sesión y avisos propios, consultados solo en el servidor. */
+export async function UsuarioPortal({
+  compacto = false,
+}: {
+  compacto?: boolean;
+}) {
+  const usuario = await leerUsuarioPortal();
+  if (!usuario) return null;
+  const { correo, perfil } = usuario;
   const roles: Record<string, string> = {
     CONVIVENCIA: "Convivencia",
     PROFESOR: "Profesor",
