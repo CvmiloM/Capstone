@@ -11,8 +11,6 @@ const URL_API =
 
 const CODIGO = /^[A-Za-z0-9_-]{43}$/;
 
-export const dynamic = "force-dynamic";
-
 const sinEnlace = () =>
   new Response("El enlace del calendario no existe o se desactivó.", {
     status: 404,
