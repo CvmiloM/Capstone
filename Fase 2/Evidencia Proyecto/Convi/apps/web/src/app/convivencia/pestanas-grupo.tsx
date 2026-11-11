@@ -7,14 +7,10 @@ import { useLayoutEffect, useRef } from "react";
 // Pantallas que comparten una entrada del menú lateral de Convivencia. Cada
 // una conserva su dirección, así los enlaces de alertas, avisos y correos
 // siguen funcionando, y se cambia entre ellas con estas pestañas.
+// La Agenda de seguimientos pasó a ser el filtro Solo seguimientos del
+// calendario (refinamientos de Convivencia, sección 5.5), así que el
+// calendario ya no tiene pestañas.
 export const GRUPOS = {
-  agenda: {
-    etiqueta: "Calendario y agenda",
-    pestanas: [
-      { href: "/convivencia/calendario", texto: "Calendario" },
-      { href: "/convivencia/seguimientos", texto: "Agenda de seguimientos" },
-    ],
-  },
   consultas: {
     etiqueta: "Indicadores e informes",
     pestanas: [
