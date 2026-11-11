@@ -8,6 +8,7 @@ import { AvisoNoDisponible } from "../aviso-no-disponible";
 import { pedir } from "../datos";
 import { esSeguimiento, type MesCalendario, TIPOS, type TipoEvento } from "./eventos";
 import { GrillaCalendario } from "./grilla";
+import { type EstadoSuscripcion, SuscripcionCalendario } from "./suscripcion";
 
 // PB-085 (HU-074): calendario de Convivencia. Reúne en un mes las fechas de
 // encuentros y seguimientos, compromisos, pasos de protocolo, acciones de los
@@ -54,7 +55,15 @@ export default async function Calendario({
     mes: filtros.mes ?? "",
     tipos: soloSeguimientos ? "ACTUACION" : (filtros.tipos ?? ""),
   });
-  const r = await pedir<MesCalendario>(`/convivencia/calendario?${consulta}`);
+  // Refinamientos de Convivencia, sección 5: estado del enlace para Google
+  // Calendar, en paralelo con los eventos del mes. Si falla, el calendario se
+  // muestra igual, sin el botón.
+  const [r, s] = await Promise.all([
+    pedir<MesCalendario>(`/convivencia/calendario?${consulta}`),
+    pedir<EstadoSuscripcion>("/convivencia/calendario/suscripcion").catch(
+      () => ({ ok: false }) as const,
+    ),
+  ]);
   if (!r.ok) return <AvisoNoDisponible volverA="/convivencia" />;
   const c = r.datos;
   const eventos = soloSeguimientos ? c.eventos.filter(esSeguimiento) : c.eventos;
@@ -83,15 +92,20 @@ export default async function Calendario({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-titulo text-3xl font-semibold">
-          Calendario de Convivencia
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Las fechas de casos, protocolos, planes y Plan de Gestión en un solo
-          mes, elige un día para ver todos sus eventos y abre cada uno para
-          editarlo o reprogramarlo en su registro
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
+          <h1 className="font-titulo text-3xl font-semibold">
+            Calendario de Convivencia
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            Las fechas de casos, protocolos, planes y Plan de Gestión en un solo
+            mes, elige un día para ver todos sus eventos y abre cada uno para
+            editarlo o reprogramarlo en su registro
+          </p>
+        </div>
+        {s.ok && (
+          <SuscripcionCalendario estado={s.datos} zonaHoraria={c.zona_horaria} />
+        )}
       </header>
 
       <div className="flex flex-wrap items-end justify-between gap-4">
