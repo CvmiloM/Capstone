@@ -36,6 +36,12 @@ export async function guardarContenidoInforme(id: string,_estado: EstadoInforme,
   const entrada = {
     ...Object.fromEntries(["titulo","subtitulo","comentarios","tema","agrupacion","revision"].map(c=>[c,formulario.get(c)??""])),
     portada:formulario.get("portada")==="on",tablas:formulario.get("tablas")==="on",secciones:formulario.getAll("secciones"),
+    // Se envían las posiciones de los hallazgos sin marcar.
+    hallazgos_omitidos:(()=>{
+      const total=Number(formulario.get("hallazgos_total")??0);
+      const elegidos=new Set(formulario.getAll("hallazgos").map(String));
+      return Number.isInteger(total)&&total>0?Array.from({length:Math.min(total,100)},(_,i)=>i).filter(i=>!elegidos.has(String(i))):[];
+    })(),
   };
   const r = await pedir("/"+encodeURIComponent(id)+"/contenido",entrada);
   if (!r.ok) return { mensaje:r.mensaje };

@@ -1,6 +1,8 @@
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 import {
+  AVISO_HALLAZGOS,
+  hallazgosElegidos,
   seccionesDelInforme,
   type CeldaInforme,
   type InstantaneaInforme,
@@ -122,11 +124,14 @@ export async function generarXlsxInforme(
       ],
     ],
   );
-  agregar(
-    'Hallazgos',
-    ['Observación'],
-    d.hallazgos.map((t) => [t]),
-  );
+  // Solo los hallazgos que la persona dejó, con la advertencia fija al final.
+  const hallazgos = hallazgosElegidos(d);
+  if (hallazgos.length)
+    agregar(
+      'Hallazgos',
+      ['Observación'],
+      [...hallazgos, AVISO_HALLAZGOS].map((t) => [t]),
+    );
   for (const s of seccionesDelInforme(d)) {
     const hoja = agregar(s.titulo, s.columnas, s.filas);
     hoja.addRow([]);
@@ -250,21 +255,26 @@ export function generarPdfInforme(d: InstantaneaInforme): Promise<Buffer> {
       texto('Preparado por ' + d.creador + ' · ' + fecha(d), 9);
       for (const filtro of d.filtros_texto) texto(filtro, 9);
     }
-    titulo('Lectura del período');
-    texto(
-      'Cifras al ' +
-        new Intl.DateTimeFormat('es-CL', {
-          dateStyle: 'long',
-          timeStyle: 'short',
-          timeZone: d.indicadores.zona_horaria,
-        }).format(new Date(d.indicadores.calculado_en)) +
-        ' · ' +
-        d.indicadores.zona_horaria,
-      9,
-    );
-    for (const hallazgo of d.hallazgos) {
-      espacio(50);
-      texto(hallazgo, 11);
+    // Refinamientos de Convivencia, anexo de insights: la lectura del período
+    // se puede quitar entera dejando sin marcar todos sus hallazgos.
+    const lectura = hallazgosElegidos(d);
+    if (lectura.length) {
+      titulo('Lectura del período');
+      texto(
+        'Cifras al ' +
+          new Intl.DateTimeFormat('es-CL', {
+            dateStyle: 'long',
+            timeStyle: 'short',
+            timeZone: d.indicadores.zona_horaria,
+          }).format(new Date(d.indicadores.calculado_en)) +
+          ' · ' +
+          d.indicadores.zona_horaria,
+        9,
+      );
+      for (const hallazgo of [...lectura, AVISO_HALLAZGOS]) {
+        espacio(50);
+        texto(hallazgo, 11);
+      }
     }
     if (d.presentacion.comentarios) {
       titulo('Comentarios del equipo');

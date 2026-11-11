@@ -4,15 +4,17 @@ import { useActionState, useState } from "react";
 import { EnlaceConCarga, FormularioConCarga } from "@/app/components/actividad";
 import { AvisoError, claseBotonPrimario, claseBotonSecundario } from "@/app/components/formulario";
 import { guardarContenidoInforme, publicarInforme } from "./acciones";
-import { controlInforme, type Informe } from "./datos";
+import { AVISO_HALLAZGOS, controlInforme, hallazgosConPosicion, type Informe } from "./datos";
 import { PasosInforme } from "./pasos";
 
-export type DatosContenidoInforme=Pick<Informe,"id"|"revision">&{definiciones_calculo:Pick<Informe["definiciones_calculo"],"escuela"|"alcance"|"sujeto"|"presentacion">&{indicadores:{total_situaciones:number};secciones:Pick<Informe["secciones_elegidas"][number],"id"|"titulo"|"descripcion">[]}};
+export type DatosContenidoInforme=Pick<Informe,"id"|"revision">&{definiciones_calculo:Pick<Informe["definiciones_calculo"],"escuela"|"alcance"|"sujeto"|"presentacion"|"hallazgos">&{indicadores:{total_situaciones:number};secciones:Pick<Informe["secciones_elegidas"][number],"id"|"titulo"|"descripcion">[]}};
 export function ContenidoInforme({ informe }: { informe:DatosContenidoInforme }) {
   const d=informe.definiciones_calculo;
   const [p,setP]=useState(d.presentacion);
   const [estado,accion,pendiente]=useActionState(guardarContenidoInforme.bind(null,informe.id),{});
   const secciones=d.secciones.filter(s=>s.id!=="evolucion_dia");
+  const hallazgos=hallazgosConPosicion(d.hallazgos);
+  const omitidos=p.hallazgos_omitidos??[];
   return <div className="space-y-7">
     <PasosInforme actual={3}/>
     <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_16rem]">
@@ -31,6 +33,16 @@ export function ContenidoInforme({ informe }: { informe:DatosContenidoInforme })
             <span><span className="font-medium">{s.id==="evolucion_mes"?"Evolución de situaciones en el tiempo":s.titulo}</span><span className="mt-0.5 block text-xs text-muted-foreground">{s.descripcion}</span></span>
           </label>)}</div>
         </fieldset>
+        {/* Refinamientos de Convivencia, anexo de insights: la lectura del período se arma con las cifras de este corte, sin IA, y cada hallazgo se puede quitar. */}
+        {hallazgos.length>0 && <fieldset className="mt-7 border-t border-border pt-5"><legend className="pr-3 text-base font-semibold">Lectura del período</legend>
+          <input type="hidden" name="hallazgos_total" value={d.hallazgos.length}/>
+          <p className="mt-2 text-xs text-muted-foreground">CONVI arma estos hallazgos con las cifras de este informe, sin IA, cada uno indica la sección que lo respalda, desmarca los que no quieras incluir y si los quitas todos el informe no lleva esta lectura.</p>
+          <div className="mt-4 space-y-3">{hallazgos.map(h=><label key={h.posicion} className="flex cursor-pointer items-start gap-3 text-sm">
+            <input name="hallazgos" type="checkbox" value={h.posicion} checked={!omitidos.includes(h.posicion)} onChange={e=>setP({...p,hallazgos_omitidos:e.target.checked?omitidos.filter(n=>n!==h.posicion):[...omitidos,h.posicion]})} className="mt-1 size-4 shrink-0 accent-primary"/>
+            <span>{h.texto}</span>
+          </label>)}</div>
+          <p className="mt-3 text-xs text-muted-foreground">Siempre se agrega al final: {AVISO_HALLAZGOS}.</p>
+        </fieldset>}
         <fieldset className="mt-7 border-t border-border pt-5"><legend className="pr-3 text-base font-semibold">Presentación</legend>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium">Agrupación temporal<select name="agrupacion" value={p.agrupacion} onChange={e=>setP({...p,agrupacion:e.target.value as "mes"|"dia"})} className={controlInforme}><option value="mes">Por mes</option><option value="dia">Por día</option></select></label>

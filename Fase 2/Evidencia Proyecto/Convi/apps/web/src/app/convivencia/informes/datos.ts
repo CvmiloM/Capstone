@@ -8,7 +8,15 @@ export type AlcanceInforme = {
 export type PresentacionInforme = {
   titulo: string; subtitulo: string; comentarios: string; tema: "azul" | "verde";
   portada: boolean; tablas: boolean; agrupacion: "mes" | "dia"; secciones: string[];
+  /** Posiciones de los hallazgos que se quitaron, las ediciones anteriores no lo tienen. */
+  hallazgos_omitidos?: number[];
 };
+/** Advertencia fija de la lectura del período, igual que AVISO_HALLAZGOS de la API. */
+export const AVISO_HALLAZGOS = "Las cifras describen registros disponibles al momento del cálculo, no determinan causas ni predicen la conducta de estudiantes";
+/** Hallazgos con su posición, sin la advertencia que las ediciones anteriores guardaban al final. */
+export function hallazgosConPosicion(hallazgos: string[]) {
+  return hallazgos.map((texto, posicion) => ({ texto, posicion })).filter(h => h.texto !== AVISO_HALLAZGOS);
+}
 export type SeccionInforme = {
   id: string; titulo: string; descripcion: string; columnas: string[];
   filas: (string | number | null)[][]; grafico: "barras" | "lineas" | "matriz" | null;
