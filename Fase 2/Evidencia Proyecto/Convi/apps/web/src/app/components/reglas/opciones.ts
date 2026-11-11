@@ -107,6 +107,65 @@ export const usaVentana = (tipo: Tipo) =>
 export const cuentaVencidos = (tipo: Tipo) =>
   tipo === "FECHA_LIMITE" || tipo === "PLAZO_PROTOCOLO";
 
+/**
+ * Refinamientos de Convivencia, sección 13.1: qué revisa cada ámbito, tal
+ * como lo calcula el motor (apps/api/src/modules/alertas, motor.service.ts y
+ * motor-diario.service.ts): cada estudiante, curso o caso por separado.
+ */
+export const AYUDA_AMBITO: Record<Ambito, string> = {
+  ESTUDIANTE:
+    "Revisa a cada estudiante por separado, con las situaciones en que participa, no a un estudiante elegido ni a varios sumados.",
+  CURSO:
+    "Revisa cada curso por separado, con las situaciones del curso o de sus estudiantes.",
+  ESTABLECIMIENTO: "Revisa el total de situaciones de la escuela.",
+  CASO: "Revisa cada caso abierto por separado.",
+};
+
+/**
+ * La regla explicada en lenguaje simple, para leerla antes de guardarla o
+ * activarla (sección 13.4): a quién revisa, qué cuenta, cuándo revisa y qué
+ * pasa al cumplirse.
+ */
+export function resumirRegla(regla: {
+  tipo_regla: Tipo;
+  codigo_ambito: Ambito;
+  categoria: string | null;
+  codigo_accion: string;
+  codigo_prioridad: string;
+}): { titulo: string; texto: string }[] {
+  if (regla.tipo_regla === "OTRO") return [];
+  const prioridad = (
+    NOMBRE_PRIORIDAD[regla.codigo_prioridad] ?? regla.codigo_prioridad
+  ).toLowerCase();
+  const aviso =
+    regla.codigo_accion === "ALERTA_Y_NOTIFICACION"
+      ? " y avisa a Convivencia en la campanita"
+      : ", sin aviso en la campanita";
+  return [
+    { titulo: "A quién revisa", texto: AYUDA_AMBITO[regla.codigo_ambito] },
+    {
+      titulo: "Qué cuenta",
+      texto:
+        regla.tipo_regla === "FECHA_LIMITE"
+          ? "Los compromisos, acciones del plan y seguimientos del caso con la fecha vencida."
+          : regla.tipo_regla === "PLAZO_PROTOCOLO"
+            ? "Los pasos del protocolo aplicado al caso con el plazo vencido."
+            : `Las situaciones ${regla.categoria ? `de ${regla.categoria}` : "de todas las categorías"} según la fecha en que ocurrieron, sin las descartadas.`,
+    },
+    {
+      titulo: "Cuándo revisa",
+      texto:
+        regla.tipo_regla === "RECURRENCIA"
+          ? "Cada vez que se registra una situación."
+          : "Una vez al día, cada mañana.",
+    },
+    {
+      titulo: "Al cumplirse",
+      texto: `Registra una alerta de prioridad ${prioridad}${aviso}, y no la repite mientras se siga cumpliendo por lo mismo.`,
+    },
+  ];
+}
+
 const DONDE: Record<Ambito, string> = {
   ESTUDIANTE: "del mismo estudiante",
   CURSO: "del mismo curso",
