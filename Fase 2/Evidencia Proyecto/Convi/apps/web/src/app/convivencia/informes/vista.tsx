@@ -1,4 +1,4 @@
-import type { Informe, SeccionInforme } from "./datos";
+import { AVISO_HALLAZGOS, hallazgosConPosicion, type Informe, type SeccionInforme } from "./datos";
 
 function valor(v: string|number|null,columna="") { return v===null?(columna.includes("Variación")?"No calculable":"Sin datos"):typeof v==="number"?v.toLocaleString("es-CL",{maximumFractionDigits:1})+(columna.includes("Variación")?" %":""):v; }
 
@@ -49,10 +49,12 @@ function GraficoInforme({ seccion:s,verde }: { seccion:SeccionInforme; verde:boo
 export function VistaInforme({ informe }: { informe:Informe }) {
   const d=informe.definiciones_calculo;
   const p=d.presentacion;
+  // Solo los hallazgos que se dejaron en el informe (anexo de insights).
+  const lectura=hallazgosConPosicion(d.hallazgos).filter(h=>!(p.hallazgos_omitidos??[]).includes(h.posicion));
   const fecha=new Intl.DateTimeFormat("es-CL",{dateStyle:"long",timeStyle:"short",timeZone:d.indicadores.zona_horaria});
   return <article className="min-w-0 rounded-2xl border border-border bg-card px-5 py-7 sm:px-8 sm:py-9" aria-label="Vista previa del contenido del informe">
     <div className="border-b border-border pb-6"><p className="text-sm text-muted-foreground">{d.escuela}</p><h2 className={"mt-3 break-words font-serif text-3xl font-semibold "+(p.tema==="verde"?"text-verde":"text-primary")}>{p.titulo}</h2>{p.subtitulo&&<p className="mt-3 whitespace-pre-wrap text-lg">{p.subtitulo}</p>}<p className="mt-4 text-sm">Del {d.alcance.desde} al {d.alcance.hasta}</p><p className="mt-2 text-xs text-muted-foreground">Creado por {d.creador} · {fecha.format(new Date(d.creado_en))}</p><p className="mt-1 text-xs text-muted-foreground">Cifras al {fecha.format(new Date(d.indicadores.calculado_en))} · {d.indicadores.zona_horaria}</p><ul className="mt-4 space-y-1 text-xs text-muted-foreground">{d.filtros_texto.map(f=><li key={f}>{f}</li>)}</ul></div>
-    <section className="mt-7"><h3 className="text-lg font-semibold">Lectura del período</h3><ul className="mt-4 list-disc space-y-3 pl-5 text-sm">{d.hallazgos.map(h=><li key={h}>{h}</li>)}</ul></section>
+    {lectura.length>0 && <section className="mt-7"><h3 className="text-lg font-semibold">Lectura del período</h3><ul className="mt-4 list-disc space-y-3 pl-5 text-sm">{lectura.map(h=><li key={h.posicion}>{h.texto}</li>)}</ul><p className="mt-3 text-xs text-muted-foreground">{AVISO_HALLAZGOS}</p></section>}
     {p.comentarios && <section className="mt-7 border-t border-border pt-6"><h3 className="text-lg font-semibold">Comentarios del equipo</h3><p className="mt-3 whitespace-pre-wrap text-sm">{p.comentarios}</p></section>}
     {informe.secciones_elegidas.map(s=><section key={s.id} className="mt-8 border-t border-border pt-6"><h3 className="text-lg font-semibold">{s.titulo}</h3><p className="mt-2 text-xs text-muted-foreground">{s.descripcion}</p>{!s.filas.length?<p className="mt-4 text-sm text-muted-foreground">Sin datos para este período y alcance</p>:<><GraficoInforme seccion={s} verde={p.tema==="verde"}/>{s.grafico&&s.grafico!=="matriz"?<details className="mt-4"><summary className="cursor-pointer text-sm font-medium text-primary">Ver datos exactos</summary><TablaInforme seccion={s}/></details>:s.grafico!=="matriz"&&<TablaInforme seccion={s}/>}</>}</section>)}
     <details className="mt-8 border-t border-border pt-6"><summary className="cursor-pointer text-base font-semibold">Criterios y definiciones de cálculo</summary><dl className="mt-5 space-y-5 text-sm">{d.definiciones.map(c=><div key={c.indicador}><dt className="font-semibold">{c.indicador}</dt><dd className="mt-1 space-y-1 text-muted-foreground"><p>{c.fecha}</p><p>{c.formula}</p><p>{c.denominador}</p></dd></div>)}</dl></details>

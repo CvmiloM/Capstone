@@ -265,6 +265,7 @@ export class InformesService {
             portada: true,
             tablas: true,
             agrupacion: 'mes',
+            hallazgos_omitidos: [],
             secciones: secciones
               .filter((s) =>
                 (alcance.tipo === 'PERIODO'
@@ -571,6 +572,7 @@ export class InformesService {
           snapshot.secciones
             .filter((s) => s.id !== 'evolucion_dia')
             .map((s) => s.id),
+          snapshot.hallazgos.length,
         );
         await db.query(
           'UPDATE convi.informes SET titulo=$2,definiciones_calculo=$3 WHERE id=$1',

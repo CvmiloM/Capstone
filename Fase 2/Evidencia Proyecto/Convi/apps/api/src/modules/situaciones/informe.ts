@@ -27,6 +27,12 @@ export type PresentacionInforme = {
   tablas: boolean;
   agrupacion: 'mes' | 'dia';
   secciones: string[];
+  /**
+   * Refinamientos de Convivencia, anexo de insights: posiciones de los
+   * hallazgos que la persona quitó del informe. Las ediciones anteriores no
+   * lo tienen y se leen como vacío (todos incluidos).
+   */
+  hallazgos_omitidos?: number[];
 };
 export type CeldaInforme = string | number | null;
 export type SeccionInforme = {
@@ -116,8 +122,18 @@ function texto(valor: unknown, maximo: number, requerido = false) {
 export function validarPresentacionInforme(
   entrada: unknown,
   disponibles: string[],
+  cantidadHallazgos = 0,
 ): PresentacionInforme {
   const d = objeto(entrada);
+  const omitidos = d.hallazgos_omitidos ?? [];
+  if (
+    !Array.isArray(omitidos) ||
+    omitidos.some(
+      (n) => !Number.isInteger(n) || n < 0 || n >= cantidadHallazgos,
+    ) ||
+    new Set(omitidos).size !== omitidos.length
+  )
+    throw new BadRequestException('Revisa los hallazgos elegidos');
   if (
     !Array.isArray(d.secciones) ||
     !d.secciones.length ||
@@ -144,6 +160,7 @@ export function validarPresentacionInforme(
     portada: d.portada,
     tablas: d.tablas,
     secciones: d.secciones as string[],
+    hallazgos_omitidos: [...(omitidos as number[])].sort((a, b) => a - b),
   };
 }
 
@@ -313,15 +330,64 @@ export function seccionesIndicadores(
     },
   ];
 }
+/**
+ * Advertencia fija de la lectura del período. Las ediciones anteriores la
+ * guardaban como último hallazgo, hallazgosElegidos la quita de esa lista.
+ */
+export const AVISO_HALLAZGOS =
+  'Las cifras describen registros disponibles al momento del cálculo, no determinan causas ni predicen la conducta de estudiantes';
+
+const porcentaje = new Intl.NumberFormat('es-CL', {
+  maximumFractionDigits: 1,
+  signDisplay: 'always',
+});
+
+/** Último día del mes de una fecha AAAA-MM-DD. */
+function finDeMes(dia: string) {
+  const [a, m] = dia.split('-').map(Number);
+  return new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+}
+
+/**
+ * PB-110 y refinamientos de Convivencia (anexo de insights, sección 4): la
+ * lectura del período en frases verificables, calculadas sin IA con las
+ * cifras de la misma instantánea. Cada frase dice su cifra, su contexto, su
+ * límite y la sección que la respalda, y nunca atribuye causas.
+ */
 export function hallazgosInforme(d: IndicadoresCalculados): string[] {
   const frases = [
     d.total_situaciones
       ? 'Se registraron ' +
         d.total_situaciones +
-        ' situaciones distintas dentro del período elegido'
+        ' situaciones distintas dentro del período elegido (sección Resumen del período)'
       : 'No hay situaciones registradas para este período y alcance',
   ];
   const meses = serieCompleta(d.desde, d.hasta, 'mes', d.por_mes);
+  // Tendencia: el último mes del período frente al anterior.
+  if (d.total_situaciones && meses.length >= 2) {
+    const [ultimo, actual] = meses[meses.length - 1];
+    const [previo, anterior] = meses[meses.length - 2];
+    const parcial =
+      d.hasta !== finDeMes(d.hasta) ||
+      (meses.length === 2 && !d.desde.endsWith('-01'));
+    frases.push(
+      'En ' +
+        ultimo +
+        ' se registraron ' +
+        actual +
+        ' situaciones, frente a ' +
+        anterior +
+        ' en ' +
+        previo +
+        (anterior
+          ? ' (' +
+            porcentaje.format(((actual - anterior) / anterior) * 100) +
+            ' %)'
+          : ', sin registros el mes anterior la variación no se calcula') +
+        (parcial ? ', uno de esos meses está incompleto en el período' : '') +
+        ' (sección Evolución mensual de situaciones)',
+    );
+  }
   const maximo = Math.max(0, ...meses.map((f) => f[1]));
   const picos = meses.filter((f) => f[1] === maximo);
   if (maximo)
@@ -331,6 +397,19 @@ export function hallazgosInforme(d: IndicadoresCalculados): string[] {
         ', registrado en ' +
         picos.map((f) => f[0]).join(', '),
     );
+  if (d.por_categoria.length && d.total_situaciones) {
+    const mayor = d.por_categoria[0].total;
+    frases.push(
+      'La categoría con más registros fue ' +
+        d.por_categoria
+          .filter((f) => f.total === mayor)
+          .map((f) => f.nombre)
+          .join(', ') +
+        ', con ' +
+        mayor +
+        ' situaciones (sección Situaciones por categoría)',
+    );
+  }
   if (d.por_nivel.length && d.total_situaciones) {
     const mayor = d.por_nivel[0].total;
     frases.push(
@@ -375,6 +454,20 @@ export function hallazgosInforme(d: IndicadoresCalculados): string[] {
         ' registros, los meses de inicio y término pueden ser parciales',
     );
   }
+  // Gestión pendiente: vencido es una fecha que ya pasó, distinto de pendiente.
+  const vencidos = [
+    [d.compromisos.vencidos, 'compromiso vencido', 'compromisos vencidos'],
+    [d.seguimientos.vencidos, 'seguimiento vencido', 'seguimientos vencidos'],
+  ] as const;
+  const conVencidos = vencidos.filter(([n]) => n > 0);
+  if (conVencidos.length)
+    frases.push(
+      'Hay ' +
+        conVencidos
+          .map(([n, uno, varios]) => n + ' ' + (n === 1 ? uno : varios))
+          .join(' y ') +
+        ' dentro del corte, conviene revisar sus responsables y próximas acciones (sección Compromisos y seguimientos)',
+    );
   if (d.cierres.con_plazo)
     frases.push(
       d.cierres.oportunos +
@@ -382,12 +475,18 @@ export function hallazgosInforme(d: IndicadoresCalculados): string[] {
         d.cierres.con_plazo +
         ' casos con plazo cerraron oportunamente, ' +
         d.cierres.sin_plazo +
-        ' casos sin plazo se excluyen del porcentaje',
+        ' casos sin plazo se excluyen del porcentaje' +
+        (d.cierres.con_plazo < 5
+          ? ', son pocos casos y no indican una tendencia'
+          : ''),
     );
-  frases.push(
-    'Las cifras describen registros disponibles al momento del cálculo, no determinan causas ni predicen la conducta de estudiantes',
-  );
   return frases;
+}
+
+/** Los hallazgos que la persona dejó en el informe, sin la advertencia fija. */
+export function hallazgosElegidos(d: InstantaneaInforme): string[] {
+  const omitidos = new Set(d.presentacion.hallazgos_omitidos ?? []);
+  return d.hallazgos.filter((h, i) => !omitidos.has(i) && h !== AVISO_HALLAZGOS);
 }
 
 export function seccionesDelInforme(d: InstantaneaInforme) {

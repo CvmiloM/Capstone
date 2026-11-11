@@ -19,7 +19,7 @@ export default async function PaginaInforme({params,searchParams}:{params:Promis
   const d=informe.definiciones_calculo;
   return <div className="mx-auto max-w-6xl space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-3"><Encabezado titulo={publicado?"Informe publicado":paso==="contenido"?"Personaliza el informe":"Revisa antes de publicar"} descripcion={publicado?"Los archivos y criterios de esta publicación se conservan":"Comprueba el contenido y las cifras antes de conservar los archivos"}/><EnlaceConCarga href="/convivencia/informes/guardados" className="py-2 text-sm text-primary underline-offset-4 hover:underline">Informes guardados</EnlaceConCarga></div>
-    {!publicado&&paso==="contenido"?<ContenidoInforme informe={{id,revision:informe.revision,definiciones_calculo:{escuela:d.escuela,alcance:d.alcance,sujeto:d.sujeto,presentacion:d.presentacion,indicadores:{total_situaciones:d.indicadores.total_situaciones},secciones:d.secciones.map(s=>({id:s.id,titulo:s.titulo,descripcion:s.descripcion}))}}}/>:<>
+    {!publicado&&paso==="contenido"?<ContenidoInforme informe={{id,revision:informe.revision,definiciones_calculo:{escuela:d.escuela,alcance:d.alcance,sujeto:d.sujeto,presentacion:d.presentacion,hallazgos:d.hallazgos,indicadores:{total_situaciones:d.indicadores.total_situaciones},secciones:d.secciones.map(s=>({id:s.id,titulo:s.titulo,descripcion:s.descripcion}))}}}/>:<>
       {!publicado&&<PasosInforme actual={4}/>}
       <div className="flex flex-wrap gap-3">
         <a href={"/convivencia/informes/"+id+"/archivo/pdf?ver=1"} target="_blank" rel="noopener noreferrer" className={claseBotonSecundario}>{publicado?"Abrir PDF conservado":"Abrir vista previa PDF"}</a>

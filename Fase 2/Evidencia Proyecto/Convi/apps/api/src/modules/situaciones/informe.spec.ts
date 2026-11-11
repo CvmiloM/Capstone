@@ -7,6 +7,8 @@ import {
 } from './calculo-indicadores.js';
 import { generarPdfInforme, generarXlsxInforme } from './informe-archivos.js';
 import {
+  AVISO_HALLAZGOS,
+  hallazgosElegidos,
   hallazgosInforme,
   seccionesDelInforme,
   seccionesIndicadores,
@@ -245,6 +247,98 @@ describe('Alcance y presentación de informes', () => {
       d.indicadores.comparacion.indicadores[0].variacion_porcentual,
     ).toBeNull();
   });
+});
+
+describe('Lectura del período (anexo de insights)', () => {
+  it('compara el último mes con el anterior, sin inventar porcentajes', () => {
+    const d = muestra();
+    expect(d.hallazgos).toContain(
+      'En 2026-08 se registraron 4 situaciones, frente a 1 en 2026-07 (+300 %) (sección Evolución mensual de situaciones)',
+    );
+    const sinAnterior = {
+      ...d.indicadores,
+      por_mes: [{ mes: '2026-08', total: 4 }],
+    };
+    expect(hallazgosInforme(sinAnterior).join(' ')).toContain(
+      'frente a 0 en 2026-07, sin registros el mes anterior la variación no se calcula',
+    );
+  });
+  it('avisa los meses incompletos, la categoría mayor, los vencidos y las muestras chicas', () => {
+    const d = muestra().indicadores;
+    const frases = hallazgosInforme({ ...d, hasta: '2026-08-20' }).join(' ');
+    expect(frases).toContain('uno de esos meses está incompleto en el período');
+    expect(frases).toContain(
+      'La categoría con más registros fue Conflicto verbal, con 10 situaciones',
+    );
+    expect(frases).toContain(
+      'Hay 1 compromiso vencido y 1 seguimiento vencido dentro del corte',
+    );
+    expect(frases).toContain('son pocos casos y no indican una tendencia');
+    const sinVencidos = hallazgosInforme({
+      ...d,
+      compromisos: vacio,
+      seguimientos: { ...vacio, vencidos: 2 },
+    }).join(' ');
+    expect(sinVencidos).toContain('Hay 2 seguimientos vencidos dentro del corte');
+    expect(sinVencidos).not.toContain('compromiso');
+  });
+  it('la advertencia queda fuera de la lista y se pueden omitir hallazgos', () => {
+    const d = muestra();
+    expect(d.hallazgos).not.toContain(AVISO_HALLAZGOS);
+    d.presentacion.hallazgos_omitidos = [0, 2];
+    expect(hallazgosElegidos(d)).toEqual(
+      d.hallazgos.filter((_, i) => i !== 0 && i !== 2),
+    );
+    // Una edición anterior guardaba la advertencia como último hallazgo.
+    d.hallazgos = [...d.hallazgos, AVISO_HALLAZGOS];
+    d.presentacion.hallazgos_omitidos = [];
+    expect(hallazgosElegidos(d)).not.toContain(AVISO_HALLAZGOS);
+  });
+  it('valida las posiciones de los hallazgos omitidos', () => {
+    const d = muestra();
+    const ids = d.secciones.map((s) => s.id);
+    for (const omitidos of [[-1], [1.5], ['1'], [0, 0], [d.hallazgos.length], 'x'])
+      expect(() =>
+        validarPresentacionInforme(
+          { ...d.presentacion, hallazgos_omitidos: omitidos },
+          ids,
+          d.hallazgos.length,
+        ),
+      ).toThrow();
+    expect(
+      validarPresentacionInforme(
+        { ...d.presentacion, hallazgos_omitidos: [2, 0] },
+        ids,
+        d.hallazgos.length,
+      ).hallazgos_omitidos,
+    ).toEqual([0, 2]);
+    expect(
+      validarPresentacionInforme(d.presentacion, ids, d.hallazgos.length)
+        .hallazgos_omitidos,
+    ).toEqual([]);
+  });
+  it('sin hallazgos elegidos el PDF y el XLSX no muestran la lectura del período', async () => {
+    const d = muestra();
+    d.presentacion.hallazgos_omitidos = d.hallazgos.map((_, i) => i);
+    const extraido = await extractText(
+      new Uint8Array(await generarPdfInforme(d)),
+      { mergePages: true },
+    );
+    expect(extraido.text).not.toContain('Lectura del período');
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(
+      (await generarXlsxInforme(d)) as unknown as ExcelJS.Buffer,
+    );
+    expect(libro.getWorksheet('Hallazgos')).toBeUndefined();
+    d.presentacion.hallazgos_omitidos = [];
+    const completo = new ExcelJS.Workbook();
+    await completo.xlsx.load(
+      (await generarXlsxInforme(d)) as unknown as ExcelJS.Buffer,
+    );
+    const hoja = completo.getWorksheet('Hallazgos')!;
+    expect(hoja.rowCount).toBe(d.hallazgos.length + 2);
+    expect(hoja.getCell(`A${hoja.rowCount}`).value).toBe(AVISO_HALLAZGOS);
+  }, 20000);
 });
 
 describe('Archivos de un mismo corte', () => {
