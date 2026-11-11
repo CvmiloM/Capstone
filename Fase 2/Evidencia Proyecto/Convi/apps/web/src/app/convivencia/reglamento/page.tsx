@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Encabezado } from "@/app/components/formulario";
 import { ConsultaReglamento } from "@/app/components/normativa/consulta-reglamento";
+import { AlcanceConsulta } from "@/app/components/normativa/alcance-consulta";
 
 export const metadata: Metadata = { title: "Consultar reglamento" };
 
@@ -12,8 +13,9 @@ export default function PaginaReglamento() {
     <>
       <Encabezado
         titulo="Consultar reglamento"
-        descripcion="Pregunta lo que necesites sobre el reglamento interno: la IA responde solo con las versiones publicadas y vigentes de tu escuela y muestra el documento, la versión y la página de cada cita."
+        descripcion="Pregunta lo que necesites sobre el reglamento interno y los protocolos: la IA responde solo con los documentos publicados y vigentes de tu escuela y muestra el documento, la versión y la página de cada cita."
       />
+      <AlcanceConsulta />
       <ConsultaReglamento />
     </>
   );
