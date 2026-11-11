@@ -23,7 +23,7 @@ const SECCIONES: SeccionMenu[] = [
         texto: "Plan de Gestión",
         icono: "documentos",
       },
-      // PB-085 (HU-074): calendario, con la agenda de seguimientos en otra pestaña
+      // PB-085 (HU-074): calendario, la antigua agenda de seguimientos redirige a su filtro Solo seguimientos
       {
         href: "/convivencia/calendario",
         texto: "Calendario",

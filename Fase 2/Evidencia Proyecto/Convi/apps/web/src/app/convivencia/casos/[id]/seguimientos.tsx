@@ -45,8 +45,8 @@ export function SeguimientoCaso({
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-semibold">Compromisos del caso</h3>
-            <Link href="/convivencia/seguimientos" className={claseEnlace}>
-              Ver agenda de seguimientos
+            <Link href="/convivencia/calendario?seguimientos=1" className={claseEnlace}>
+              Ver seguimientos en el calendario
             </Link>
           </div>
           {caso.compromisos.length === 0 && (
