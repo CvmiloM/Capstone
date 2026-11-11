@@ -30,6 +30,8 @@ export const ACCIONES: Record<string, string> = {
   ACLARACION: 'Aclaración solicitada',
   RESPUESTA_ACLARACION: 'Aclaración respondida',
   RESPONSABLE_SITUACION: 'Cambio de responsable',
+  SUSCRIPCION_CALENDARIO_CREADA: 'Enlace del calendario creado',
+  SUSCRIPCION_CALENDARIO_REVOCADA: 'Enlace del calendario desactivado',
 };
 
 export const RESULTADOS: Record<string, string> = {
@@ -78,6 +80,7 @@ export const RECURSOS: Record<string, string> = {
   protocolos: 'Protocolo',
   versiones_protocolo: 'Versión de protocolo',
   procesos_importacion: 'Importación',
+  suscripciones_calendario: 'Enlace del calendario para Google Calendar',
   planes_intervencion: 'Plan de intervención',
   acciones_plan_intervencion: 'Acción del plan',
   protocolos_caso: 'Protocolo del caso',

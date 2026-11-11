@@ -238,6 +238,53 @@ export class CuentaService implements OnModuleDestroy {
   }
 
   /**
+   * Refinamientos de Convivencia, sección 5: Google Calendar consulta el
+   * calendario suscrito sin la sesión de una persona. Corre como convi_backend
+   * sin cuenta ni escuela en el contexto, así que la seguridad por fila no le
+   * deja ver ninguna tabla: solo llama a convi.calendario_suscrito, que
+   * comprueba el enlace y entrega los campos mínimos. Devuelve null si el
+   * enlace no sirve.
+   */
+  async calendarioSuscrito(huella: Buffer): Promise<unknown> {
+    const cliente = await this.pool.connect().catch(() => {
+      throw new ServiceUnavailableException(
+        'No se pudo consultar el calendario.',
+      );
+    });
+    let descartarConexion = false;
+    try {
+      // READ COMMITTED: la función anota la última consulta del enlace.
+      await cliente.query(
+        'BEGIN ISOLATION LEVEL READ COMMITTED; SET LOCAL ROLE convi_backend',
+      );
+      await cliente.query(
+        `SELECT set_config('app.auth_usuario_id', '', true),
+                set_config('app.aal', '', true),
+                set_config('app.membresia_id', '', true),
+                set_config('app.establecimiento_id', '', true)`,
+      );
+      const filas = await cliente.query<{ calendario: unknown }>(
+        'SELECT convi.calendario_suscrito($1::bytea) AS calendario',
+        [huella],
+      );
+      await cliente.query('COMMIT');
+      return filas.rows[0]?.calendario ?? null;
+    } catch (error) {
+      try {
+        await cliente.query('ROLLBACK');
+      } catch {
+        descartarConexion = true;
+      }
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException(
+        'No se pudo consultar el calendario.',
+      );
+    } finally {
+      cliente.release(descartarConexion);
+    }
+  }
+
+  /**
    * PB-091 y PB-092: las escuelas activas que tienen reglas diarias activas,
    * para la evaluación de cada mañana. La identidad técnica del motor solo ve
    * la escuela de cada transacción, así que la lista la entrega una función
