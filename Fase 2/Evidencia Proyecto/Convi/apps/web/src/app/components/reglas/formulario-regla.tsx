@@ -8,14 +8,17 @@ import { crearRegla, editarRegla, type EstadoFormulario } from "./acciones";
 import type { Regla } from "./datos";
 import {
   AMBITOS_DEL_TIPO,
+  AYUDA_AMBITO,
   cuentaVencidos,
   describirRegla,
+  describirVigencia,
   LARGO_MAXIMO_NOMBRE,
   NOMBRE_ACCION,
   NOMBRE_AMBITO,
   NOMBRE_OPERADOR,
   NOMBRE_PRIORIDAD,
   OPERADORES_DEL_TIPO,
+  resumirRegla,
   TIPOS,
   usaVentana,
   VENTANA_MAXIMA_DIAS,
@@ -148,6 +151,20 @@ export function FormularioRegla({
     ventana_dias: numero(ventana),
     categoria: cuentaVencidos(tipo) ? null : nombreCategoria,
   });
+  const resumen = resumirRegla({
+    tipo_regla: tipo,
+    codigo_ambito: ambito as Ambito,
+    categoria: cuentaVencidos(tipo) ? null : nombreCategoria,
+    codigo_accion: accionRegla,
+    codigo_prioridad: prioridad,
+  });
+  // Refinamientos de Convivencia, sección 13.4: queda claro si se guarda como
+  // borrador o se activa.
+  const queda = regla
+    ? "Sigue como borrador y no genera alertas hasta que uses Activar esta versión"
+    : activar
+      ? "Queda activa desde hoy y empieza a generar alertas"
+      : "Se guarda como borrador y no genera alertas hasta que la actives en su detalle";
 
   return (
     <FormularioConCarga action={accion} noValidate className="space-y-5">
@@ -185,7 +202,7 @@ export function FormularioRegla({
         valor={ambito}
         alCambiar={setAmbito}
         error={errores.codigo_ambito}
-        ayuda={cuentaVencidos(tipo) ? "Las reglas de vencimientos siempre cuentan por caso." : undefined}
+        ayuda={AYUDA_AMBITO[ambito as Ambito]}
       >
         {AMBITOS_DEL_TIPO[tipo].map((a) => (
           <option key={a} value={a}>
@@ -287,10 +304,33 @@ export function FormularioRegla({
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Así se lee la regla</p>
+      <section
+        aria-labelledby="resumen-regla"
+        className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm"
+      >
+        <h3 id="resumen-regla" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Así funciona la regla
+        </h3>
         <p className="mt-1 font-medium">{frase}</p>
-      </div>
+        {resumen.length > 0 && (
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+            {[
+              ...resumen,
+              ...(volverAGuia
+                ? []
+                : [{ titulo: "Vigencia", texto: describirVigencia(desde || null, hasta || null) }]),
+            ].map((r) => (
+              <div key={r.titulo}>
+                <dt className="text-xs text-muted-foreground">{r.titulo}</dt>
+                <dd className="mt-0.5">{r.texto}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        <p className="mt-3 text-muted-foreground">
+          {queda}, y cada alerta es una señal para que el equipo revise, nunca una sanción ni una conclusión sobre un estudiante.
+        </p>
+      </section>
 
       {volverAGuia && (
         <fieldset>

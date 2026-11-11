@@ -14,6 +14,7 @@ import {
   NOMBRE_ESTADO,
   NOMBRE_PRIORIDAD,
   NOMBRE_TIPO,
+  resumirRegla,
 } from "./opciones";
 
 const AVISOS = {
@@ -101,6 +102,20 @@ export function PantallaRegla({
                 <Dato nombre="Prioridad">{NOMBRE_PRIORIDAD[regla.codigo_prioridad]}</Dato>
                 <Dato nombre="Vigencia">{describirVigencia(regla.vigente_desde, regla.vigente_hasta)}</Dato>
               </dl>
+              {/* Refinamientos de Convivencia, sección 13.1: la regla en lenguaje simple. */}
+              {resumirRegla(regla).length > 0 && (
+                <>
+                  <h3 className="mt-5 text-sm font-semibold">Cómo funciona</h3>
+                  <dl className="mt-2 grid gap-4 text-sm sm:grid-cols-2">
+                    {resumirRegla(regla).map((r) => (
+                      <div key={r.titulo}>
+                        <dt className="text-xs text-muted-foreground">{r.titulo}</dt>
+                        <dd className="mt-0.5">{r.texto}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
+              )}
               <p className="mt-4 text-sm text-muted-foreground">
                 {regla.estado === "ACTIVO"
                   ? "Una regla activa no se edita, para cambiarla crea una versión nueva y actívala."
