@@ -3,7 +3,7 @@
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   AvisoError,
   BotonEnviar,
@@ -22,6 +22,17 @@ const FASES_ESPERA = ["buscando", "pensando", "escribiendo"] as const;
 
 const estadoInicial: EstadoConsulta = {};
 const LARGO_MAXIMO = 1000;
+
+// Refinamientos de Convivencia, sección 10.1: preguntas frecuentes con una
+// parte entre corchetes que se completa, sin datos de estudiantes.
+const EJEMPLOS = [
+  "¿Qué procedimiento establece el reglamento para [tipo de situación]?",
+  "¿Qué medidas contempla el reglamento ante [tipo de falta]?",
+  "¿Qué pasos y plazos tiene el protocolo de [nombre del protocolo]?",
+  "¿Quién es responsable de [acción o etapa] según el reglamento?",
+  "¿Cómo y cuándo se informa a la familia en caso de [tipo de situación]?",
+  "¿Qué dice el reglamento sobre [tema]?",
+];
 
 function ubicacion(cita: Cita) {
   if (cita.pagina_desde === null) return "documento Word, sin página";
@@ -50,6 +61,19 @@ export function ConsultaReglamento() {
   );
   const resultado = estado.resultado;
   const [paso, setPaso] = useState(0);
+  const pregunta = useRef<HTMLTextAreaElement>(null);
+
+  // Copia el ejemplo en la pregunta y deja seleccionada la parte entre
+  // corchetes, así lo que se escribe la reemplaza.
+  function usarEjemplo(texto: string) {
+    const campo = pregunta.current;
+    if (!campo) return;
+    campo.value = texto;
+    campo.focus();
+    const inicio = texto.indexOf("[");
+    const fin = texto.indexOf("]");
+    if (inicio >= 0 && fin > inicio) campo.setSelectionRange(inicio, fin + 1);
+  }
 
   useEffect(() => {
     if (!pendiente) return;
@@ -79,11 +103,33 @@ export function ConsultaReglamento() {
         onSubmit={() => setPaso(0)}
         className="space-y-4 rounded-2xl border border-border bg-card p-5"
       >
+        <fieldset disabled={pendiente}>
+          <legend className="text-sm font-medium">
+            Preguntas de ejemplo
+          </legend>
+          <p id="ejemplos-ayuda" className="mt-1 text-sm text-muted-foreground">
+            Elige una y completa la parte entre corchetes
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {EJEMPLOS.map((texto) => (
+              <button
+                key={texto}
+                type="button"
+                aria-describedby="ejemplos-ayuda"
+                onClick={() => usarEjemplo(texto)}
+                className="min-h-11 rounded-xl border border-border px-4 py-2.5 text-left text-sm text-primary transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+              >
+                {texto}
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <div>
           <label htmlFor="pregunta" className="block text-sm font-medium">
             Tu pregunta
           </label>
           <textarea
+            ref={pregunta}
             id="pregunta"
             name="pregunta"
             // Al responder, el campo conserva lo que se preguntó.
@@ -105,7 +151,7 @@ export function ConsultaReglamento() {
             className={`mt-1.5 text-sm ${estado.errores?.pregunta ? "text-destructive" : "text-muted-foreground"}`}
           >
             {estado.errores?.pregunta ??
-              "Pregunta por lo que dice el reglamento, sin nombres de estudiantes: la IA responde solo con el reglamento publicado y vigente de tu escuela."}
+              "Pregunta por lo que dice el reglamento, sin nombres de estudiantes: la IA responde solo con los documentos publicados y vigentes de tu escuela."}
           </p>
         </div>
         {estado.mensaje && !estado.errores && (
