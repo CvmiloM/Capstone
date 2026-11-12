@@ -146,6 +146,14 @@ export class GestionService {
           ${tipo === 'actividades' ? 'ac.titulo' : 'NULL::text'} AS accion,
           ${tipo === 'actividades' ? `to_char(t.inicio_programado,'DD-MM-YYYY HH24:MI')` : 'NULL::text'} AS inicio_programado,
           ${tipo === 'acciones' || tipo === 'actividades' ? "pr.nombres || ' ' || pr.apellidos" : 'NULL::text'} AS responsable
+          ${
+            tipo === 'planes'
+              ? `,
+            (SELECT count(*)::int FROM convi.objetivos_plan_gestion o WHERE o.plan_gestion_id=p.id) AS objetivos_total,
+            (SELECT count(*)::int FROM convi.acciones_plan_gestion a JOIN convi.objetivos_plan_gestion o ON o.id=a.objetivo_id WHERE o.plan_gestion_id=p.id) AS acciones_total,
+            (SELECT count(*)::int FROM convi.actividades_plan_gestion g JOIN convi.acciones_plan_gestion a ON a.id=g.accion_plan_id JOIN convi.objetivos_plan_gestion o ON o.id=a.objetivo_id WHERE o.plan_gestion_id=p.id) AS actividades_total`
+              : ''
+          }
         FROM convi.${TABLAS[tipo]} t ${UNIONES[tipo]}
         JOIN convi.anios_academicos y ON y.id=p.anio_academico_id
         ${tipo === 'acciones' || tipo === 'actividades' ? 'LEFT JOIN convi.personas pr ON pr.id=t.persona_responsable_id' : ''}
@@ -154,6 +162,7 @@ export class GestionService {
           AND ($4::uuid IS NULL OR ${tipo === 'actividades' ? 'ac.id' : 'NULL::uuid'}=$4)
           AND position(lower($5) in lower(concat_ws(' ',${titulo},${tipo === 'planes' ? 'p.nombre' : 't.descripcion'})))>0
       ) SELECT (SELECT count(*)::int FROM filas) AS total, $6::int AS pagina, 20 AS por_pagina,
+        (SELECT coalesce(jsonb_agg(anio ORDER BY anio DESC),'[]') FROM (SELECT DISTINCT anio FROM convi.anios_academicos) y) AS anios,
         coalesce((SELECT jsonb_agg(f) FROM (SELECT * FROM filas ORDER BY orden NULLS LAST, anio DESC, titulo, id LIMIT 20 OFFSET (($6::int-1)*20)) f),'[]') AS filas`,
             [
               f.anio,
@@ -175,7 +184,7 @@ export class GestionService {
     consulta: Record<string, unknown>,
   ) {
     const tipo = tipoGestion(tipoTexto),
-      { pagina } = filtrosGestion(consulta);
+      { pagina, buscar } = filtrosGestion(consulta);
     return this.operar(sesion, async (db) => {
       const c = await contextoGestion(db, tipo, id);
       const r = c.registro;
@@ -230,8 +239,48 @@ export class GestionService {
               ).rows,
             }
           : null;
+      const arbol =
+        tipo === 'planes'
+          ? (
+              await db.query(
+                `WITH objetivos AS (
+        SELECT o.* FROM convi.objetivos_plan_gestion o WHERE o.plan_gestion_id=$1
+          AND (position(lower($2) in lower(concat_ws(' ',o.titulo,o.descripcion)))>0 OR EXISTS (
+            SELECT 1 FROM convi.acciones_plan_gestion a LEFT JOIN convi.actividades_plan_gestion g ON g.accion_plan_id=a.id
+            WHERE a.objetivo_id=o.id AND position(lower($2) in lower(concat_ws(' ',a.titulo,a.descripcion,g.titulo,g.descripcion)))>0))
+      ), pagina AS (SELECT * FROM objetivos ORDER BY orden,id LIMIT 20 OFFSET (($3::int-1)*20)),
+      acciones AS (SELECT a.id,a.objetivo_id,a.titulo,a.descripcion,a.estado,
+        per.nombres || ' ' || per.apellidos AS responsable,
+        (SELECT count(*)::int FROM convi.actividades_plan_gestion g WHERE g.accion_plan_id=a.id) AS actividades_total,
+        row_number() OVER (PARTITION BY a.objetivo_id ORDER BY a.titulo,a.id) AS numero
+        FROM convi.acciones_plan_gestion a JOIN pagina o ON o.id=a.objetivo_id
+        LEFT JOIN convi.personas per ON per.id=a.persona_responsable_id
+        WHERE position(lower($2) in lower(concat_ws(' ',o.titulo,o.descripcion,a.titulo,a.descripcion)))>0
+          OR EXISTS (SELECT 1 FROM convi.actividades_plan_gestion g WHERE g.accion_plan_id=a.id
+            AND position(lower($2) in lower(concat_ws(' ',g.titulo,g.descripcion)))>0)
+      ) SELECT (SELECT count(*)::int FROM objetivos) AS total,$3::int AS pagina,
+        coalesce((SELECT jsonb_agg(f ORDER BY orden,id) FROM (
+          SELECT o.id,o.titulo,o.descripcion,o.orden,
+            (SELECT count(*)::int FROM acciones a WHERE a.objetivo_id=o.id) AS acciones_total,
+            coalesce((SELECT jsonb_agg(a ORDER BY a.titulo,a.id) FROM acciones a WHERE a.objetivo_id=o.id AND a.numero<=50),'[]') AS acciones
+          FROM pagina o) f),'[]') AS filas`,
+                [id, buscar, pagina],
+              )
+            ).rows[0]
+          : null;
+      const actividades =
+        tipo === 'acciones'
+          ? await this.listadoActividades(
+              db,
+              id,
+              filtrosGestion({ pagina: consulta.pagina_actividades ?? 1 })
+                .pagina,
+            )
+          : null;
       return {
         ...c,
+        arbol,
+        actividades,
         siguiente_orden:
           tipo === 'planes'
             ? (
@@ -339,7 +388,7 @@ export class GestionService {
       throw new BadRequestException('La actividad no tiene esta operación.');
     const datos =
       tipo === 'planes'
-        ? datosObjetivo(cuerpo)
+        ? datosObjetivo({ ...objeto(cuerpo), orden: 1 })
         : tipo === 'objetivos'
           ? datosAccion(cuerpo)
           : datosActividad(cuerpo);
@@ -352,12 +401,19 @@ export class GestionService {
         throw new ConflictException(
           'La acción ya terminó y no recibe nuevas actividades.',
         );
-      if (tipo === 'planes')
-        return this.insertarObjetivo(
-          db,
-          id,
-          datos as ReturnType<typeof datosObjetivo>,
-        );
+      if (tipo === 'planes') {
+        // El bloqueo del Plan serializa las altas y reserva el siguiente orden.
+        const siguiente = (
+          await db.query<{ orden: number }>(
+            'SELECT coalesce(max(orden),0)+1 AS orden FROM convi.objetivos_plan_gestion WHERE plan_gestion_id=$1',
+            [id],
+          )
+        ).rows[0].orden;
+        return this.insertarObjetivo(db, id, {
+          ...(datos as ReturnType<typeof datosObjetivo>),
+          orden: siguiente,
+        });
+      }
       await this.responsable(
         db,
         (datos as ReturnType<typeof datosAccion>).persona_responsable_id,
@@ -640,6 +696,23 @@ export class GestionService {
         'Otra persona cambió el registro, recarga la página antes de guardar.',
       );
   }
+  private async listadoActividades(db: PoolClient, id: string, pagina: number) {
+    return (
+      await db.query(
+        `WITH filas AS (
+      SELECT g.id,g.titulo,g.descripcion,g.estado,
+        to_char(g.inicio_programado,'DD-MM-YYYY HH24:MI') AS inicio_programado, g.inicio_programado AS inicio_orden,
+        p.nombres || ' ' || p.apellidos AS responsable
+      FROM convi.actividades_plan_gestion g LEFT JOIN convi.personas p ON p.id=g.persona_responsable_id
+      WHERE g.accion_plan_id=$1
+    ) SELECT (SELECT count(*)::int FROM filas) AS total,$2::int AS pagina,
+      coalesce((SELECT jsonb_agg(to_jsonb(f)-'inicio_orden' ORDER BY inicio_orden,id) FROM (
+        SELECT * FROM filas ORDER BY inicio_orden,id LIMIT 20 OFFSET (($2::int-1)*20)) f),'[]') AS filas`,
+        [id, pagina],
+      )
+    ).rows[0];
+  }
+
   private async insertarObjetivo(
     db: PoolClient,
     id: string,

@@ -15,6 +15,7 @@ import {
   claseBotonSecundario,
 } from "@/app/components/formulario";
 import { FormularioConCarga } from "@/app/components/actividad";
+import { Icono } from "@/app/components/icono";
 import { buscarOpciones, guardarGestion } from "./acciones";
 import {
   ESTADOS,
@@ -35,20 +36,53 @@ const ROJO =
 export function PanelFormulario({
   titulo,
   children,
+  compacto = false,
+  inicialAbierto = false,
 }: {
   titulo: string;
   children: ReactNode;
+  compacto?: boolean;
+  inicialAbierto?: boolean;
 }) {
-  const [abierto, setAbierto] = useState(false);
+  const [abierto, setAbierto] = useState(inicialAbierto);
   return (
     <details
-      className="mt-5 rounded-xl border border-border bg-card p-4 sm:p-5"
+      open={abierto}
+      className={
+        compacto
+          ? "mt-2"
+          : "mt-5 rounded-xl border border-border bg-card p-4 sm:p-5"
+      }
       onToggle={(e) => setAbierto(e.currentTarget.open)}
     >
-      <summary className="min-h-11 cursor-pointer py-2 text-base font-semibold text-primary focus-visible:outline-2 focus-visible:outline-ring">
-        {titulo}
+      <summary
+        title={compacto ? titulo : undefined}
+        className={`min-h-11 cursor-pointer py-2 font-semibold text-primary focus-visible:outline-2 focus-visible:outline-ring ${compacto ? "inline-flex min-w-11 items-center justify-center rounded-lg hover:bg-accent" : "text-base"}`}
+      >
+        {compacto ? (
+          <>
+            <Icono nombre="editar" />
+            <span className="sr-only">{titulo}</span>
+          </>
+        ) : (
+          titulo
+        )}
       </summary>
-      {abierto && <div className="mt-5 max-w-3xl">{children}</div>}
+      {abierto && (
+        <div className="mt-3 max-w-3xl rounded-xl border border-border bg-background p-4">
+          {children}
+          <button
+            type="button"
+            className={`mt-4 ${claseBotonSecundario}`}
+            onClick={(e) => {
+              const panel = e.currentTarget.closest("details");
+              if (panel) panel.open = false;
+            }}
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
     </details>
   );
 }
@@ -230,11 +264,13 @@ export function FormularioGestion({
   detalle,
   confirmacion,
   ordenInicial = 1,
+  campoEditable,
 }: {
   contexto: ContextoFormulario;
   detalle?: Detalle;
   confirmacion?: string;
   ordenInicial?: number;
+  campoEditable?: string;
 }) {
   const [estado, accion, pendiente] = useActionState(
     guardarGestion.bind(null, contexto),
@@ -287,6 +323,15 @@ export function FormularioGestion({
   ) {
     const valor =
       estado.valores?.[name] ?? opciones.valor ?? r[name as keyof Registro];
+    if (campoEditable && name !== campoEditable && name !== "motivo")
+      return (
+        <input
+          key={name}
+          type="hidden"
+          name={name}
+          value={valor == null ? "" : String(valor)}
+        />
+      );
     return (
       <Campo
         key={name}
@@ -325,6 +370,17 @@ export function FormularioGestion({
     ayuda?: string,
     requerido = true,
   ) {
+    if (campoEditable && name !== campoEditable && name !== "motivo")
+      return (
+        <input
+          key={name}
+          type="hidden"
+          name={name}
+          value={String(
+            estado.valores?.[name] ?? r[name as keyof Registro] ?? "",
+          )}
+        />
+      );
     return (
       <div key={name}>
         <label htmlFor={`${uid}-${name}`} className="text-sm font-medium">
@@ -362,17 +418,24 @@ export function FormularioGestion({
       </div>
     );
   }
-  const responsable = (
-    <SelectorGestion
-      clase="personas"
-      controlId={`${uid}-persona_responsable_id`}
-      name="persona_responsable_id"
-      etiqueta="Responsable principal"
-      inicial={r.persona_responsable_id}
-      nombreInicial={r.responsable}
-      error={errores.persona_responsable_id}
-    />
-  );
+  const responsable =
+    campoEditable && campoEditable !== "persona_responsable_id" ? (
+      <input
+        type="hidden"
+        name="persona_responsable_id"
+        value={r.persona_responsable_id ?? ""}
+      />
+    ) : (
+      <SelectorGestion
+        clase="personas"
+        controlId={`${uid}-persona_responsable_id`}
+        name="persona_responsable_id"
+        etiqueta="Responsable principal"
+        inicial={r.persona_responsable_id}
+        nombreInicial={r.responsable}
+        error={errores.persona_responsable_id}
+      />
+    );
   const plan = (
     <>
       {campo("nombre", "Nombre del Plan", {
@@ -715,19 +778,34 @@ export function FormularioGestion({
             {camposTipo === "objetivos" ? (
               <>
                 {area("descripcion", "Descripción", undefined, false)}
-                {campo("orden", "Orden dentro del Plan", {
-                  tipo: "number",
-                  valor: r.orden ?? ordenInicial,
-                })}
+                <input
+                  type="hidden"
+                  name="orden"
+                  value={r.orden ?? ordenInicial}
+                />
               </>
             ) : camposTipo === "acciones" ? (
               <>
                 {datosAccion}
-                <fieldset className="space-y-4 border-t border-border pt-4">
+                <fieldset
+                  className="space-y-4 border-t border-border pt-4"
+                  hidden={
+                    !!campoEditable &&
+                    ![
+                      "nombre_indicador",
+                      "unidad_indicador",
+                      "meta_indicador",
+                      "valor_indicador",
+                    ].includes(campoEditable)
+                  }
+                >
                   <legend className="text-base font-semibold">
                     Cómo se medirá el resultado
                   </legend>
-                  <p className="text-sm text-muted-foreground">
+                  <p
+                    className="text-sm text-muted-foreground"
+                    hidden={!!campoEditable}
+                  >
                     Un indicador es una medida para revisar el resultado, por
                     ejemplo número de talleres realizados.
                   </p>

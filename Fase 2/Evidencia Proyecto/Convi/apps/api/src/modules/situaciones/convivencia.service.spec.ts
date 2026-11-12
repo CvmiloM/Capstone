@@ -41,6 +41,8 @@ describe('lecturas agrupadas de Situaciones', () => {
       situaciones: filas,
       conteo,
       limite: MAXIMO_BANDEJA,
+      pagina: 1,
+      total: 3,
     });
     expect(query).toHaveBeenCalledTimes(1);
     expect(operar.mock.calls[0][1]).toEqual({

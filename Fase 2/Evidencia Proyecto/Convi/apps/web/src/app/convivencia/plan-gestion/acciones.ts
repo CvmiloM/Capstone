@@ -117,9 +117,9 @@ export async function guardarGestion(
     };
   if (operacion === "cursos" || operacion === "profesionales")
     redirect(
-      `${rutaDetalle("actividades", id!)}?seccion=participantes&guardado=1`,
+      `${rutaDetalle("actividades", id!)}?guardado=1#participantes`,
     );
   redirect(
-    `${rutaDetalle(destinoTipo, r.id ?? id!)}?guardado=1${operacion === "estado" && tipo !== "planes" ? "&seccion=resultados" : ""}`,
+    `${rutaDetalle(destinoTipo, r.id ?? id!)}?guardado=1${operacion === "estado" && tipo !== "planes" ? "#resultados" : ""}`,
   );
 }

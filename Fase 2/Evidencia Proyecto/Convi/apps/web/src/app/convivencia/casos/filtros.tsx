@@ -28,10 +28,12 @@ export function FiltrosListaCasos({
   inicial,
   opciones,
   estados,
+  para = "",
 }: {
   inicial: FiltrosCasos;
   opciones: PaginaCasos["opciones"];
   estados: [string, string][];
+  para?: string;
 }) {
   const [valores, setValores] = useState(inicial);
   const seleccionar = (
@@ -54,6 +56,7 @@ export function FiltrosListaCasos({
       aria-label="Filtrar casos"
       className="mb-5 space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5"
     >
+      {para && <input type="hidden" name="para" value={para}/>}
       <div className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <label className="block text-sm font-medium">
           Nombre o caso

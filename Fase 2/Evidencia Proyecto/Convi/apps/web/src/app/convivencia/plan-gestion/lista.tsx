@@ -12,10 +12,12 @@ export function BusquedaGestion({
   ruta,
   parametros,
   anio = false,
+  anios = [],
 }: {
   ruta: string;
   parametros: Record<string, string>;
   anio?: boolean;
+  anios?: number[];
 }) {
   const { q = "", anio: year = "" } = parametros;
   const resto = Object.fromEntries(
@@ -49,16 +51,21 @@ export function BusquedaGestion({
           <label htmlFor="anio-plan" className="block text-sm font-medium">
             Año académico
           </label>
-          <input
+          <select
             id="anio-plan"
             name="anio"
-            type="number"
-            min={2000}
-            max={2200}
             defaultValue={year}
-            placeholder="Todos"
             className="mt-1.5 min-h-11 w-36 rounded-lg border border-input bg-card px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
-          />
+          >
+            <option value="">Todos</option>
+            {[...new Set([...anios, ...(year ? [Number(year)] : [])])]
+              .sort((a, b) => b - a)
+              .map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+          </select>
         </div>
       )}
       <button className={claseBotonPrimario}>Buscar</button>
@@ -76,15 +83,17 @@ export function PaginacionGestion({
   pagina,
   ruta,
   parametros,
+  parametroPagina = "pagina",
 }: {
   total: number;
   pagina: number;
   ruta: string;
   parametros: Record<string, string>;
+  parametroPagina?: string;
 }) {
   const paginas = Math.max(1, Math.ceil(total / 20));
   const enlace = (n: number) =>
-    `${ruta}?${new URLSearchParams({ ...parametros, pagina: String(n) })}`;
+    `${ruta}?${new URLSearchParams({ ...parametros, [parametroPagina]: String(n) })}`;
   return (
     <nav
       aria-label="Páginas de resultados"
@@ -136,16 +145,16 @@ export function ListaGestion({
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-border rounded-xl border border-border bg-card px-5">
+        <ul className="space-y-4">
           {lista.filas.map((f) => (
             <li
               key={f.id}
-              className="flex flex-wrap items-start justify-between gap-3 py-4"
+              className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-border bg-card p-5 sm:p-6"
             >
               <div className="min-w-0 flex-1">
                 <Link
                   href={rutaDetalle(tipo, f.id)}
-                  className="break-words text-base font-semibold text-primary underline-offset-4 hover:underline"
+                  className={`break-words font-semibold text-primary underline-offset-4 hover:underline ${tipo === "planes" ? "font-serif text-2xl" : "text-base"}`}
                 >
                   {f.orden ? `${f.orden}. ` : ""}
                   {f.titulo}
@@ -159,6 +168,33 @@ export function ListaGestion({
                   <p className="mt-2 line-clamp-2 break-words text-sm">
                     {f.descripcion}
                   </p>
+                )}
+                {tipo === "planes" && (
+                  <>
+                    <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                      Organiza los objetivos, las acciones y las actividades de
+                      convivencia de este año.
+                    </p>
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                      <p className="rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground">
+                        {f.objetivos_total ?? 0}{" "}
+                        {f.objetivos_total === 1 ? "objetivo" : "objetivos"} ·{" "}
+                        {f.acciones_total ?? 0}{" "}
+                        {f.acciones_total === 1 ? "acción" : "acciones"} ·{" "}
+                        {f.actividades_total ?? 0}{" "}
+                        {f.actividades_total === 1
+                          ? "actividad"
+                          : "actividades"}
+                      </p>
+                      <Link
+                        href={rutaDetalle(tipo, f.id)}
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        Ver Plan<span className="sr-only"> {f.titulo}</span>
+                        <span aria-hidden="true"> →</span>
+                      </Link>
+                    </div>
+                  </>
                 )}
                 {(f.inicio_programado || f.responsable) && (
                   <p className="mt-2 text-sm text-muted-foreground">

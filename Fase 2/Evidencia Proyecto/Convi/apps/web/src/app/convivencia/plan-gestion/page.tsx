@@ -30,7 +30,7 @@ export default async function Planes({
           Crear Plan
         </Link>
       </div>
-      <BusquedaGestion ruta={RAIZ} parametros={parametros} anio />
+      <BusquedaGestion ruta={RAIZ} parametros={parametros} anio anios={r.datos.anios} />
       <ListaGestion lista={r.datos} tipo="planes" parametros={parametros} />
     </div>
   );

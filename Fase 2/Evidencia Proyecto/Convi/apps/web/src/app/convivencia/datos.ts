@@ -39,6 +39,8 @@ export type Bandeja = {
   situaciones: SituacionBandeja[];
   conteo: { estado: string; urgencia: string; total: number }[];
   limite: number;
+  pagina: number;
+  total: number;
 };
 
 export type DetalleConvivencia = SituacionBandeja & {
@@ -175,10 +177,12 @@ export async function pedir<T>(ruta: string): Promise<Respuesta<T>> {
 }
 
 /** HU-037 CA1: filtros opcionales de la bandeja. */
-export function obtenerBandeja(filtros: { estado?: string; urgencia?: string }) {
+export function obtenerBandeja(filtros: { estado?: string; urgencia?: string; q?: string; pagina?: string }) {
   const parametros = new URLSearchParams();
   if (filtros.estado) parametros.set("estado", filtros.estado);
   if (filtros.urgencia) parametros.set("urgencia", filtros.urgencia);
+  if (filtros.q) parametros.set("q", filtros.q);
+  if (filtros.pagina) parametros.set("pagina", filtros.pagina);
   const consulta = parametros.toString();
   return pedir<Bandeja>(
     `/convivencia/situaciones${consulta ? `?${consulta}` : ""}`,

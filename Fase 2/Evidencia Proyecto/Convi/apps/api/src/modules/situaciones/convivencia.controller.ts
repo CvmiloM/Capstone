@@ -67,8 +67,9 @@ export class ConvivenciaController {
     @Req() peticion: PeticionConSesion,
     @Query('estado') estado: unknown,
     @Query('urgencia') urgencia: unknown,
+    @Query() consulta: Record<string, unknown>,
   ) {
-    return this.convivencia.bandeja(peticion.sesion, estado, urgencia);
+    return this.convivencia.bandeja(peticion.sesion, estado, urgencia, consulta);
   }
 
   @Get('situaciones/:id')

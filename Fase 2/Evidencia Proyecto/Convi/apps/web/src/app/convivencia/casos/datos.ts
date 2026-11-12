@@ -428,6 +428,15 @@ export const NOMBRE_ESTADO_CASO: Record<string, string> = {
   REABIERTO: "Reabierto",
 };
 
+export const COLOR_ESTADO_CASO: Record<string, string> = {
+  EN_ANALISIS: "bg-sky-50 text-sky-900",
+  EN_REVISION: "bg-indigo-50 text-indigo-900",
+  EN_INTERVENCION: "bg-blue-100 text-blue-900",
+  EN_SEGUIMIENTO: "bg-emerald-50 text-emerald-900",
+  REABIERTO: "bg-amber-50 text-amber-900",
+  CERRADO: "bg-muted text-muted-foreground",
+};
+
 /** Una fecha AAAA-MM-DD como 20-10-2026, sin pasar por la zona horaria. */
 export function formatearDia(dia: string) {
   const [anio, mes, diaDelMes] = dia.split("-");

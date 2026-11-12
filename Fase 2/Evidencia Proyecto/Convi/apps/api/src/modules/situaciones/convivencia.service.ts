@@ -18,6 +18,7 @@ import {
 import { crearAvisos, TEXTO_AVISO } from '../alertas/crear-avisos.js';
 import { EvaluacionReglas } from '../alertas/evaluacion.service.js';
 import { validarCambioUrgencia } from './cambio-urgencia.js';
+import { leerBusquedaBandeja } from './bandeja.js';
 import {
   cambiosDeSituacion,
   type CambioSituacion,
@@ -85,7 +86,7 @@ export const ESTADOS = [
 const ESTADOS_ABIERTOS = ['NUEVA', 'EN_REVISION', 'INFORMACION_SOLICITADA'];
 
 /** Tope de filas de la bandeja; los totales siempre cuentan todas (CA4). */
-export const MAXIMO_BANDEJA = 200;
+export const MAXIMO_BANDEJA = 20;
 
 export type SituacionBandeja = {
   id: string;
@@ -112,6 +113,8 @@ export type Bandeja = {
   /** Cantidad de situaciones por estado y urgencia, sin filtros. */
   conteo: { estado: string; urgencia: string; total: number }[];
   limite: number;
+  pagina: number;
+  total: number;
 };
 
 export type DetalleConvivencia = SituacionBandeja & {
@@ -282,9 +285,17 @@ export class ConvivenciaService {
     sesion: Sesion,
     estadoPedido: unknown,
     urgenciaPedida: unknown,
+    consulta: Record<string, unknown> = {},
   ): Promise<Bandeja> {
     const estado = filtro(estadoPedido, ESTADOS);
-    const urgencia = filtro(urgenciaPedida, URGENCIAS);
+    const urgencia = filtro(urgenciaPedida, [...URGENCIAS, 'PRIORITARIA']);
+    const f = leerBusquedaBandeja(consulta);
+    const busqueda = `($3::text = '' OR position(lower($3) in lower(s.codigo)) > 0 OR EXISTS (
+      SELECT 1 FROM convi.participaciones pa
+      JOIN convi.estudiantes e ON e.persona_id=pa.persona_id
+      JOIN convi.personas persona ON persona.id=e.persona_id
+      WHERE pa.situacion_id=s.id AND (position(lower($3) in lower(concat_ws(' ',persona.nombres,persona.apellidos)))>0
+        OR ($4::text IS NOT NULL AND translate(upper(persona.rut),'.- ','') LIKE $4 || '%'))))`;
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
@@ -293,24 +304,32 @@ export class ConvivenciaService {
         const situaciones = db.query<SituacionBandeja>(
           `${ESTUDIANTES_VISIBLES} SELECT ${COLUMNAS_BANDEJA}
            ${DESDE_BANDEJA}
-           WHERE ($1::text IS NULL OR s.estado = $1)
-             AND ($2::text IS NULL OR s.urgencia = $2)
+           WHERE (($1::text IS NULL AND s.estado <> 'DESCARTADA') OR s.estado = $1)
+             AND ($2::text IS NULL OR s.urgencia = $2 OR ($2='PRIORITARIA' AND s.urgencia IN ('URGENTE','INMEDIATA')))
+             AND ($2::text IS DISTINCT FROM 'PRIORITARIA' OR s.estado IN ('NUEVA','EN_REVISION','INFORMACION_SOLICITADA'))
+             AND ${busqueda}
            ORDER BY CASE s.urgencia WHEN 'INMEDIATA' THEN 0
                                     WHEN 'URGENTE' THEN 1 ELSE 2 END,
                     s.reportado_en DESC
-           LIMIT $3`,
-          [estado, urgencia, MAXIMO_BANDEJA],
+           LIMIT $5 OFFSET $6`,
+          [estado, urgencia, f.buscar, f.rut, MAXIMO_BANDEJA, (f.pagina - 1) * MAXIMO_BANDEJA],
         );
         const conteo = db.query<Bandeja['conteo'][number]>(
-          `SELECT estado, urgencia, count(*)::int AS total
-           FROM convi.situaciones
-           GROUP BY estado, urgencia`,
+          `SELECT s.estado, s.urgencia, count(*)::int AS total
+           FROM convi.situaciones s WHERE ${busqueda.replaceAll('$3', '$1').replaceAll('$4', '$2')}
+           GROUP BY s.estado, s.urgencia`,
+          [f.buscar, f.rut],
         );
         const datos = await todasLasLecturas({ situaciones, conteo });
         return {
           situaciones: datos.situaciones.rows,
           conteo: datos.conteo.rows,
           limite: MAXIMO_BANDEJA,
+          pagina: f.pagina,
+          total: datos.conteo.rows.filter(fila =>
+            (estado ? fila.estado === estado : fila.estado !== 'DESCARTADA') &&
+            (!urgencia || (urgencia === 'PRIORITARIA' ? ['URGENTE','INMEDIATA'].includes(fila.urgencia) && ESTADOS_ABIERTOS.includes(fila.estado) : fila.urgencia === urgencia)),
+          ).reduce((suma, fila) => suma + fila.total, 0),
         };
       },
     );

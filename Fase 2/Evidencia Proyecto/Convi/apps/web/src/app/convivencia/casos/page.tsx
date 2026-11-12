@@ -4,7 +4,7 @@ import { Encabezado, claseEnlace } from "@/app/components/formulario";
 import { obtenerFormatoFecha } from "@/app/profesor/datos";
 import { FiltrosListaCasos, type FiltrosCasos } from "./filtros";
 import { AvisoNoDisponible } from "../aviso-no-disponible";
-import { formatearDia, NOMBRE_ESTADO_CASO, obtenerCasos } from "./datos";
+import { formatearDia, NOMBRE_ESTADO_CASO, COLOR_ESTADO_CASO, obtenerCasos } from "./datos";
 
 export const metadata: Metadata = { title: "Casos" };
 
@@ -14,6 +14,8 @@ export default async function PaginaCasos({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const consulta = await searchParams;
+  const destinos: Record<string,string> = { intervencion:"encuentros", seguimiento:"seguimientos", evidencia:"evidencias" };
+  const para = typeof consulta.para === "string" && destinos[consulta.para] ? consulta.para : "";
   const campos = [
     "nombre",
     "rut",
@@ -41,6 +43,7 @@ export default async function PaginaCasos({
   const enlace = (numero: number) => {
     const p = new URLSearchParams(parametros);
     p.set("pagina", String(numero));
+    if (para) p.set("para",para);
     return `/convivencia/casos?${p.toString()}`;
   };
 
@@ -55,7 +58,13 @@ export default async function PaginaCasos({
         inicial={filtros}
         opciones={opciones}
         estados={Object.entries(NOMBRE_ESTADO_CASO)}
+        para={para}
       />
+      {para && <p role="status" className="mb-5 rounded-xl bg-accent p-4 text-sm text-accent-foreground">Elige el caso en el que quieres {para === "intervencion" ? "registrar una intervención" : para === "seguimiento" ? "añadir un seguimiento" : "adjuntar una evidencia"}, se abrirá la sección correspondiente.</p>}
+      <p className="mb-5 text-sm text-muted-foreground">
+        Para abrir un caso, entra a una situación y utiliza Abrir caso o Vincular a caso. {" "}
+        <Link href="/convivencia/situaciones" className={claseEnlace}>Ir a la bandeja de situaciones</Link>
+      </p>
       <p className="mb-3 text-sm text-muted-foreground">
         Del movimiento más reciente al más antiguo, hasta {limite} casos por
         página
@@ -71,7 +80,7 @@ export default async function PaginaCasos({
           {casos.map((caso) => (
             <li key={caso.id}>
               <Link
-                href={`/convivencia/casos/${caso.id}`}
+                href={`/convivencia/casos/${caso.id}${para ? `?seccion=${destinos[para]}` : ""}`}
                 anticipar
                 className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-tarjeta transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-ring sm:flex-row sm:items-center"
               >
@@ -118,7 +127,7 @@ export default async function PaginaCasos({
                       ? "1 situación"
                       : `${caso.situaciones} situaciones`}
                   </span>
-                  <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${COLOR_ESTADO_CASO[caso.estado_actual] ?? "bg-muted text-foreground"}`}>
                     {NOMBRE_ESTADO_CASO[caso.estado_actual] ??
                       caso.estado_actual}
                   </span>
