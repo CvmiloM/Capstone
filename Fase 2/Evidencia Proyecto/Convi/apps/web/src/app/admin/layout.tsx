@@ -33,6 +33,7 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
                   src={logo}
                   alt="Convi, ir al inicio del portal"
                   priority
+                  sizes="101px"
                   className="-my-3 -ml-2 block h-14 w-auto"
                 />
               </Link>
@@ -64,6 +65,7 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
             <Image
               src={logo}
               alt="Convi"
+              sizes="86px"
               className="-my-3 -ml-2 block h-12 w-auto"
             />
             <span className="translate-y-2 rounded bg-accent px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-accent-foreground">

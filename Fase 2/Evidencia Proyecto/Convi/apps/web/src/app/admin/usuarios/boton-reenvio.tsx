@@ -40,7 +40,7 @@ export function BotonReenvio({
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       {estado.reenviado && (
         <p role="status" className="text-sm text-primary">
-          Invitación reenviada al mismo correo.
+          Solicitud de reenvío registrada. Revisa el buzón antes de pedir otra invitación.
         </p>
       )}
     </FormularioConCarga>

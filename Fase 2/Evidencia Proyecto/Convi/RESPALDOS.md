@@ -25,6 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\respaldar.ps1 -Ent
 - Local usa `.env` y Supabase local, Cloud usa `.env.cloud` con `sslmode=verify-full` y el certificado de `supabase/certs`.
 - Cada respaldo queda en `%USERPROFILE%\CONVI-respaldos\convi-<entorno>-<fecha>` con `base.dump`, `roles.sql`, `archivos\`, las huellas y `respaldo.json` con los tiempos y el sha256 de la base.
 - `-Destino <carpeta>` cambia dónde se guarda y `-Conservar <n>` cuántos respaldos completos del mismo entorno se mantienen (14 por defecto, 0 no borra ninguno).
+- La retención cuenta solo manifiestos legibles del mismo entorno, sin fallas de archivos, con todos los archivos contabilizados y un `base.dump` del tamaño registrado. Excluye las capturas donde cambió la base durante el respaldo. Las carpetas fallidas o incompletas se conservan para revisión; no ocupan una de las copias completas retenidas. Esto no reemplaza el ensayo de restauración ni verifica otra vez el contenido de todos los archivos al depurar.
 
 **El respaldo tiene datos personales de estudiantes:** guárdalo solo en un disco cifrado con BitLocker, nunca en Git, en carpetas compartidas ni en el chat.
 

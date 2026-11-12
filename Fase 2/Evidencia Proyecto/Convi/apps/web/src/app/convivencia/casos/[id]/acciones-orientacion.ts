@@ -112,7 +112,7 @@ async function pedirOrientacion(
         body: JSON.stringify(pregunta ? { pregunta } : {}),
         cache: "no-store",
         // La primera solicitud del día puede tardar mientras se carga el modelo.
-        signal: AbortSignal.timeout(130000),
+        signal: AbortSignal.timeout(235000),
       },
     );
   } catch {

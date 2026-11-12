@@ -166,9 +166,21 @@ if ($fallas.Count -gt 0) {
 if ($Conservar -gt 0) {
     $patron = '^convi-' + $Entorno.ToLower() + '-\d{8}-\d{6}$'
     $completos = @(Get-ChildItem -LiteralPath $Destino -Directory | Where-Object {
-        $_.Name -match $patron -and (Test-Path -LiteralPath (Join-Path $_.FullName 'respaldo.json'))
+        if ($_.Name -notmatch $patron -or ($_.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $false }
+        try {
+            $registro = Get-Content -Raw -LiteralPath (Join-Path $_.FullName 'respaldo.json') | ConvertFrom-Json
+            $archivoBase = Get-Item -LiteralPath (Join-Path $_.FullName 'base.dump')
+            return ($registro.entorno -eq $Entorno -and @($registro.archivos.fallas).Count -eq 0 -and
+                $registro.archivos.esperados -eq $registro.archivos.respaldados -and
+                $registro.base.bytes -gt 0 -and $archivoBase.Length -eq $registro.base.bytes -and
+                -not $registro.base_cambio_durante_el_respaldo)
+        } catch { return $false }
     } | Sort-Object Name -Descending)
+    $destinoAbsoluto = (Resolve-Path -LiteralPath $Destino).ProviderPath.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
     foreach ($viejo in ($completos | Select-Object -Skip $Conservar)) {
+        if (-not $viejo.FullName.StartsWith($destinoAbsoluto, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'El respaldo a depurar queda fuera del destino autorizado.'
+        }
         Remove-Item -LiteralPath $viejo.FullName -Recurse -Force
         Write-Host "  Borrado respaldo antiguo $($viejo.Name)"
     }

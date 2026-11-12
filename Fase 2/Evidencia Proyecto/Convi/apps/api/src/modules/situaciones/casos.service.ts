@@ -561,6 +561,11 @@ export class CasosService {
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
+        // Cambiar la versión MVCC del padre impide que dos instantáneas acepten la misma ausencia.
+        await db.query(
+          'UPDATE convi.casos SET estado_actual = estado_actual WHERE id = $1',
+          [casoId],
+        );
         await casoAbierto(db, casoId);
         const errores: Record<string, string> = {};
         const version = await db.query<{ protocolo_id: string }>(

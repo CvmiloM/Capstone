@@ -14,3 +14,12 @@ supabase/.branches
 **/__pycache__
 **/.pytest_cache
 **/.ruff_cache
+**/.impeccable
+**/graphify-out
+**/playwright-report
+**/test-results
+**/CONVI-respaldos
+**/respaldo.json
+**/*.dump
+**/*.har
+**/*.sarif

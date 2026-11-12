@@ -138,11 +138,23 @@ describe('Servicio de correo (PB-087, HU-076)', () => {
       await motivo(vi.fn().mockResolvedValue(respuesta(400, { Error: 'x' }))),
     ).toBe('RECHAZADO');
     expect(await motivo(vi.fn().mockResolvedValue(respuesta(200, {})))).toBe(
-      'RECHAZADO',
+      'SIN_RESPUESTA',
     );
     expect(await motivo(vi.fn().mockRejectedValue(new Error('red')))).toBe(
       'SIN_RESPUESTA',
     );
+  });
+  it('conserva la clave de idempotencia y trata un fallo 5xx como incierto', async () => {
+    const pedir = vi.fn().mockResolvedValue(respuesta(201, { messageId: 'referencia' }));
+    const enviar = crearEnvioCorreo(leerConfiguracion({ BREVO_API_KEY: 'ficticia', CORREO_REMITENTE: 'convi@escuela.test' }), pedir);
+    await enviar({ ...correo, claveIdempotencia: '55df4ccd-b372-48d1-9f54-6b10eda564ec' });
+    expect(JSON.parse(pedir.mock.calls[0][1].body).headers).toEqual({ idempotencyKey: '55df4ccd-b372-48d1-9f54-6b10eda564ec' });
+    pedir.mockResolvedValue(respuesta(500, {}));
+    await expect(enviar(correo)).rejects.toMatchObject({ motivo: 'SIN_RESPUESTA' });
+    pedir.mockResolvedValue(respuesta(400, { code: 'duplicate_parameter' }));
+    await expect(enviar(correo)).rejects.toMatchObject({ motivo: 'SIN_RESPUESTA' });
+    pedir.mockResolvedValue(respuesta(408, {}));
+    await expect(enviar(correo)).rejects.toMatchObject({ motivo: 'SIN_RESPUESTA' });
   });
 });
 

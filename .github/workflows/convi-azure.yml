@@ -91,6 +91,12 @@ jobs:
             -t "$registry_server/convi-web:$GITHUB_SHA" .
           docker push "$registry_server/convi-api:$GITHUB_SHA"
           docker push "$registry_server/convi-web:$GITHUB_SHA"
+          api_digest=$(az acr repository show --name "$REGISTRY" --image "convi-api:$GITHUB_SHA" --query digest -o tsv --only-show-errors)
+          web_digest=$(az acr repository show --name "$REGISTRY" --image "convi-web:$GITHUB_SHA" --query digest -o tsv --only-show-errors)
+          [[ "$api_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          [[ "$web_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          echo "API_IMAGE=$registry_server/convi-api@$api_digest" >> "$GITHUB_ENV"
+          echo "WEB_IMAGE=$registry_server/convi-web@$web_digest" >> "$GITHUB_ENV"
           echo "REGISTRY_SERVER=$registry_server" >> "$GITHUB_ENV"
       - name: Actualizar API interna y web pública
         env:
@@ -103,9 +109,9 @@ jobs:
           az extension add --name containerapp --upgrade --only-show-errors
           # Solo cambia las imágenes, conserva secretos, permisos e ingreso HTTPS.
           az containerapp update -g rg-convi-pruebas -n ca-convi-api-estandar \
-            --image "$REGISTRY_SERVER/convi-api:$GITHUB_SHA" --only-show-errors -o none
+            --image "$API_IMAGE" --only-show-errors -o none
           az containerapp update -g rg-convi-pruebas -n ca-convi-web-estandar \
-            --image "$REGISTRY_SERVER/convi-web:$GITHUB_SHA" --only-show-errors -o none
+            --image "$WEB_IMAGE" --only-show-errors -o none
           host=$(az containerapp show -g rg-convi-pruebas -n ca-convi-web-estandar --query properties.configuration.ingress.fqdn -o tsv)
           curl --fail --silent --show-error --retry 6 --retry-all-errors --retry-delay 10 --max-time 60 "https://$host/login" -o /dev/null
           printf '### CONVI publicado\n\nCommit: `%s`\n\n[Entrar a CONVI](https://%s)\n' "$GITHUB_SHA" "$host" >> "$GITHUB_STEP_SUMMARY"

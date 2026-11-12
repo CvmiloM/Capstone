@@ -1,7 +1,7 @@
 export const ACCIONES: Record<string, string> = {
   MFA_RESTABLECIMIENTO_SOLICITADO: 'Recuperación del autenticador solicitada',
   MFA_RESTABLECIDO: 'Segundo factor restablecido',
-  INVITACION_REENVIADA: 'Invitación reenviada',
+  INVITACION_REENVIADA: 'Reenvío de invitación solicitado',
   REPUBLICACION_DOCUMENTO: 'Documento publicado nuevamente',
   BORRADOR_CORREO_DESCARTADO: 'Borrador de correo descartado',
   HABILITACION_BUSQUEDA_IA: 'Documento habilitado para búsqueda con IA',

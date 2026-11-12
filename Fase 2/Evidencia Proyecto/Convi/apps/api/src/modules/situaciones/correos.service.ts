@@ -36,6 +36,7 @@ import {
   ErrorEnvio,
   type ConsultarEntrega,
   type EnviarCorreo,
+  type CorreoSaliente,
   type MotivoErrorEnvio,
   type ResultadoEntrega,
 } from './envio-correo.js';
@@ -52,8 +53,7 @@ const NO_EDITABLE =
 const NO_DISPONIBLE =
   'La IA no está disponible en este momento, puedes redactar el correo a mano e intentarlo con IA más tarde.';
 
-// PB-087: lo que se responde si el servicio de correo no envió. En todos los
-// casos el correo sigue en borrador y se puede reintentar con la misma clave.
+// Solo un rechazo inequívoco vuelve a borrador; un resultado incierto no se reenvía.
 const NO_ENVIADO: Record<MotivoErrorEnvio, string> = {
   NO_CONFIGURADO:
     'El envío de correos no está configurado en este ambiente. El correo sigue en borrador.',
@@ -62,7 +62,7 @@ const NO_ENVIADO: Record<MotivoErrorEnvio, string> = {
   RECHAZADO:
     'El servicio de correo rechazó el envío. El correo sigue en borrador: revisa la dirección e inténtalo nuevamente.',
   SIN_RESPUESTA:
-    'El servicio de correo no respondió. El correo sigue en borrador: inténtalo nuevamente en unos minutos.',
+    'No pudimos confirmar el resultado del envío. Queda pendiente de verificación y no se reenviará automáticamente. Revisa el proveedor antes de preparar otro correo.',
 };
 
 // PB-088: lo que se responde si no se pudo revisar la entrega. El estado no cambia.
@@ -172,20 +172,20 @@ export class CorreosService {
    * PB-087 (HU-076): un profesional de Convivencia activo confirma y se envía.
    * Con el patrón del reenvío de invitaciones (PB-146): la confirmación guarda
    * quién, cuándo y la clave creada al mostrar la página (CA1); la misma clave
-   * repetida responde lo mismo sin enviar otro correo (CA3); si el servicio de
-   * correo falla se deshace todo, el correo sigue en borrador y se reintenta.
+   * repetida responde lo mismo sin enviar otro correo (CA3). La intención se
+   * confirma antes de llamar al proveedor: una caída posterior no habilita otro envío.
    * Enviado, la base no deja cambiarlo (CA4). CA5: si el apoderado no puede
    * ser contactado hay que confirmar la advertencia, y la base la deja en la
    * auditoría. READ COMMITTED: una repetición simultánea espera el bloqueo y
    * ve el envío de la primera.
    */
-  enviar(
+  async enviar(
     sesion: Sesion,
     correoId: string,
     cuerpo: unknown,
   ): Promise<{ id: string; estado: string }> {
     const { clave_envio, con_advertencia } = validarEnvio(cuerpo);
-    return this.cuentas.operar(
+    const reserva = await this.cuentas.operar<{ id: string; estado: string; correo?: CorreoSaliente }>(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
@@ -260,33 +260,52 @@ export class CorreosService {
              WHERE id = convi.establecimiento_actual()`,
           )
         ).rows[0];
-        let referencia: string;
-        try {
-          ({ referencia } = await this.entregar({
+        return {
+          id: correoId,
+          estado: 'PENDIENTE',
+          correo: {
             para: correo.direccion,
             nombrePara: persona?.nombre ?? null,
             asunto: correo.asunto,
             texto: correo.contenido,
             nombreRemitente: escuela.nombre,
             responderA: escuela.correo_contacto,
-          }));
-        } catch (error) {
-          if (!(error instanceof ErrorEnvio)) throw error;
-          // Sin la dirección ni el contenido, solo el motivo. 409 con el mensaje,
-          // para que la pantalla lo muestre tal cual.
-          this.logger.warn(`No se envió un correo del caso: ${error.motivo}`);
-          throw new ConflictException(NO_ENVIADO[error.motivo]);
-        }
-        await db.query(
-          `UPDATE convi.comunicaciones
-           SET estado_entrega = 'ENVIADO', enviado_en = now(), referencia_externa = $2
-           WHERE id = $1`,
-          [correoId, referencia],
-        );
-        return { id: correoId, estado: 'ENVIADO' };
+            claveIdempotencia: clave_envio,
+          },
+        };
       },
       'READ COMMITTED',
     );
+    if (!reserva.correo) return { id: reserva.id, estado: reserva.estado };
+    let referencia: string;
+    try {
+      ({ referencia } = await this.entregar(reserva.correo));
+    } catch (error) {
+      const motivo = error instanceof ErrorEnvio ? error.motivo : 'SIN_RESPUESTA';
+      this.logger.warn(`Resultado del servicio de correo: ${motivo}`);
+      if (motivo !== 'SIN_RESPUESTA') {
+        await this.operar(sesion, (db) =>
+          db.query(
+            `UPDATE convi.comunicaciones SET estado_entrega='BORRADOR',
+               confirmado_por=NULL,confirmado_en=NULL,clave_envio=NULL
+             WHERE id=$1 AND clave_envio=$2 AND enviado_en IS NULL`,
+            [correoId, clave_envio],
+          ),
+        );
+      }
+      throw new ConflictException(NO_ENVIADO[motivo]);
+    }
+    return this.operar(sesion, async (db) => {
+      const guardado = await db.query(
+        `UPDATE convi.comunicaciones
+         SET estado_entrega = 'ENVIADO', enviado_en = now(), referencia_externa = $2
+         WHERE id = $1 AND clave_envio = $3 AND estado_entrega = 'PENDIENTE' RETURNING id`,
+        [correoId, referencia, clave_envio],
+      );
+      if (!guardado.rowCount)
+        throw new ConflictException('El envío requiere verificar su estado. No lo vuelvas a enviar.');
+      return { id: correoId, estado: 'ENVIADO' };
+    });
   }
 
   /**

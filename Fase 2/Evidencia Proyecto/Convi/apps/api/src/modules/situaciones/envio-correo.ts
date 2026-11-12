@@ -16,6 +16,8 @@ export type CorreoSaliente = {
   nombreRemitente: string;
   /** Correo de contacto de la escuela, para que las respuestas lleguen ahí. */
   responderA: string | null;
+  /** Misma confirmación en el proveedor, incluso si se pierde su respuesta. */
+  claveIdempotencia?: string;
 };
 
 /** Entrega el correo y devuelve la referencia del proveedor, o lanza ErrorEnvio. */
@@ -85,6 +87,7 @@ function cuerpoDe(
       ...(c.responderA ? { replyTo: { email: c.responderA } } : {}),
       subject: c.asunto,
       textContent: c.texto,
+      ...(c.claveIdempotencia ? { headers: { idempotencyKey: c.claveIdempotencia } } : {}),
     };
   return {
     From: { Email: remitente, Name: c.nombreRemitente },
@@ -123,8 +126,12 @@ export function crearEnvioCorreo(
     const datos = (await respuesta.json().catch(() => null)) as {
       messageId?: unknown;
       ID?: unknown;
+      code?: unknown;
     } | null;
     const id = proveedor === 'BREVO' ? datos?.messageId : datos?.ID;
+    if (respuesta.status >= 500 || respuesta.status === 408 || respuesta.status === 409
+      || datos?.code === 'duplicate_parameter' || (respuesta.ok && (typeof id !== 'string' || !id)))
+      throw new ErrorEnvio('SIN_RESPUESTA');
     if (!respuesta.ok || typeof id !== 'string' || !id)
       throw new ErrorEnvio('RECHAZADO');
     // PB-088 consulta el estado con el proveedor de la referencia.

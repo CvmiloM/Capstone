@@ -4,6 +4,7 @@ import {
   MODELO_EMBEDDING,
   type Fragmento,
 } from './preparacion.js';
+import { conCapacidadIA } from '../../common/capacidad-ia.js';
 
 /** Contrato de /api/embed de Ollama, también utilizable detrás de FastAPI. */
 export function configuracionEmbeddings() {
@@ -105,6 +106,7 @@ export async function generarEmbeddings(
   for (let inicio = 0; inicio < fragmentos.length; inicio += 8) {
     const lote = fragmentos.slice(inicio, inicio + 8);
     try {
+      const preparados = await conCapacidadIA(async () => {
       const respuesta = await fetch(configuracion.url, {
         method: 'POST',
         redirect: 'error',
@@ -130,9 +132,9 @@ export async function generarEmbeddings(
           respuesta.status === 429 || respuesta.status >= 500,
         );
       }
-      vectores.push(
-        ...validarEmbeddings(await respuestaAcotada(respuesta), lote.length),
-      );
+      return validarEmbeddings(await respuestaAcotada(respuesta), lote.length);
+      });
+      vectores.push(...preparados);
     } catch (error) {
       if (error instanceof ErrorPreparacion) throw error;
       throw new ErrorPreparacion(

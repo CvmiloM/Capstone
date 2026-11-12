@@ -33,8 +33,8 @@ export async function pedirPropuestaProtocolo(
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
-        // La primera solicitud del día puede tardar mientras se carga el modelo.
-        signal: AbortSignal.timeout(130000),
+        // Incluye la espera en cola, los embeddings y la generación.
+        signal: AbortSignal.timeout(235000),
       },
     );
   } catch {

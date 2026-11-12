@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { enviar } from "../../datos";
 import type { EstadoAccion } from "./acciones";
@@ -79,8 +80,7 @@ export async function descartarCorreo(
 }
 
 // PB-087 (HU-076): confirma y envía. La clave viene de la página, así que
-// repetir el mismo envío no manda otro correo; si el envío falla, el correo
-// sigue en borrador.
+// repetir el mismo envío no manda otro correo; un resultado incierto queda en verificación.
 export async function enviarCorreo(
   _anterior: EstadoAccion,
   formData: FormData,
@@ -98,9 +98,10 @@ export async function enviarCorreo(
       con_advertencia: leerTexto(formData, "con_advertencia") === "si",
     },
   );
+  revalidatePath(`/convivencia/casos/${casoId}`);
   if (!resultado.ok)
     return { mensaje: resultado.mensaje, errores: resultado.errores };
-  volver(casoId, "correo-enviado");
+  volver(casoId, resultado.estado === "PENDIENTE" ? "correo-pendiente" : "correo-enviado");
   return {};
 }
 
@@ -170,7 +171,7 @@ export async function prepararCorreoConIA(
         body: JSON.stringify(valores),
         cache: "no-store",
         // La primera solicitud del día puede tardar mientras se carga el modelo.
-        signal: AbortSignal.timeout(130000),
+        signal: AbortSignal.timeout(235000),
       },
     );
   } catch {

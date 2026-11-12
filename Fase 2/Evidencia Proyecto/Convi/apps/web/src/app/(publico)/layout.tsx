@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import mascota from "@/assets/convi-favicon.png";
 import { EnlaceConCarga } from "@/app/components/actividad";
 import "./acceso.css";
+import { figtree } from "../fuente-publica";
 
 // Las páginas de acceso continúan la landing: el mismo fondo, la misma barra y
 // la misma pila de carpetas, con el formulario en la carpeta de adelante.
@@ -28,10 +29,10 @@ const estiloCarpeta = (
 
 export default function LayoutPublico({ children }: { children: ReactNode }) {
   return (
-    <div className="acc-pagina flex flex-1 flex-col font-cuerpo">
+    <div className={`${figtree.variable} acc-pagina flex flex-1 flex-col font-cuerpo`}>
       <nav aria-label="Principal" className="acc-barra">
         <EnlaceConCarga href="/" aria-label="Convi, inicio" className="rounded-full">
-          <Image src={mascota} alt="" priority className="block size-12" />
+          <Image src={mascota} alt="" priority sizes="48px" className="block size-12" />
         </EnlaceConCarga>
         <EnlaceConCarga
           href="/"
