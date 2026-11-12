@@ -49,7 +49,7 @@ const SECCIONES: SeccionMenu[] = [
         href: "/convivencia/indicadores",
         texto: "Indicadores e informes",
         icono: "categorias",
-        tambien: ["/convivencia/informes"],
+        tambien: ["/convivencia/analitica", "/convivencia/informes"],
       },
     ],
   },

@@ -40,6 +40,8 @@ import { ApoderadoController } from './apoderado.controller.js';
 import { ApoderadoService } from './apoderado.service.js';
 import { IndicadoresController } from './indicadores.controller.js';
 import { IndicadoresService } from './indicadores.service.js';
+import { AnaliticaController } from './analitica.controller.js';
+import { AnaliticaService } from './analitica.service.js';
 import { InformesController } from './informes.controller.js';
 import { InformesService } from './informes.service.js';
 import { ProfesorController } from './profesor.controller.js';
@@ -65,6 +67,7 @@ import { ProfesorService } from './profesor.service.js';
     JornadaController,
     InformesController,
     IndicadoresController,
+    AnaliticaController,
     SeguimientosController,
     ApoderadoController,
     ProfesorController,
@@ -84,6 +87,7 @@ import { ProfesorService } from './profesor.service.js';
     JornadaService,
     InformesService,
     IndicadoresService,
+    AnaliticaService,
     SeguimientosService,
     ApoderadoService,
     ProfesorService,
