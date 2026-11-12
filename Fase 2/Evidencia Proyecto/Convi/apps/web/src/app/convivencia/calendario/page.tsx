@@ -87,8 +87,11 @@ export default async function Calendario({
     return ruta(c.mes, otros, false);
   };
 
-  const pendientes = eventos.filter((e) => e.vencido).length;
-  const enElMes = eventos.filter((e) => e.dia.startsWith(c.mes)).length;
+  // La grilla también muestra días del mes anterior y del siguiente, el
+  // resumen cuenta solo los eventos del mes, también los atrasados.
+  const delMes = eventos.filter((e) => e.dia.startsWith(c.mes));
+  const enElMes = delMes.length;
+  const pendientes = delMes.filter((e) => e.vencido).length;
 
   return (
     <div className="space-y-6">
