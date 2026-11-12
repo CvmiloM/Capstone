@@ -170,6 +170,25 @@ Por ahora se usa un remitente Gmail verificado. Brevo puede sustituir la
 dirección de envío por una de su dominio. Un dominio propio y autenticado
 queda para la publicación definitiva, junto con las URL públicas de retorno.
 
+### Diseño de los correos de cuenta
+
+Las cuatro plantillas de `supabase/templates/` siguen la identidad de la
+landing: fondo tinta, la pila de carpetas, la carpeta crema con su pestaña y
+el botón naranjo. Están hechas con tablas y estilos en línea porque los
+programas de correo no aceptan el CSS de la web. Los enlaces, las variables
+y los asuntos no cambiaron.
+
+La mascota se carga desde `{{ .SiteURL }}/correo/convi-mascota.png`
+(`apps/web/public/correo/`), por eso en cloud aparece cuando la web publicada
+ya tiene la imagen. Si el programa de correo bloquea imágenes, el correo se
+lee igual.
+
+En el proyecto cloud, volver a guardar en **Authentication → Emails** el
+contenido de cada archivo, sin cambiar los asuntos ni el SMTP: Invite user
+(`invitacion.html`), Confirm sign up (`confirmacion.html`), Magic Link
+(`continuar-invitacion.html`) y Reset password (`recuperacion.html`).
+En local se aplican al reiniciar Supabase con `detener.ps1` e `iniciar.ps1`.
+
 ## Verificación realizada
 
 Las cinco migraciones se aplicaron al proyecto `cwgydufnbpapinzauzui` y el
