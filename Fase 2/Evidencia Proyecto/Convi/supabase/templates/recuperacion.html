@@ -1,4 +1,135 @@
-<h2>Recupera tu contraseña de CONVI</h2>
-<p>Se solicitó recuperar la contraseña de tu cuenta.</p>
-<p><a href="{{ .SiteURL }}/restablecer-contrasena?token_hash={{ .TokenHash }}&amp;type=recovery">Definir una nueva contraseña</a></p>
-<p>Si no hiciste esta solicitud, ignora este correo. Tu contraseña no cambia por solicitar el enlace ni por abrirlo.</p>
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light only">
+    <meta name="supported-color-schemes" content="light only">
+    <title>Recupera tu contraseña de CONVI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;700&amp;family=Outfit:wght@800&amp;display=swap" rel="stylesheet">
+    <style>
+      body { margin: 0; padding: 0; }
+      @media (max-width: 480px) {
+        .cv-cuerpo { padding: 28px 22px 24px !important; }
+        .cv-titulo { font-size: 26px !important; }
+        .cv-nombre { font-size: 44px !important; }
+      }
+    </style>
+  </head>
+  <body style="margin:0;padding:0;background-color:#13254a;">
+    <!-- Lo que se lee en la bandeja antes de abrir el correo. -->
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#13254a;opacity:0;">Define una nueva contraseña para tu cuenta de CONVI.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#13254a" style="background-color:#13254a;">
+      <tr>
+        <td align="center" style="padding:28px 12px 40px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+            <!-- Marca: la mascota y el nombre, como en el login. -->
+            <tr>
+              <td align="center" style="padding:0 0 8px;">
+                <img src="{{ .SiteURL }}/correo/convi-mascota.png" width="56" height="56" alt="" style="display:block;width:56px;height:56px;border:0;">
+              </td>
+            </tr>
+            <tr>
+              <td class="cv-nombre" align="center" style="padding:0 0 30px;font-family:'Outfit','Trebuchet MS',Arial,sans-serif;font-size:52px;font-weight:800;line-height:1;letter-spacing:-2px;color:#fbf7f0;">Convi</td>
+            </tr>
+            <!-- La pila de carpetas de la landing. -->
+          <tr>
+            <td style="padding:0;background-color:#13254a;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="4%" height="12" style="height:12px;font-size:0;line-height:0;">&nbsp;</td>
+                  <td width="26%" height="12" bgcolor="#3d4d6e" style="height:12px;background-color:#3d4d6e;font-size:0;line-height:0;">&nbsp;</td>
+                  <td width="70%" height="12" style="height:12px;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td height="10" bgcolor="#3d4d6e" style="height:10px;background-color:#3d4d6e;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:0;background-color:#3d4d6e;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="25%" height="12" style="height:12px;font-size:0;line-height:0;">&nbsp;</td>
+                  <td width="26%" height="12" bgcolor="#4fbf8b" style="height:12px;background-color:#4fbf8b;font-size:0;line-height:0;">&nbsp;</td>
+                  <td width="49%" height="12" style="height:12px;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td height="10" bgcolor="#4fbf8b" style="height:10px;background-color:#4fbf8b;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:0;background-color:#4fbf8b;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="47%" height="12" style="height:12px;font-size:0;line-height:0;">&nbsp;</td>
+                  <td width="26%" height="12" bgcolor="#f7b815" style="height:12px;background-color:#f7b815;font-size:0;line-height:0;">&nbsp;</td>
+                  <td width="27%" height="12" style="height:12px;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td height="10" bgcolor="#f7b815" style="height:10px;background-color:#f7b815;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:0;background-color:#f7b815;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="70%" height="12" style="height:12px;font-size:0;line-height:0;">&nbsp;</td>
+                  <td width="26%" height="12" bgcolor="#c9d1e3" style="height:12px;background-color:#c9d1e3;font-size:0;line-height:0;">&nbsp;</td>
+                  <td width="4%" height="12" style="height:12px;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td height="10" bgcolor="#c9d1e3" style="height:10px;background-color:#c9d1e3;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+            <!-- La carpeta de adelante, con su pestaña. -->
+            <tr>
+              <td style="padding:0;background-color:#c9d1e3;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="8%" style="font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="30%" align="center" bgcolor="#fbf7f0" style="background-color:#fbf7f0;padding:9px 8px 7px;font-family:'Figtree','Segoe UI',Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;color:#13254a;white-space:nowrap;">Contraseña</td>
+                    <td width="62%" style="font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td class="cv-cuerpo" bgcolor="#fbf7f0" style="background-color:#fbf7f0;padding:36px 36px 28px;">
+                <h1 class="cv-titulo" style="margin:0 0 14px;font-family:'Outfit','Trebuchet MS',Arial,sans-serif;font-size:30px;font-weight:800;line-height:1.1;letter-spacing:-0.5px;color:#13254a;">Recupera tu contraseña</h1>
+                <p style="margin:0 0 12px;font-family:'Figtree','Segoe UI',Arial,sans-serif;font-size:16px;line-height:24px;color:#13254a;">Se solicitó recuperar la contraseña de tu cuenta.</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0;">
+                  <tr>
+                    <td bgcolor="#f26b3a" style="background-color:#f26b3a;border-bottom:4px solid #c24e22;">
+                      <a href="{{ .SiteURL }}/restablecer-contrasena?token_hash={{ .TokenHash }}&amp;type=recovery" style="display:inline-block;padding:16px 30px;font-family:'Figtree','Segoe UI',Arial,sans-serif;font-size:16px;font-weight:700;line-height:20px;color:#13254a;text-decoration:none;">Definir una nueva contraseña</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 6px;font-family:'Figtree','Segoe UI',Arial,sans-serif;font-size:13px;line-height:19px;color:#3d4d6e;">¿El botón no funciona? Copia este enlace en tu navegador:</p>
+                <p style="margin:0;font-family:'Figtree','Segoe UI',Arial,sans-serif;font-size:13px;line-height:19px;word-break:break-all;"><a href="{{ .SiteURL }}/restablecer-contrasena?token_hash={{ .TokenHash }}&amp;type=recovery" style="color:#13254a;text-decoration:underline;">{{ .SiteURL }}/restablecer-contrasena?token_hash={{ .TokenHash }}&amp;type=recovery</a></p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;">
+                  <tr><td style="border-top:1px solid #dcdad6;font-size:0;line-height:0;">&nbsp;</td></tr>
+                </table>
+                <p style="margin:18px 0 0;font-family:'Figtree','Segoe UI',Arial,sans-serif;font-size:13px;line-height:19px;color:#3d4d6e;">El enlace es personal, no lo compartas. Si no hiciste esta solicitud, ignora este correo. Tu contraseña no cambia por solicitar el enlace ni por abrirlo.</p>
+                <p style="margin:6px 0 0;font-family:'Figtree','Segoe UI',Arial,sans-serif;font-size:13px;line-height:19px;color:#3d4d6e;">Este correo se envió a {{ .Email }}.</p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:24px 12px 0;font-family:'Figtree','Segoe UI',Arial,sans-serif;font-size:13px;line-height:19px;color:#c9d1e3;">
+                Convi · Seguimiento y trazabilidad de la convivencia escolar.<br>
+                <a href="{{ .SiteURL }}" style="color:#c9d1e3;text-decoration:underline;">Ir a Convi</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
