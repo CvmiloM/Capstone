@@ -15,6 +15,7 @@ export const GRUPOS = {
     etiqueta: "Indicadores e informes",
     pestanas: [
       { href: "/convivencia/indicadores", texto: "Indicadores" },
+      { href: "/convivencia/analitica", texto: "Analítica" },
       { href: "/convivencia/informes", texto: "Informes" },
     ],
   },
