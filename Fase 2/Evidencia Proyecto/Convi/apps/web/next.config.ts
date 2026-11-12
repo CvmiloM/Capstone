@@ -2,14 +2,35 @@ import type { NextConfig } from "next";
 import path from "node:path";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../../"),
   // Una pestaña de la versión anterior debe recargar después del despliegue.
   deploymentId: process.env.DEPLOYMENT_ID,
   async headers() {
+    const produccion = process.env.NODE_ENV === "production";
+    // shortcut: CSP permite inline con Cache Components; revisar nonces/hashes al cambiar el renderizado.
+    const politica = [
+      "default-src 'self'",
+      `script-src 'self' 'unsafe-inline'${produccion ? "" : " 'unsafe-eval'"}`,
+      "script-src-attr 'none'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self'",
+      `connect-src 'self'${produccion ? "" : " ws: wss:"}`,
+      "object-src 'none'",
+      "base-uri 'none'",
+      // El visor de documentos incrusta los PDF del propio portal.
+      "frame-ancestors 'self'",
+      "frame-src 'self'",
+      "form-action 'self'",
+      ...(produccion ? ["upgrade-insecure-requests"] : []),
+    ].join("; ");
     const recuperacion = [
       "/recuperar-contrasena",
       "/restablecer-contrasena",
+      "/confirmar-correo",
+      "/registro/confirmar",
     ].map((source) => ({
       source,
       headers: [
@@ -17,17 +38,19 @@ const nextConfig: NextConfig = {
         { key: "Referrer-Policy", value: "no-referrer" },
       ],
     }));
-    return process.env.NODE_ENV === "production"
-      ? [
-          ...recuperacion,
-          {
-            source: "/:path*",
-            headers: [
-              { key: "Strict-Transport-Security", value: "max-age=15552000" },
-            ],
-          },
-        ]
-      : recuperacion;
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: politica },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          ...(produccion ? [{ key: "Strict-Transport-Security", value: "max-age=15552000" }] : []),
+        ],
+      },
+      ...recuperacion,
+    ];
   },
   cacheComponents: true,
   partialPrefetching: true,

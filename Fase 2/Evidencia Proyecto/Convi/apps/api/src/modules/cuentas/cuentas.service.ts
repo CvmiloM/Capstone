@@ -210,13 +210,13 @@ export class CuentasService {
   // PB-011: el correo sale de la cuenta guardada, nunca de lo que manda el navegador.
   // PB-146 (HU-125): la clave de la solicitud es el id del evento de auditoría,
   // así la misma solicitud repetida envía un solo correo y responde lo mismo.
-  reenviar(
+  async reenviar(
     sesion: Sesion,
     id: string,
     cuerpo?: unknown,
   ): Promise<InvitacionEnviada> {
     const { solicitud_id } = validarReenvio(cuerpo);
-    return this.cuentas.operar(
+    const reserva = await this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
@@ -251,7 +251,7 @@ export class CuentasService {
               throw new ConflictException(
                 'Esta solicitud ya corresponde a otro reenvío, actualiza la página.',
               );
-            return respuesta;
+            return { respuesta, enviar: false };
           }
         }
         if (cuenta.estado !== 'PENDIENTE' || cuenta.auth_usuario_id)
@@ -259,13 +259,12 @@ export class CuentasService {
             'Solo puedes reenviar una invitación pendiente.',
           );
 
-        // El evento va antes del correo: si el envío falla, la transacción lo
-        // deshace y la misma solicitud se puede reintentar.
+        // Reservar antes de contactar Auth evita repetir un envío de resultado incierto.
         const evento = await db.query(
           `INSERT INTO convi.eventos_auditoria(id, establecimiento_id, membresia_actor_id,
              codigo_accion, tipo_recurso, recurso_id, codigo_resultado, solicitud_id, metadatos)
            VALUES($1, $2, $3, 'INVITACION_REENVIADA', 'membresias_establecimiento',
-                  $4, 'OK', $1, '{}')
+                  $4, 'OK', $1, '{"fase":"SOLICITUD_REGISTRADA"}')
            ON CONFLICT (id) DO NOTHING`,
           [
             solicitud_id ?? randomUUID(),
@@ -279,39 +278,39 @@ export class CuentasService {
             'Esta solicitud ya se usó en otra acción, actualiza la página.',
           );
 
-        let { error } = await this.supabase.auth.admin.inviteUserByEmail(
-          cuenta.correo,
-          { data: { membresia_id: cuenta.id } },
-        );
-        // Si ya confirmó el correo pero no terminó, recibe un enlace para la misma identidad.
-        if (error?.code === 'email_exists') {
-          ({ error } = await this.supabase.auth.signInWithOtp({
-            email: cuenta.correo,
-            options: { shouldCreateUser: false },
-          }));
-        }
-        if (error) {
-          throw new ServiceUnavailableException(
-            error.status === 429 || error.code === 'over_email_send_rate_limit'
-              ? 'Espera un minuto antes de reenviar la invitación nuevamente.'
-              : 'No se pudo reenviar la invitación. Inténtalo nuevamente.',
-          );
-        }
-        // Se conservan persona, escuela, perfil y quién hizo la invitación original.
-        return respuesta;
+        return { respuesta, enviar: true };
       },
-      // Con READ COMMITTED la repetición ve el evento de la primera en vez de fallar por serialización.
       'READ COMMITTED',
     );
+    if (reserva.enviar) {
+      let { error } = await this.supabase.auth.admin.inviteUserByEmail(
+        reserva.respuesta.correo,
+        { data: { membresia_id: reserva.respuesta.id } },
+      );
+      // Si ya confirmó el correo pero no terminó, recibe un enlace para la misma identidad.
+      if (error?.code === 'email_exists') {
+        ({ error } = await this.supabase.auth.signInWithOtp({
+          email: reserva.respuesta.correo,
+          options: { shouldCreateUser: false },
+        }));
+      }
+      if (error) {
+        throw new ServiceUnavailableException(
+          error.status === 429 || error.code === 'over_email_send_rate_limit'
+            ? 'Espera un minuto antes de reenviar la invitación nuevamente.'
+            : 'No se pudo confirmar el reenvío. Revisa el correo antes de solicitar otra invitación.',
+        );
+      }
+    }
+    return reserva.respuesta;
   }
 
   // CA1, CA2 y CA4: crea (o reutiliza) la ficha de la persona y su cuenta
-  // Pendiente, y Supabase envía el correo con el enlace de activación. El
-  // correo se envía dentro de la transacción: si falla, no queda una cuenta
-  // Pendiente sin invitación (PB-138).
-  invitar(sesion: Sesion, cuerpo: unknown): Promise<InvitacionEnviada> {
+  // Pendiente, y Supabase envía el correo con el enlace de activación. La
+  // cuenta se confirma antes del envío: un enlace nunca apunta a una cuenta deshecha.
+  async invitar(sesion: Sesion, cuerpo: unknown): Promise<InvitacionEnviada> {
     const datos = validarInvitacion(cuerpo);
-    return this.cuentas.operar(
+    const invitacion = await this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
@@ -367,15 +366,16 @@ export class CuentasService {
           });
         const invitacion = membresia.rows[0];
 
-        await this.enviarInvitacionAuth(invitacion);
         return invitacion;
       },
     );
+    await this.enviarInvitacionAuth(invitacion);
+    return invitacion;
   }
 
   // PB-115 completa la invitación de PB-010 desde una persona ya vinculada.
-  invitarApoderado(sesion: Sesion, vinculoId: string) {
-    return this.cuentas.operar(
+  async invitarApoderado(sesion: Sesion, vinculoId: string) {
+    const invitacion = await this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
@@ -409,11 +409,12 @@ export class CuentasService {
          RETURNING id,correo_invitacion AS correo,codigo_perfil AS perfil,estado`,
           [persona.id, persona.correo],
         );
-        await this.enviarInvitacionAuth(resultado.rows[0]);
         return resultado.rows[0];
       },
       'READ COMMITTED',
     );
+    await this.enviarInvitacionAuth(invitacion);
+    return invitacion;
   }
 
   private async enviarInvitacionAuth(invitacion: InvitacionEnviada) {
@@ -430,7 +431,7 @@ export class CuentasService {
     throw new ServiceUnavailableException(
       error.status === 429
         ? 'Se enviaron demasiados correos en poco tiempo, espera unos minutos e inténtalo nuevamente'
-        : 'No se pudo enviar la invitación, inténtalo nuevamente',
+        : 'La cuenta quedó pendiente, pero no se pudo confirmar el envío. Revisa el correo y usa Reenviar invitación si no llegó.',
     );
   }
 }

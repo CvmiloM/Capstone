@@ -72,6 +72,17 @@ try {
         throw 'Falta configuracion cloud HTTPS/verify-full o claves modernas del proyecto CONVI, no se muestran valores privados.'
     }
 
+    # Una migración con ON CONFLICT no corrige un bucket antiguo configurado como público.
+    try {
+        $bucket = Invoke-RestMethod -Method Get -Uri ($cloud['SUPABASE_URL'] + '/storage/v1/bucket/convi-privado') -Headers @{ apikey = $cloud['SUPABASE_SECRET_KEY']; 'User-Agent' = 'CONVI-Despliegue/1.0' } -TimeoutSec 15 -MaximumRedirection 0
+        if ($bucket.id -ne 'convi-privado' -or $bucket.public -ne $false -or
+            -not $bucket.file_size_limit -or [long]$bucket.file_size_limit -gt 26214400 -or [long]$bucket.file_size_limit -le 0) {
+            throw 'Configuración de almacenamiento incompatible'
+        }
+    } catch {
+        throw 'No se verificó el bucket convi-privado: debe existir, ser privado y limitar archivos a un máximo de 25 MiB. Revisa Storage antes de publicar; no se muestran credenciales.'
+    }
+
     try { $redisUrl = [uri]$cloud['AZURE_REDIS_URL'] } catch { throw 'AZURE_REDIS_URL no es una URL TLS valida; no se muestran credenciales.' }
     if (-not $redisUrl -or $redisUrl.Scheme -ne 'rediss' -or
         $redisUrl.Host -notmatch '^[a-z0-9-]+\.brazilsouth\.redis\.azure\.net$' -or
@@ -121,6 +132,15 @@ try {
         $env:NEXT_PUBLIC_SUPABASE_URL = $anteriorUrl
         $env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = $anteriorClave
     }
+
+    # Desplegar el contenido exacto publicado, aunque después se vuelva a usar la etiqueta.
+    $apiDigest = Invocar-Az -Argumentos @('acr', 'repository', 'show', '--name', $base.registryName.value, '--image', "convi-api:$Version", '--query', 'digest', '-o', 'tsv')
+    $webDigest = Invocar-Az -Argumentos @('acr', 'repository', 'show', '--name', $base.registryName.value, '--image', "convi-web:$Version", '--query', 'digest', '-o', 'tsv')
+    if ($apiDigest -notmatch '^sha256:[a-f0-9]{64}$' -or $webDigest -notmatch '^sha256:[a-f0-9]{64}$') {
+        throw 'No se pudo comprobar la identidad de las imágenes, no se actualizan las aplicaciones.'
+    }
+    $apiImage = "$registro/convi-api@$apiDigest"
+    $webImage = "$registro/convi-web@$webDigest"
 
     # El certificado publico va en la imagen, el DSN privado se entrega como parametro seguro.
     $db = $cloud['SUPABASE_DB_URL']

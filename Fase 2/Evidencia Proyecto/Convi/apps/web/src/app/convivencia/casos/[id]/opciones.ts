@@ -120,7 +120,7 @@ export const LARGO_MAXIMO_DIRECCION = 220;
 export const LARGO_MAXIMO_INDICACION = 500;
 export const NOMBRE_ESTADO_CORREO: Record<string, string> = {
   BORRADOR: "Borrador",
-  PENDIENTE: "Pendiente de envío",
+  PENDIENTE: "Envío en verificación",
   ENVIADO: "Enviado",
   ENTREGADO: "Entregado",
   FALLIDO: "Fallido",

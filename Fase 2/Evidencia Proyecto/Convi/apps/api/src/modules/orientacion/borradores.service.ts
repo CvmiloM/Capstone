@@ -330,6 +330,11 @@ export class BorradoresService {
 
 /** La última edición, pendiente y sin cambios desde que se vio (PB-139). */
 async function bloquear(db: PoolClient, id: string, version: string) {
+  // Una edición agrega una fila: actualizar el padre invalida instantáneas que no la ven.
+  await db.query(
+    "UPDATE convi.borradores_documentales_ia SET estado = estado WHERE id = $1 AND estado = 'BORRADOR'",
+    [id],
+  );
   const fila = (
     await db.query<{
       caso_id: string;

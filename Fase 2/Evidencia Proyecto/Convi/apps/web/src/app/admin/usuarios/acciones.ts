@@ -41,12 +41,12 @@ export async function invitarCuenta(
     perfil: leerTexto(formData, "perfil"),
   };
   const resultado = await enviarInvitacion(valores);
+  // Auth puede fallar después de guardar la cuenta pendiente: mostrarla para recuperarla.
+  revalidatePath("/admin/usuarios");
+  revalidatePath("/admin/guia");
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  revalidatePath("/admin/usuarios");
-  // PB-033: el mismo formulario se usa en el paso Equipo de la guía.
-  revalidatePath("/admin/guia");
   return { invitado: resultado.correo };
 }
 

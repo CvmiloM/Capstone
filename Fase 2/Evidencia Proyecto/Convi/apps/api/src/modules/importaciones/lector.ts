@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { Readable } from 'node:stream';
 import { Worker } from 'node:worker_threads';
 import { type Formato, LIMITES } from './importacion.js';
+import { comprobarXlsx, XlsxNoValido } from './xlsx-seguro.js';
 
 // PB-019 (HU-015 CA2): lee la primera hoja de un CSV o XLSX. La primera fila
 // con datos son los títulos de las columnas; cada fila siguiente se guarda con
@@ -24,24 +25,24 @@ export class ArchivoNoValido extends Error {}
 /** Capacidad temporal del servidor; no significa que el archivo sea inválido. */
 export class LecturaNoDisponible extends Error {}
 
-// Un solo Excel grande a la vez para limitar CPU/memoria, sin bloquear las páginas.
-let leyendoGrande = false;
+// Cualquier XLSX puede expandirse mucho: un solo lector aislado, sin importar su peso comprimido.
+let leyendoExcel = false;
 
 export async function leerArchivo(
   contenido: Buffer,
   formato: Formato,
 ): Promise<HojaLeida> {
-  if (formato !== 'xlsx' || contenido.length < 256 * 1024)
+  if (formato !== 'xlsx')
     return leerArchivoDirecto(contenido, formato);
-  if (leyendoGrande)
+  if (leyendoExcel)
     throw new LecturaNoDisponible(
-      'Ya se está leyendo otro Excel grande. Espera a que termine y vuelve a intentarlo.',
+      'Ya se está leyendo otro Excel. Espera a que termine y vuelve a intentarlo.',
     );
-  leyendoGrande = true;
+  leyendoExcel = true;
   try {
     return await leerEnHilo(contenido);
   } finally {
-    leyendoGrande = false;
+    leyendoExcel = false;
   }
 }
 
@@ -53,6 +54,7 @@ function leerEnHilo(contenido: Buffer): Promise<HojaLeida> {
       workerData: copia,
       transferList: [copia.buffer],
       env: {},
+      resourceLimits: { maxOldGenerationSizeMb: 128, maxYoungGenerationSizeMb: 16, stackSizeMb: 4 },
     });
     let vencido = false;
     const plazo = setTimeout(() => {
@@ -95,11 +97,17 @@ function leerEnHilo(contenido: Buffer): Promise<HojaLeida> {
   });
 }
 
-/** Solo el hilo lector y los archivos pequeños llaman al lector directamente. */
+/** Solo el hilo lector y los CSV llaman al lector directamente. */
 export async function leerArchivoDirecto(
   contenido: Buffer,
   formato: Formato,
 ): Promise<HojaLeida> {
+  if (formato === 'xlsx') {
+    try { await comprobarXlsx(contenido); }
+    catch (error) {
+      throw new ArchivoNoValido(error instanceof XlsxNoValido ? error.message : 'No pudimos comprobar el Excel. Utiliza otra copia o CSV.');
+    }
+  }
   const libro = new ExcelJS.Workbook();
   let hoja: ExcelJS.Worksheet | undefined;
   try {

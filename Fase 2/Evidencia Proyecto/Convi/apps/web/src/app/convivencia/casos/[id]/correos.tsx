@@ -93,6 +93,12 @@ export function Correos({
                   El servicio de correo aún no confirma la entrega.
                 </p>
               )}
+              {c.estado === "PENDIENTE" && (
+                <p className="mt-2 rounded-lg border border-border bg-muted p-3 text-sm">
+                  Envío confirmado, pendiente de verificar su resultado. Para evitar duplicados, no se reenviará automáticamente.
+                  Revisa el proveedor antes de crear otro correo.
+                </p>
+              )}
               {problema && (
                 <div className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-xs">
                   <p className="font-medium text-destructive">

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import {
-  Figtree,
   Geist,
   Geist_Mono,
   Outfit,
@@ -17,6 +16,7 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 // Fuente de los títulos (h1, h2), le da el tono institucional
@@ -25,14 +25,9 @@ const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
 });
 
-// Fuentes de la landing: títulos (font-titulo) y texto (font-cuerpo)
+// font-titulo también se usa en los portales.
 const outfit = Outfit({
   variable: "--font-outfit",
-  subsets: ["latin"],
-});
-
-const figtree = Figtree({
-  variable: "--font-figtree",
   subsets: ["latin"],
 });
 
@@ -45,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} ${sourceSerif.variable} ${outfit.variable} ${figtree.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${sourceSerif.variable} ${outfit.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}

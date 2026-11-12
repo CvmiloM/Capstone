@@ -114,6 +114,8 @@ const AVISOS: Record<string, string> = {
   // PB-087 (HU-076): envío con confirmación.
   "correo-enviado":
     "Enviaste el correo: quedó guardado quién lo confirmó, cuándo y su contenido, y ya no se puede editar. Enviado no significa que ya fue entregado.",
+  "correo-pendiente":
+    "El envío ya fue confirmado y está pendiente de verificar su resultado. No se reenviará automáticamente: revisa el proveedor antes de crear otro correo.",
   "correo-copiado":
     "Copiaste el correo en un borrador nuevo: revísalo antes de enviarlo. El original no cambió.",
   // PB-088 (HU-077): estado de entrega según el servicio de correo.

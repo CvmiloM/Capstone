@@ -17,10 +17,10 @@ export async function gestionarAccesoApoderado(estudianteId: string, vinculoId: 
     : await enviarCambio(operacion === "otorgar" ? "POST" : "PATCH",
       operacion === "otorgar" ? base : `${base}/${encodeURIComponent(String(acceso))}/${operacion === "renovar" ? "renovacion" : "revocacion"}`,
       operacion === "revocar" ? { confirmado: formulario.get("confirmar") === "si" } : { vence_el: typeof vence === "string" ? vence : "" });
-  if (!resultado.ok) return { mensaje: resultado.errores?.correo ?? resultado.mensaje, errores: resultado.errores };
   revalidatePath(`/admin/estudiantes/${estudianteId}/apoderados`);
   revalidatePath("/admin/apoderados");
   revalidatePath("/admin/usuarios");
   revalidatePath("/admin/auditoria");
+  if (!resultado.ok) return { mensaje: resultado.errores?.correo ?? resultado.mensaje, errores: resultado.errores };
   redirect(`/admin/estudiantes/${encodeURIComponent(estudianteId)}/apoderados?${new URLSearchParams({ apoderado: vinculoId, acceso: String(operacion) })}#vinculo-${encodeURIComponent(vinculoId)}`);
 }

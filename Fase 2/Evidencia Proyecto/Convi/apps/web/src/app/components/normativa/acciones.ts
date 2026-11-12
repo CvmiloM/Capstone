@@ -61,8 +61,8 @@ export async function consultarReglamento(
       },
       body: JSON.stringify({ pregunta }),
       cache: "no-store",
-      // La primera consulta del día puede tardar mientras se carga el modelo.
-      signal: AbortSignal.timeout(130000),
+      // Incluye la espera en cola, los embeddings y la generación.
+      signal: AbortSignal.timeout(235000),
     });
   } catch {
     return { pregunta, mensaje: SIN_CONEXION };

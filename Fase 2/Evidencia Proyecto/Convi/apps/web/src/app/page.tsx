@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import mascota from "@/assets/convi-favicon.png";
+import { figtree } from "./fuente-publica";
 import escuelaMontegrande from "@/assets/landing/escuela-montegrande.jpg";
 import escuelaManquemapu from "@/assets/landing/escuela-rural-manquemapu.jpg";
 import liceo1920 from "@/assets/landing/liceo-de-aplicacion-1920.jpg";
@@ -117,13 +118,13 @@ const claseEnlace =
 
 export default function PaginaInicio() {
   return (
-    <div className={`lp-pagina flex flex-1 flex-col font-cuerpo`}>
+    <div className={`${figtree.variable} lp-pagina flex flex-1 flex-col font-cuerpo`}>
       <main className="flex-1">
         {/* La pila de carpetas. */}
         <section aria-labelledby="titulo-convi" className="lp-heroe">
           <nav aria-label="Principal" className="lp-barra">
             <Link href="/" aria-label="Convi, inicio" className="rounded-full focus-visible:outline-2 focus-visible:outline-crema">
-              <Image src={mascota} alt="" priority className="block size-12" />
+              <Image src={mascota} alt="" priority sizes="48px" className="block size-12" />
             </Link>
             <Link href="/login" className={`lp-acceso ${claseEnlace}`}>
               Iniciar sesión

@@ -60,8 +60,8 @@ export async function pedirBorrador(
             : {}),
         }),
         cache: "no-store",
-        // La primera solicitud del día puede tardar mientras se carga el modelo.
-        signal: AbortSignal.timeout(130000),
+        // Incluye la espera en cola y la carga del modelo.
+        signal: AbortSignal.timeout(235000),
       },
     );
   } catch {

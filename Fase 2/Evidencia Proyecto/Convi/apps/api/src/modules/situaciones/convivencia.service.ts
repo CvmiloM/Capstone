@@ -612,7 +612,8 @@ export class ConvivenciaService {
           async (db) => {
             const actual = await db
               .query<{ estado: string }>(
-                'SELECT estado FROM convi.situaciones WHERE id = $1 FOR UPDATE',
+                // La consulta añade una revisión hija: la versión del padre debe cambiar también.
+                'UPDATE convi.situaciones SET estado = estado WHERE id = $1 RETURNING estado',
                 [id],
               )
               .catch((error: unknown) => {

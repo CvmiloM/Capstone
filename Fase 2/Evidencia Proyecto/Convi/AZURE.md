@@ -767,6 +767,15 @@ El portal de Convivencia tiene Consultar reglamento, la API busca con bge-m3 en 
 
 Se configura en la API con `IA_GENERACION_URL` (local `http://host.docker.internal:8000/api/chat`) y el mismo `IA_EMBEDDINGS_TOKEN`, el modelo se instala con `ollama pull qwen3.5:9b`, cada consulta queda en `registros_solicitudes_ia` con propósito, modelo, fuentes citadas, tiempo y resultado, sin la pregunta ni la respuesta, y si la IA falla la consulta queda Fallida y la pantalla lo informa sin afectar el resto de CONVI
 
+Generación y embeddings comparten hasta cuatro llamadas simultáneas por proceso
+de API. Las siguientes esperan por orden de llegada en una cola de hasta 20
+llamadas, durante un máximo de 20 segundos por llamada. Si la cola se llena o se
+agota la espera, se informa que el servicio está ocupado; una espera vencida no
+se ejecuta después. La web deja hasta 235 segundos para el recorrido completo,
+incluyendo búsqueda, cola y generación. La cola vive en memoria: no es un trabajo
+duradero ni se comparte entre réplicas. Son límites iniciales que deben calibrarse
+con la capacidad real del servicio de IA, sin cambiar los modelos ni sus prompts.
+
 Para Azure, `.env.cloud` lleva `IA_EMBEDDINGS_URL=https://<servicio>/api/embed`,
 `IA_GENERACION_URL=https://<servicio>/api/chat` y `IA_EMBEDDINGS_TOKEN` privado,
 `publicar-azure.ps1` exige HTTPS y entrega ambas direcciones solo a la API,
@@ -835,9 +844,48 @@ crear un borrador dirigido a un correo propio y usar Confirmar y enviar una sola
 vez. Comprobar la referencia de Brevo, la confirmación conservada, el estado
 Enviado y la llegada al buzón. Enviado significa que Brevo aceptó el envío;
 los estados de entrega, fallos y rebotes corresponden a PB-088. Si el resultado
-del envío es incierto, comprobar el historial de Brevo antes de repetirlo.
+del envío es incierto, comprobar el historial de Brevo antes de preparar otro correo.
+
+El envío confirma primero su registro y su clave única en la base. Solo un rechazo
+inequívoco lo devuelve a Borrador. Si se pierde la respuesta o falla guardar la
+referencia después de que el proveedor aceptó, queda Envío en verificación y no se
+reenvía automáticamente. Repetir la confirmación devuelve el estado ya guardado.
+Brevo recibe la misma clave de idempotencia como defensa adicional; su ventana
+temporal no sustituye el registro persistente de CONVI. Para conciliar un resultado
+incierto se revisa el historial del proveedor: no hay una conciliación automática
+sin referencia externa. Las invitaciones también guardan su cuenta pendiente y
+la solicitud de reenvío antes de contactar Auth; ante un fallo se revisa primero
+el buzón y luego se solicita otro reenvío desde Usuarios.
+
+La publicación manual verifica antes que `convi-privado` exista, sea privado y
+tenga un límite de archivo de hasta 25 MiB. La comprobación solo lee configuración;
+no cambia permisos. Tanto el script como GitHub publican las imágenes por su digest
+SHA-256, conservando las etiquetas por versión/commit para identificarlas. Al
+actualizar Node hay que renovar también el digest fijado en los Dockerfile.
 
 Referencias: [secretos de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/manage-secrets),
 [IP de salida de Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/networking),
 [autenticación del dominio](https://help.brevo.com/hc/en-us/articles/12163873383186)
 y [autorización de IP en Brevo](https://help.brevo.com/hc/en-us/articles/5740111683858).
+
+### Cabeceras de protección web/API
+
+La web restringe la incrustación a su propio origen (`SAMEORIGIN` y
+`frame-ancestors 'self'`), conservando el visor interno de PDF. Web y API envían
+`X-Content-Type-Options: nosniff` y omiten `X-Powered-By`; la API no admite
+incrustación. Las rutas de recuperación/confirmación mantienen `no-store` y
+`no-referrer`.
+
+La CSP web limita recursos y conexiones al propio origen, impide objetos y
+manejadores de eventos inline, y no permite `unsafe-eval` en producción. Conserva
+`unsafe-inline` para scripts y estilos por compatibilidad con el renderizado de
+Next/Cache Components: es una política inicial, no una CSP estricta ni una
+garantía contra XSS. Los nonces por petición requieren revisar el impacto sobre
+prerenderizado y caché antes de adoptarlos. Desarrollo permite eval y WebSocket
+para las herramientas de Next; producción exige recursos HTTPS.
+
+No se amplió `serverActions.allowedOrigins`: se conserva la comprobación de
+origen de Next. Tras publicar, verificar las cabeceras HTTPS reales, el acceso y
+renovación de sesión/MFA, formularios y visor PDF; el ensayo local de framework
+no verifica la configuración de proxies de Azure. Las cookies ya usan `Secure`
+en producción; no se cambió `HttpOnly` sin ensayar el recorrido completo de Auth.

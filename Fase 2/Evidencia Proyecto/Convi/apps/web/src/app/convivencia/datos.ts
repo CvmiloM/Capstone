@@ -194,7 +194,7 @@ export function obtenerSituacion(id: string) {
 // --- Acciones sobre una situación ---
 
 export type ResultadoAccion =
-  | { ok: true; id?: string }
+  | { ok: true; id?: string; estado?: string }
   | { ok: false; mensaje: string; errores?: Record<string, string> };
 
 const SIN_CONEXION =
@@ -229,11 +229,12 @@ export async function enviar(
 
   const datos = (await respuesta.json().catch(() => null)) as {
     id?: string;
+    estado?: string;
     mensaje?: string;
     message?: string;
     errores?: Record<string, string>;
   } | null;
-  if (respuesta.ok) return { ok: true, id: datos?.id };
+  if (respuesta.ok) return { ok: true, id: datos?.id, estado: datos?.estado };
   if (respuesta.status === 400 && datos?.errores) {
     return {
       ok: false,

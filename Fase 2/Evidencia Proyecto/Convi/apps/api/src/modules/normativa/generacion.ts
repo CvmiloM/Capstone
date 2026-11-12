@@ -1,4 +1,5 @@
 import { ErrorIA, MODELO_GENERACION } from './consulta.js';
+import { conCapacidadIA, leerTextoIA } from '../../common/capacidad-ia.js';
 
 // PB-118: llamada a POST /api/chat de convi-ia (apps/ia), el mismo contrato de Ollama.
 // Usa el mismo token que los embeddings porque es el mismo servicio.
@@ -41,6 +42,14 @@ export async function generar(
   mensajes: Mensaje[],
   esquema: Record<string, unknown>,
 ): Promise<string> {
+  try { return await conCapacidadIA(() => generarTexto(mensajes, esquema)); }
+  catch (error) {
+    if (error instanceof ErrorIA) throw error;
+    throw new ErrorIA(error instanceof Error ? error.message : 'La IA no está disponible.');
+  }
+}
+
+async function generarTexto(mensajes: Mensaje[], esquema: Record<string, unknown>): Promise<string> {
   const { url, token } = configuracionGeneracion();
   let respuesta: Response;
   try {
@@ -66,9 +75,7 @@ export async function generar(
     await respuesta.body?.cancel();
     throw new ErrorIA(`El servicio de IA respondió ${respuesta.status}`);
   }
-  const texto = await respuesta.text();
-  if (texto.length > MAXIMO_RESPUESTA)
-    throw new ErrorIA('La respuesta del servicio de IA es demasiado grande');
+  const texto = await leerTextoIA(respuesta, MAXIMO_RESPUESTA);
   let datos: { model?: unknown; message?: { content?: unknown } } | null;
   try {
     datos = JSON.parse(texto) as typeof datos;
