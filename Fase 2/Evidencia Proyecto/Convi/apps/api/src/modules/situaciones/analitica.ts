@@ -2,10 +2,9 @@ import { BadRequestException } from '@nestjs/common';
 
 // Analítica de Convivencia: la historia de la escuela en gráficos, sin límite
 // de un año como los indicadores. Evolución mensual de las situaciones,
-// comparación de un año con otro, categorías por año, duración de los casos y
-// el tiempo que pasan en cada estado. Solo cifras agrupadas, sin nombres ni
-// registros, calculadas con las tablas existentes (situaciones, casos e
-// historial_estados_caso) y la seguridad por fila de la escuela.
+// comparación de un año con otro, categorías por año y duración de los casos.
+// Solo cifras agrupadas, sin nombres ni registros, calculadas con las tablas
+// existentes (situaciones y casos) y la seguridad por fila de la escuela.
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -51,7 +50,6 @@ WITH parametros AS (
     AND (p.categoria IS NULL OR s.categoria_id = p.categoria)
 ), casos_ambito AS MATERIALIZED (
   SELECT c.id, c.estado_actual = 'CERRADO' AND c.cerrado_en IS NOT NULL cerrado,
-         c.abierto_en, c.estado_actual,
          c.abierto_en::date abierto, c.cerrado_en::date fecha_cierre
   FROM convi.casos c, parametros p
   WHERE c.abierto_en >= p.inicio::timestamptz
@@ -62,26 +60,6 @@ WITH parametros AS (
   SELECT cerrado, abierto,
          (CASE WHEN cerrado THEN fecha_cierre ELSE current_date END) - abierto dias
   FROM casos_ambito
-), eventos AS (
-  -- El historial guarda los cambios, no el estado con que nace el caso: el
-  -- primer tramo va desde la apertura con el estado anterior al primer cambio,
-  -- o el actual si el caso nunca cambió.
-  SELECT c.id caso_id, c.abierto_en momento, 0 orden, ''::text desempate,
-         NULL::text estado_anterior,
-         coalesce((SELECT h.estado_anterior FROM convi.historial_estados_caso h
-                   WHERE h.caso_id = c.id ORDER BY h.cambiado_en, h.id LIMIT 1),
-                  c.estado_actual)::text estado_nuevo
-  FROM casos_ambito c
-  UNION ALL
-  SELECT h.caso_id, h.cambiado_en, 1, h.id::text, h.estado_anterior::text, h.estado_nuevo::text
-  FROM convi.historial_estados_caso h
-  JOIN casos_ambito c ON c.id = h.caso_id
-), cambios AS (
-  SELECT estado_anterior, estado_nuevo, caso_id,
-         extract(epoch FROM coalesce(
-           lead(momento) OVER (PARTITION BY caso_id ORDER BY momento, orden, desempate),
-           current_timestamp) - momento) / 86400 dias
-  FROM eventos WHERE estado_nuevo IS NOT NULL
 ), meses AS (
   SELECT generate_series(
     coalesce((SELECT date_trunc('month', min(fecha))::date FROM hechos),
@@ -120,17 +98,6 @@ SELECT current_timestamp AS calculado_en,
    FROM (SELECT extract(year FROM abierto)::int anio, count(*)::int abiertos,
                 count(*) FILTER (WHERE cerrado)::int cerrados
          FROM duraciones GROUP BY 1) x) AS casos_por_anio,
-  (SELECT coalesce(jsonb_agg(jsonb_build_object('estado', estado_nuevo, 'veces', veces,
-      'casos', casos, 'promedio_dias', promedio, 'mediana_dias', mediana)
-      ORDER BY promedio DESC NULLS LAST), '[]'::jsonb)
-   FROM (SELECT estado_nuevo, count(*)::int veces, count(DISTINCT caso_id)::int casos,
-                round(avg(dias)::numeric, 1) promedio,
-                round((percentile_cont(0.5) WITHIN GROUP (ORDER BY dias))::numeric, 1) mediana
-         FROM cambios WHERE estado_nuevo <> 'CERRADO' GROUP BY 1) x) AS tiempo_por_estado,
-  (SELECT coalesce(jsonb_agg(jsonb_build_object('desde', estado_anterior, 'hacia', estado_nuevo,
-      'total', total) ORDER BY total DESC, estado_anterior, estado_nuevo), '[]'::jsonb)
-   FROM (SELECT estado_anterior, estado_nuevo, count(*)::int total FROM cambios
-         WHERE estado_anterior IS NOT NULL GROUP BY 1, 2) x) AS transiciones,
   (SELECT coalesce(jsonb_agg(jsonb_build_object('id', id, 'nombre', nombre) ORDER BY nombre), '[]'::jsonb)
    FROM convi.categorias_convivencia WHERE estado = 'ACTIVO') AS categorias`;
 
@@ -150,14 +117,6 @@ type Fila = {
     abierto_mas_antiguo: number | null;
   };
   casos_por_anio: { anio: number; abiertos: number; cerrados: number }[];
-  tiempo_por_estado: {
-    estado: string;
-    veces: number;
-    casos: number;
-    promedio_dias: number | string | null;
-    mediana_dias: number | string | null;
-  }[];
-  transiciones: { desde: string; hacia: string; total: number }[];
   categorias: { id: string; nombre: string }[];
 };
 
@@ -230,12 +189,6 @@ export function armarAnalitica(fila: Fila) {
       abierto_mas_antiguo: fila.resumen_casos.abierto_mas_antiguo,
     },
     casos_por_anio: fila.casos_por_anio,
-    tiempo_por_estado: fila.tiempo_por_estado.map((e) => ({
-      ...e,
-      promedio_dias: numero(e.promedio_dias),
-      mediana_dias: numero(e.mediana_dias),
-    })),
-    transiciones: fila.transiciones,
     opciones: { categorias: fila.categorias },
   };
 }

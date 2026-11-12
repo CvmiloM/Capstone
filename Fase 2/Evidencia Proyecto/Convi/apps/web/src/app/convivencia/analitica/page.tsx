@@ -2,15 +2,14 @@ import type { Metadata } from "next";
 import { FormularioBusqueda } from "@/app/components/actividad";
 import { claseBotonSecundario, Encabezado } from "@/app/components/formulario";
 import { AvisoNoDisponible } from "../aviso-no-disponible";
-import { NOMBRE_ESTADO_CASO } from "../casos/datos";
 import { pedir } from "../datos";
 import { PestanasGrupo } from "../pestanas-grupo";
 import { GraficoLineas } from "./graficos";
 
 // Analítica de Convivencia (pestaña de Indicadores e informes): la historia
 // de la escuela en gráficos, hasta 10 años hacia atrás. Evolución mensual,
-// comparación de un año con otro, categorías por año, duración de los casos y
-// tiempo en cada estado. Todo viene agrupado de la API (convivencia/analitica),
+// comparación de un año con otro, categorías por año y duración de los casos.
+// Todo viene agrupado de la API (convivencia/analitica),
 // sin nombres ni registros, con las tablas existentes del modelo.
 
 export const metadata: Metadata = { title: "Analítica de Convivencia" };
@@ -37,8 +36,6 @@ type Analitica = {
     abierto_mas_antiguo: number | null;
   };
   casos_por_anio: { anio: number; abiertos: number; cerrados: number }[];
-  tiempo_por_estado: { estado: string; veces: number; casos: number; promedio_dias: number | null; mediana_dias: number | null }[];
-  transiciones: { desde: string; hacia: string; total: number }[];
   opciones: { categorias: { id: string; nombre: string }[] };
 };
 
@@ -46,7 +43,6 @@ const caja = "rounded-2xl border border-border bg-card p-5 shadow-tarjeta";
 const control = "mt-1.5 w-full rounded-xl border border-input bg-card px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-ring";
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const numero = (v: number) => v.toLocaleString("es-CL", { maximumFractionDigits: 1 });
-const estado = (codigo: string) => NOMBRE_ESTADO_CASO[codigo] ?? codigo;
 const situaciones = (v: number) => `${numero(v)} ${v === 1 ? "situación" : "situaciones"}`;
 const dias = (v: number | null) => (v === null ? "Sin datos" : `${numero(v)} ${v === 1 ? "día" : "días"}`);
 
@@ -207,24 +203,6 @@ export default async function PaginaAnalitica({
           filas={d.casos_por_anio.map((c) => [c.anio, c.abiertos, c.cerrados, c.abiertos - c.cerrados])} titulo="Ver casos por año de apertura" />
       </section>
 
-      <section className={caja} aria-labelledby="trazabilidad">
-        <h2 id="trazabilidad" className="font-titulo text-xl font-semibold">Trazabilidad de los casos</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Cuánto tiempo pasan los casos en cada estado antes de cambiar, según el historial de estados</p>
-        {d.tiempo_por_estado.length === 0 ? <SinDatos /> : <>
-          <Barras filas={d.tiempo_por_estado.map((e) => ({
-            nombre: estado(e.estado), valor: e.promedio_dias ?? 0,
-            texto: `${dias(e.promedio_dias)} en promedio · típico ${dias(e.mediana_dias)}`,
-          }))} />
-          <p className="mt-2 text-xs text-muted-foreground">Si el caso sigue en ese estado, cuenta hasta hoy, Cerrado no se mide porque es el final</p>
-          <DatosExactos columnas={["Estado", "Veces que se entró", "Casos", "Promedio", "Típico (mediana)"]}
-            filas={d.tiempo_por_estado.map((e) => [estado(e.estado), e.veces, e.casos, dias(e.promedio_dias), dias(e.mediana_dias)])} />
-          {d.transiciones.length > 0 && (
-            <DatosExactos titulo="Ver los cambios de estado más frecuentes" columnas={["Desde", "Hacia", "Veces"]}
-              filas={d.transiciones.slice(0, 15).map((t) => [estado(t.desde), estado(t.hacia), t.total])} />
-          )}
-        </>}
-      </section>
-
       <p className="text-xs text-muted-foreground">Uso interno del equipo de Convivencia, las cifras describen los registros de CONVI, no determinan causas ni predicen la conducta de estudiantes</p>
     </div>
   );
@@ -243,7 +221,7 @@ function SinDatos() {
 }
 
 /** Barras horizontales de una serie, con su valor escrito al lado. */
-function Barras({ filas }: { filas: { nombre: string; valor: number; texto?: string }[] }) {
+function Barras({ filas }: { filas: { nombre: string; valor: number }[] }) {
   const maximo = Math.max(1, ...filas.map((f) => f.valor));
   return <ul className="mt-4 space-y-2.5">
     {filas.map((f) => (
@@ -253,7 +231,7 @@ function Barras({ filas }: { filas: { nombre: string; valor: number; texto?: str
           <div className="h-3 min-w-0 flex-1 rounded-r" aria-hidden="true">
             <div className="h-full rounded-r bg-primary" style={{ width: `${(f.valor / maximo) * 100}%`, minWidth: f.valor > 0 ? "3px" : 0 }} />
           </div>
-          <span className="shrink-0 text-sm font-medium tabular-nums">{f.texto ?? numero(f.valor)}</span>
+          <span className="shrink-0 text-sm font-medium tabular-nums">{numero(f.valor)}</span>
         </div>
       </li>
     ))}

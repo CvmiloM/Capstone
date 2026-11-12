@@ -40,16 +40,6 @@ const fila = (cambios: Partial<FilaAnalitica> = {}): FilaAnalitica => ({
     abierto_mas_antiguo: 420,
   },
   casos_por_anio: [{ anio: 2026, abiertos: 7, cerrados: 4 }],
-  tiempo_por_estado: [
-    {
-      estado: 'EN_ANALISIS',
-      veces: 7,
-      casos: 7,
-      promedio_dias: '4.5',
-      mediana_dias: '3.0',
-    },
-  ],
-  transiciones: [{ desde: 'EN_ANALISIS', hacia: 'EN_REVISION', total: 5 }],
   categorias: [],
   ...cambios,
 });
@@ -112,10 +102,6 @@ describe('Armado de la analítica', () => {
       abiertos: 2,
     });
     expect(datos.resumen_casos.promedio_cerrados).toBe(95.5);
-    expect(datos.tiempo_por_estado[0]).toMatchObject({
-      promedio_dias: 4.5,
-      mediana_dias: 3,
-    });
   });
 
   it('sin situaciones no inventa años', () => {
