@@ -4,6 +4,12 @@ import type { ReactNode } from "react";
 // Se usan por nombre: <Icono nombre="cursos" className="size-4" />.
 // Para agregar uno, se suma su dibujo (los <path> del SVG) a TRAZOS.
 const TRAZOS = {
+  editar: (
+    <>
+      <path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z" />
+      <path d="M4 20h7" />
+    </>
+  ),
   resumen: (
     <>
       <rect x="3" y="3" width="7" height="7" rx="1" />

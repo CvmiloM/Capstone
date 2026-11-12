@@ -9,9 +9,10 @@ const SECCIONES: SeccionMenu[] = [
   {
     titulo: "Día a día",
     enlaces: [
+      { href: "/convivencia", texto: "Inicio", icono: "resumen" },
       // La bandeja incluye el detalle de cada situación y el registro por otros canales
       {
-        href: "/convivencia",
+        href: "/convivencia/situaciones",
         texto: "Bandeja de situaciones",
         icono: "documentos",
         tambien: ["/convivencia/situaciones", "/convivencia/registrar"],

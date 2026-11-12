@@ -16,7 +16,7 @@ export default async function PaginaRegistrar() {
 
   return (
     <>
-      <Link href="/convivencia" className={`text-sm ${claseEnlace}`}>
+      <Link href="/convivencia/situaciones" className={`text-sm ${claseEnlace}`}>
         ← Bandeja de situaciones
       </Link>
       <div className="mt-4">

@@ -133,7 +133,7 @@ export default async function PaginaRevisionSituacion({
 
   return (
     <>
-      <Link href="/convivencia" className={`text-sm ${claseEnlace}`}>
+      <Link href="/convivencia/situaciones" className={`text-sm ${claseEnlace}`}>
         ← Bandeja de situaciones
       </Link>
 

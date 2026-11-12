@@ -1,4 +1,6 @@
 import { SeguimientosController } from './seguimientos.controller.js';
+import { JornadaController } from './jornada.controller.js';
+import { JornadaService } from './jornada.service.js';
 import { SeguimientosService } from './seguimientos.service.js';
 import { Module } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
@@ -60,6 +62,7 @@ import { ProfesorService } from './profesor.service.js';
 @Module({
   imports: [AuthModule, AlertasModule],
   controllers: [
+    JornadaController,
     InformesController,
     IndicadoresController,
     SeguimientosController,
@@ -78,6 +81,7 @@ import { ProfesorService } from './profesor.service.js';
     EvidenciasProfesorController,
   ],
   providers: [
+    JornadaService,
     InformesService,
     IndicadoresService,
     SeguimientosService,

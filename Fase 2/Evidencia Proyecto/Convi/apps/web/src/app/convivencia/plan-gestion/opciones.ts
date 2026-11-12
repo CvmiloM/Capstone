@@ -48,6 +48,8 @@ export type Registro = {
   aprobado_fecha?: string | null;
 };
 export type Detalle = {
+  arbol?: { total: number; pagina: number; filas: { id: string; titulo: string; descripcion: string | null; orden: number; acciones_total: number; acciones: { id: string; titulo: string; descripcion: string | null; estado: string; responsable: string | null; actividades_total: number }[] }[] } | null;
+  actividades?: { total: number; pagina: number; filas: { id: string; titulo: string; descripcion: string | null; estado: string; responsable: string | null; inicio_programado: string | null }[] } | null;
   registro: Registro;
   version: string;
   plan_id: string;
@@ -74,6 +76,7 @@ export type Detalle = {
   } | null;
 };
 export type Lista = {
+  anios?: number[];
   total: number;
   pagina: number;
   por_pagina: number;
@@ -90,6 +93,9 @@ export type Lista = {
     accion: string | null;
     inicio_programado?: string | null;
     responsable?: string | null;
+    objetivos_total?: number;
+    acciones_total?: number;
+    actividades_total?: number;
   }[];
 };
 export type Opciones = {

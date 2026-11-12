@@ -1,230 +1,236 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
-import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
-// Mismos estilos de urgencia y formato de fecha que el portal del profesor.
-import { obtenerFormatoFecha, URGENCIA } from "@/app/profesor/datos";
-import { OPCIONES_URGENCIA } from "@/app/profesor/situacion-opciones";
-import { AvisoNoDisponible } from "./aviso-no-disponible";
+import { Icono, type NombreIcono } from "@/app/components/icono";
 import {
-  ESTADOS,
-  ESTADOS_ABIERTOS,
-  NOMBRE_ESTADO,
-  obtenerBandeja,
-  quienInformo,
-  type Bandeja,
-} from "./datos";
+  Encabezado,
+  claseBotonPrimario,
+  claseEnlace,
+} from "@/app/components/formulario";
+import { pedir } from "./datos";
+import { AvisoNoDisponible } from "./aviso-no-disponible";
+import { enlaceOrigen, nombreTipo, type Evento } from "./calendario/eventos";
+import {
+  Prioridades,
+  AvancePreventivo,
+  type PrioridadJornada,
+  type PlanJornada,
+} from "./jornada";
 
-export const metadata: Metadata = { title: "Bandeja de situaciones" };
+type Jornada = {
+  hoy: string;
+  zona_horaria: string;
+  nuevas: number;
+  urgentes: number;
+  seguimientos: number;
+  agenda_total: number;
+  prioridades: PrioridadJornada[];
+  agenda: Evento[];
+  planes: PlanJornada[];
+};
+export const metadata = { title: "Tu jornada" };
+const panel = "rounded-2xl border border-border bg-card p-5 sm:p-6";
 
-type Filtros = { estado?: string; urgencia?: string };
-
-function enlace({ estado, urgencia }: Filtros) {
-  const parametros = new URLSearchParams();
-  if (estado) parametros.set("estado", estado);
-  if (urgencia) parametros.set("urgencia", urgencia);
-  const consulta = parametros.toString();
-  return consulta ? `/convivencia?${consulta}` : "/convivencia";
-}
-
-// HU-037 CA4: cada total sale del conteo que la API leyó junto con la lista.
-// El de un estado respeta la urgencia elegida y viceversa.
-function total(conteo: Bandeja["conteo"], { estado, urgencia }: Filtros) {
-  return conteo
-    .filter(
-      (fila) =>
-        (!estado || fila.estado === estado) &&
-        (!urgencia || fila.urgencia === urgencia),
-    )
-    .reduce((suma, fila) => suma + fila.total, 0);
-}
-
-// PB-044 (HU-037): bandeja de situaciones de la escuela con filtros por estado
-// y por urgencia. La urgencia se muestra separada del estado.
-export default async function PaginaBandeja({
+export default async function Inicio({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string | string[]; urgencia?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const parametros = await searchParams;
-  const estado =
-    typeof parametros.estado === "string" && NOMBRE_ESTADO[parametros.estado]
-      ? parametros.estado
-      : undefined;
-  const urgencia =
-    typeof parametros.urgencia === "string" && URGENCIA[parametros.urgencia]
-      ? parametros.urgencia
-      : undefined;
-
-  const [respuesta, formatearFecha] = await Promise.all([obtenerBandeja({ estado, urgencia }), obtenerFormatoFecha()]);
-  if (!respuesta.ok) return <AvisoNoDisponible volverA="/" />;
-  const { situaciones, conteo, limite } = respuesta.datos;
-
+  const p = await searchParams;
+  // Conserva los marcadores antiguos que abrían la bandeja con filtros.
+  if (
+    ["estado", "urgencia", "q", "pagina"].some((k) => typeof p[k] === "string")
+  ) {
+    const q = new URLSearchParams();
+    for (const k of ["estado", "urgencia", "q", "pagina"])
+      if (typeof p[k] === "string") q.set(k, p[k]);
+    redirect(`/convivencia/situaciones?${q}`);
+  }
+  const r = await pedir<Jornada>("/convivencia/jornada");
+  if (!r.ok) return <AvisoNoDisponible volverA="/" />;
+  const d = r.datos;
+  const fecha = new Intl.DateTimeFormat("es-CL", {
+    dateStyle: "full",
+    timeZone: "UTC",
+  }).format(new Date(`${d.hoy}T12:00:00Z`));
+  const tarjetas: {
+    titulo: string;
+    valor: number;
+    ayuda: string;
+    href: string;
+    icono: NombreIcono;
+  }[] = [
+    {
+      titulo: "Situaciones nuevas",
+      valor: d.nuevas,
+      ayuda: "Esperan su primera revisión",
+      href: "/convivencia/situaciones?estado=NUEVA",
+      icono: "documentos",
+    },
+    {
+      titulo: "Situaciones urgentes",
+      valor: d.urgentes,
+      ayuda: "Urgentes e inmediatas sin decisión final",
+      href: "/convivencia/situaciones?urgencia=PRIORITARIA",
+      icono: "alerta",
+    },
+    {
+      titulo: "Seguimientos por realizar",
+      valor: d.seguimientos,
+      ayuda: "Programados hasta hoy y aún pendientes",
+      href: "/convivencia/jornada/seguimientos",
+      icono: "escudo",
+    },
+    {
+      titulo: "Agenda de hoy",
+      valor: d.agenda_total,
+      ayuda: "Compromisos y actividades pendientes",
+      href: `/convivencia/calendario?dia=${d.hoy}`,
+      icono: "anios",
+    },
+  ];
   return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-x-4">
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <Encabezado
-          titulo="Bandeja de situaciones"
-          descripcion="Todas las situaciones registradas en tu escuela, la más urgente primero. Abre una para revisarla."
+          titulo="Tu jornada"
+          descripcion="Prioridades y gestiones de convivencia para hoy, en tu escuela."
         />
-        {/* PB-043: situaciones que llegan por otros canales. */}
-        <Link
-          href="/convivencia/registrar"
-          className={`mb-6 ${claseBotonPrimario}`}
-        >
+        <Link href="/convivencia/registrar" className={claseBotonPrimario}>
           Registrar situación
         </Link>
       </div>
-
-      <div className="mb-6 space-y-3">
-        <Filtro
-          titulo="Estado"
-          opciones={[
-            {
-              texto: "Todos",
-              href: enlace({ urgencia }),
-              activo: !estado,
-              total: total(conteo, { urgencia }),
-            },
-            ...ESTADOS.map((e) => ({
-              texto: e.texto,
-              href: enlace({ estado: e.valor, urgencia }),
-              activo: estado === e.valor,
-              total: total(conteo, { estado: e.valor, urgencia }),
-            })),
-          ]}
-        />
-        <Filtro
-          titulo="Urgencia"
-          opciones={[
-            {
-              texto: "Todas",
-              href: enlace({ estado }),
-              activo: !urgencia,
-              total: total(conteo, { estado }),
-            },
-            ...OPCIONES_URGENCIA.map((u) => ({
-              texto: u.texto,
-              href: enlace({ estado, urgencia: u.valor }),
-              activo: urgencia === u.valor,
-              total: total(conteo, { estado, urgencia: u.valor }),
-            })),
-          ]}
-        />
-      </div>
-
-      {situaciones.length === 0 ? (
-        <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          No hay situaciones con estos filtros.
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {situaciones.map((situacion) => {
-            const estiloUrgencia = URGENCIA[situacion.urgencia] ?? URGENCIA.NORMAL;
-            return (
-              <li key={situacion.id}>
-                <Link
-                  href={`/convivencia/situaciones/${situacion.id}`}
-                  anticipar
-                  className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-tarjeta transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-ring sm:flex-row sm:items-center"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {situacion.codigo}
-                    </p>
-                    <p className="mt-1 font-semibold">
-                      {situacion.categoria ?? "Sin categoría"}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {[
-                        situacion.curso,
-                        quienInformo(situacion)
-                          ? `Informó: ${quienInformo(situacion)}`
-                          : null,
-                        `Registró ${situacion.reportado_por}`,
-                        `Ocurrió el ${formatearFecha(situacion.ocurrido_en)}`,
-                        // PB-046 (HU-039): para repartir el trabajo se ve quién revisa cada una.
-                        situacion.responsable
-                          ? `Responsable: ${situacion.responsable}`
-                          : ESTADOS_ABIERTOS.includes(situacion.estado)
-                            ? "Sin responsable"
-                            : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                      {situacion.estudiantes === 1
-                        ? "1 estudiante"
-                        : `${situacion.estudiantes} estudiantes`}
-                    </span>
-                    {situacion.aclaraciones_pendientes > 0 && (
-                      <span className="rounded-full bg-naranjo px-2.5 py-0.5 text-xs font-semibold text-tinta">
-                        Esperando aclaración
-                      </span>
-                    )}
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${estiloUrgencia.clase}`}
-                    >
-                      {estiloUrgencia.texto}
-                    </span>
-                    <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-                      {NOMBRE_ESTADO[situacion.estado] ?? situacion.estado}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {situaciones.length >= limite && (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Se muestran las {limite} más urgentes y recientes. Usa los filtros para
-          ver el resto.
-        </p>
-      )}
-    </>
-  );
-}
-
-function Filtro({
-  titulo,
-  opciones,
-}: {
-  titulo: string;
-  opciones: { texto: string; href: string; activo: boolean; total: number }[];
-}) {
-  return (
-    <nav aria-label={`Filtrar por ${titulo.toLowerCase()}`}>
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {titulo}
+      <p className="-mt-4 text-sm first-letter:uppercase text-muted-foreground">
+        <time dateTime={d.hoy}>{fecha}</time>
       </p>
-      <ul className="flex flex-wrap gap-1.5">
-        {opciones.map((opcion) => (
-          <li key={opcion.texto}>
-            <Link
-              href={opcion.href}
-              aria-current={opcion.activo ? "page" : undefined}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
-                opcion.activo
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-foreground hover:bg-muted"
-              }`}
-            >
-              {opcion.texto}
-              <span
-                className={`rounded-full px-1.5 text-xs ${
-                  opcion.activo ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {opcion.total}
-              </span>
-            </Link>
-          </li>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {tarjetas.map((t) => (
+          <Link
+            key={t.titulo}
+            href={t.href}
+            className={`${panel} group flex items-start gap-4 transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-ring`}
+          >
+            <span className="rounded-xl bg-accent p-2.5 text-primary">
+              <Icono nombre={t.icono} className="size-6" />
+            </span>
+            <div>
+              <p className="text-sm font-medium">{t.titulo}</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums">
+                {t.valor}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                {t.ayuda}
+              </p>
+            </div>
+          </Link>
         ))}
-      </ul>
-    </nav>
+      </div>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(18rem,1fr)]">
+        <section className={panel}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-serif text-2xl font-semibold">
+              Requiere atención
+            </h2>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Registros con una gestión pendiente y acceso a su contexto.
+          </p>
+          <Prioridades filas={d.prioridades} />
+        </section>
+        <section className={panel}>
+          <h2 className="font-serif text-2xl font-semibold">
+            Acciones rápidas
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Elige el registro antes de continuar con la gestión.
+          </p>
+          <div className="mt-5 grid gap-3">
+            {[
+              [
+                "Revisar una situación",
+                "/convivencia/situaciones?estado=NUEVA",
+              ],
+              [
+                "Elegir caso para una intervención",
+                "/convivencia/casos?para=intervencion",
+              ],
+              [
+                "Elegir caso para un seguimiento",
+                "/convivencia/casos?para=seguimiento",
+              ],
+              [
+                "Elegir caso para adjuntar evidencia",
+                "/convivencia/casos?para=evidencia",
+              ],
+            ].map(([titulo, href]) => (
+              <Link
+                key={href}
+                href={href}
+                className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm font-medium text-primary hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                {titulo}
+                <span aria-hidden="true">→</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+        <section className={panel}>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-serif text-2xl font-semibold">Agenda de hoy</h2>
+            <Link
+              href={`/convivencia/calendario?dia=${d.hoy}`}
+              className={`text-sm ${claseEnlace}`}
+            >
+              Ver calendario
+            </Link>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fechas programadas, los registros realizados o cancelados quedan
+            fuera.
+          </p>
+          {d.agenda.length ? (
+            <ul className="mt-4 divide-y divide-border">
+              {d.agenda.map((e) => (
+                <li key={`${e.tipo}-${e.origen_id}`}>
+                  <Link
+                    href={enlaceOrigen(e) ?? "/convivencia/calendario"}
+                    className="flex items-start gap-4 rounded-lg py-4 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <time className="shrink-0 rounded-full bg-muted px-3 py-1 text-sm font-semibold tabular-nums">
+                      {e.hora}
+                    </time>
+                    <div>
+                      <p className="text-sm font-medium">{e.titulo}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {nombreTipo(e)}
+                        {e.caso_codigo && ` · ${e.caso_codigo}`}
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="py-8 text-sm text-muted-foreground">
+              No hay actividades pendientes programadas para hoy.
+            </p>
+          )}
+          {d.agenda_total > 8 && (
+            <p className="text-xs text-muted-foreground">
+              Se muestran las primeras ocho, el calendario conserva las{" "}
+              {d.agenda_total} de hoy.
+            </p>
+          )}
+        </section>
+        <section className={panel}>
+          <h2 className="font-serif text-2xl font-semibold">
+            Gestión preventiva
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ejecución del Plan activo del año actual.
+          </p>
+          <AvancePreventivo planes={d.planes} />
+        </section>
+      </div>
+    </div>
   );
 }
