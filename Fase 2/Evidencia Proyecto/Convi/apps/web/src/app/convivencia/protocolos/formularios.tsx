@@ -76,33 +76,20 @@ export function FormularioProtocolo() {
   const errores = estado.errores ?? {};
   return (
     <FormularioConCarga action={accion} noValidate className="space-y-4">
-      {estado.mensaje && !estado.errores && <AvisoError>{estado.mensaje}</AvisoError>}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Campo
-          id="codigo"
-          etiqueta="Código"
-          error={errores.codigo}
-          ayuda="Corto y único, por ejemplo P-ACOSO."
-        >
-          <input
-            {...propsControl("codigo", "codigo", errores.codigo, true)}
-            type="text"
-            maxLength={LARGOS.codigo}
-            defaultValue={valores.codigo}
-          />
-        </Campo>
-        <div className="sm:col-span-2">
-          <Campo id="nombre" etiqueta="Nombre" error={errores.nombre}>
-            <input
-              {...propsControl("nombre", "nombre", errores.nombre)}
-              type="text"
-              maxLength={LARGOS.nombre}
-              placeholder="Por ejemplo: Protocolo de actuación ante acoso escolar"
-              defaultValue={valores.nombre}
-            />
-          </Campo>
-        </div>
-      </div>
+      {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
+      <Campo id="nombre" etiqueta="Nombre" error={errores.nombre}>
+        <input
+          {...propsControl("nombre", "nombre", errores.nombre)}
+          type="text"
+          maxLength={LARGOS.nombre}
+          placeholder="Por ejemplo: Protocolo de actuación ante acoso escolar"
+          defaultValue={valores.nombre}
+        />
+      </Campo>
+      <p className="text-sm text-muted-foreground">
+        CONVI asignará un código único al guardar y creará la primera versión en
+        borrador.
+      </p>
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
         {pendiente ? "Creando…" : "Crear protocolo"}
       </button>

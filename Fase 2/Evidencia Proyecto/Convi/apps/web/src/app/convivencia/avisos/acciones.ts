@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import {
   abrirAvisoEnApi,
   enviarLecturaAviso,
@@ -31,11 +32,13 @@ export async function marcarAvisoLeido(formData: FormData) {
   const id = leerTexto(formData, "aviso_id");
   if (!UUID.test(id)) volver(formData, "error");
   const resultado = await enviarLecturaAviso(id);
+  if (resultado.ok) revalidatePath("/convivencia", "layout");
   volver(formData, resultado.ok ? undefined : "error");
 }
 
 export async function marcarTodosLeidos(formData: FormData) {
   const resultado = await enviarLecturaTodos();
+  if (resultado.ok) revalidatePath("/convivencia", "layout");
   volver(formData, resultado.ok ? "todos-leidos" : "error");
 }
 
@@ -44,6 +47,7 @@ export async function marcarTodosLeidos(formData: FormData) {
 export async function abrirAviso(formData: FormData) {
   const id = leerTexto(formData, "aviso_id");
   const ruta = UUID.test(id) ? await abrirAvisoEnApi(id) : null;
+  if (UUID.test(id)) revalidatePath("/convivencia", "layout");
   if (!ruta) volver(formData, "no-disponible");
   redirect(ruta);
 }

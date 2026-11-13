@@ -39,7 +39,7 @@ type PaginaAvisos = {
 
 /** A dónde lleva el aviso en el portal; null si no lleva a ningún lado. */
 export type DestinoAviso = {
-  tipo: 'alerta' | 'situacion' | 'caso' | 'documento';
+  tipo: 'alerta' | 'situacion' | 'caso' | 'documento' | 'actividad';
   id: string;
   /** Pestaña de la ficha del caso y elemento dentro de ella. */
   seccion?: string;
@@ -48,8 +48,8 @@ export type DestinoAviso = {
 
 /**
  * HU-081 CA3: vuelve a buscar el registro con la seguridad por fila de la
- * escuela. Lo que vive en la ficha del caso abre su pestaña. Las actividades
- * del Plan de Gestión aún no tienen pantalla (por defecto: sin destino).
+ * escuela. Lo que vive en la ficha del caso abre su pestaña; las actividades
+ * del Plan de Gestión abren su ficha existente.
  */
 const DESTINO = `CASE n.tipo_recurso
   WHEN 'alertas' THEN (SELECT jsonb_build_object('tipo', 'alerta', 'id', x.id)
@@ -77,6 +77,8 @@ const DESTINO = `CASE n.tipo_recurso
     FROM convi.comunicaciones x WHERE x.id = n.recurso_id)
   WHEN 'versiones_documento' THEN (SELECT jsonb_build_object('tipo', 'documento', 'id', x.id)
     FROM convi.versiones_documento x WHERE x.id = n.recurso_id)
+  WHEN 'actividades_plan_gestion' THEN (SELECT jsonb_build_object('tipo', 'actividad', 'id', x.id)
+    FROM convi.actividades_plan_gestion x WHERE x.id = n.recurso_id)
 END`;
 
 @Injectable()
@@ -84,7 +86,7 @@ export class AvisosService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
   // Los avisos propios, del más reciente al más antiguo: solo los no leídos
-  // al entrar, o todos.
+  // vigentes sin leer al entrar, o todos (incluidos los vencidos).
   listar(
     sesion: Sesion,
     consulta: Record<string, unknown> = {},
@@ -96,9 +98,9 @@ export class AvisosService {
       async (db) => {
         const resultado = await db.query<PaginaAvisos>(
           `WITH propios AS MATERIALIZED (
-             SELECT n.id, n.creado_en, n.leido_en FROM convi.notificaciones n WHERE ${PROPIO}
+             SELECT n.id, n.creado_en, n.leido_en, n.expira_en FROM convi.notificaciones n WHERE ${PROPIO}
            ), filtrados AS (
-             SELECT * FROM propios WHERE $1::boolean OR leido_en IS NULL
+             SELECT * FROM propios WHERE $1::boolean OR (leido_en IS NULL AND (expira_en IS NULL OR expira_en > now()))
            ), cuenta AS (
              SELECT count(*)::int AS total,
                least($2::int, greatest(1, ceil(count(*)::numeric / $3)::int)) AS pagina
@@ -109,7 +111,7 @@ export class AvisosService {
            )
            SELECT cuenta.total, cuenta.pagina, $3::int AS limite,
              current_setting('TimeZone') AS zona_horaria,
-             (SELECT count(*)::int FROM propios WHERE leido_en IS NULL) AS no_leidos,
+             (SELECT count(*)::int FROM propios WHERE leido_en IS NULL AND (expira_en IS NULL OR expira_en > now())) AS no_leidos,
              (SELECT coalesce(jsonb_agg(jsonb_build_object(
                   'id', n.id, 'tipo', n.tipo_notificacion, 'titulo', n.titulo, 'cuerpo', n.cuerpo,
                   'creado_en', n.creado_en, 'leido_en', n.leido_en, 'expira_en', n.expira_en,

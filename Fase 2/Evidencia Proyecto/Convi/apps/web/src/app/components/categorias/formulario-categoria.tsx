@@ -47,6 +47,22 @@ export function FormularioCategoria({ categoria }: { categoria?: Categoria }) {
         </div>
       )}
       {categoria && <input type="hidden" name="id" value={categoria.id} />}
+      {categoria && (
+        <div
+          role="note"
+          className="rounded-xl border border-highlight/40 bg-highlight/15 p-4 text-sm text-foreground"
+        >
+          <p className="text-base font-semibold">
+            Esta edición también afecta a los registros existentes
+          </p>
+          <p className="mt-2">
+            Los cambios se reflejan en las situaciones y otros registros que ya
+            utilizan esta categoría. Para cambiar su significado, desactiva la
+            categoría anterior y crea una nueva. Así conservas la clasificación
+            de los registros anteriores.
+          </p>
+        </div>
+      )}
 
       <Campo
         id={`nombre-${sufijo}`}

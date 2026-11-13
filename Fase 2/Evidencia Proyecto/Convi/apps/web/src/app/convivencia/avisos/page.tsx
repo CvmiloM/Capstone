@@ -59,6 +59,7 @@ export default async function Avisos({
           Tus avisos del equipo de Convivencia. Al abrir uno queda leído con la
           fecha de lectura.
         </p>
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">La campanita cuenta tus avisos vigentes sin leer. En Todos también puedes consultar los leídos y vencidos. Leer un aviso no significa revisar su alerta: esa gestión se guarda por separado.</p>
       </header>
 
       {mensaje && (
@@ -78,7 +79,7 @@ export default async function Avisos({
         <nav aria-label="Filtrar avisos">
           <ul className="flex flex-wrap gap-1.5">
             {[
-              { valor: "no-leidos", texto: "No leídos", total: p.no_leidos },
+              { valor: "no-leidos", texto: "No leídos vigentes", total: p.no_leidos },
               { valor: "todos", texto: "Todos", total: null },
             ].map((filtro) => {
               const activo = filtro.valor === ver;
