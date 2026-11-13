@@ -82,7 +82,8 @@ export default async function Calendario({
   };
   const alternar = (tipo: TipoEvento) => {
     const otros = new Set(activos);
-    if (otros.has(tipo)) otros.delete(tipo);
+    if (otros.has(tipo) && otros.size > 1) otros.delete(tipo);
+    else if (otros.has(tipo)) return ruta(c.mes, otros, false);
     else otros.add(tipo);
     return ruta(c.mes, otros, false);
   };
@@ -186,6 +187,7 @@ export default async function Calendario({
           </span>
         </Link>
       </nav>
+      <p className="text-xs text-muted-foreground">Mantén al menos un tipo de evento seleccionado. Para consultar solo los seguimientos de casos, utiliza Solo seguimientos.</p>
 
       <p className="text-sm text-muted-foreground">
         {enElMes === 1 ? "1 evento" : `${enElMes} eventos`} en {nombreMes(c.mes)}

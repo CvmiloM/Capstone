@@ -17,8 +17,9 @@ function Buscar() {
   return <button type="submit" className={claseBotonPrimario} disabled={pending}>{pending ? "Buscando…" : "Buscar"}</button>;
 }
 
-export function FiltrosIndicadores({ inicial, opciones, error }: {
+export function FiltrosIndicadores({ inicial, opciones, error, comparar=false }: {
   inicial: { desde: string; hasta: string; curso: string; categoria: string };
+  comparar?: boolean;
   opciones: OpcionesIndicadores;
   error?: string;
 }) {
@@ -53,6 +54,7 @@ export function FiltrosIndicadores({ inicial, opciones, error }: {
         </select>
       </label>
     </div>
+    <label className="mt-4 flex items-start gap-3 text-sm"><input type="checkbox" name="comparar" value="1" defaultChecked={comparar} className="mt-1 size-4 accent-primary"/><span>Comparar con el período anterior equivalente<span className="mt-1 block text-xs text-muted-foreground">Usa la misma cantidad de días y los mismos filtros. Los dos rangos aparecerán en el resultado.</span></span></label>
     <div className="mt-4 flex flex-wrap items-center gap-3">
       <Buscar />
       <EnlaceConCarga href="/convivencia/indicadores" onClick={(evento) => {

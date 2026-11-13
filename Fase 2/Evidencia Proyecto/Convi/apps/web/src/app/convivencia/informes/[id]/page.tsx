@@ -7,17 +7,19 @@ import { PasosInforme } from "../pasos";
 import { VistaInforme } from "../vista";
 import type { Informe } from "../datos";
 import { DescargarPlanillaInforme } from "../descarga";
+import { ConfirmacionInforme } from "../confirmacion";
 
 export const metadata={ title:"Revisar informe de Convivencia" };
-export default async function PaginaInforme({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{paso?:string}>}) {
+export default async function PaginaInforme({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{paso?:string;guardado?:string;publicado?:string}>}) {
   const {id}=await params;
-  const {paso}=await searchParams;
+  const {paso,guardado,publicado:confirmado}=await searchParams;
   const r=await pedir<Informe>("/convivencia/informes/"+encodeURIComponent(id));
   if(!r.ok)return <AvisoNoDisponible volverA="/convivencia/informes"/>;
   const informe=r.datos;
   const publicado=informe.estado==="PUBLICADO";
   const d=informe.definiciones_calculo;
   return <div className="mx-auto max-w-6xl space-y-6">
+    {(guardado==="1"&&!publicado||confirmado==="1"&&publicado)&&<ConfirmacionInforme publicado={publicado}/>}
     <div className="flex flex-wrap items-start justify-between gap-3"><Encabezado titulo={publicado?"Informe publicado":paso==="contenido"?"Personaliza el informe":"Revisa antes de publicar"} descripcion={publicado?"Los archivos y criterios de esta publicación se conservan":"Comprueba el contenido y las cifras antes de conservar los archivos"}/><EnlaceConCarga href="/convivencia/informes/guardados" className="py-2 text-sm text-primary underline-offset-4 hover:underline">Informes guardados</EnlaceConCarga></div>
     {!publicado&&paso==="contenido"?<ContenidoInforme informe={{id,revision:informe.revision,definiciones_calculo:{escuela:d.escuela,alcance:d.alcance,sujeto:d.sujeto,presentacion:d.presentacion,hallazgos:d.hallazgos,indicadores:{total_situaciones:d.indicadores.total_situaciones},secciones:d.secciones.map(s=>({id:s.id,titulo:s.titulo,descripcion:s.descripcion}))}}}/>:<>
       {!publicado&&<PasosInforme actual={4}/>}

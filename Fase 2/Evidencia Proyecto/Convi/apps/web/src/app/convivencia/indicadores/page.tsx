@@ -1,3 +1,4 @@
+import { Distribucion } from "./distribucion";
 import { PestanasGrupo } from "../pestanas-grupo";
 
 import type { Metadata } from "next";
@@ -65,13 +66,13 @@ export default async function PaginaIndicadores({ searchParams }: {
     <PestanasGrupo grupo="consultas" className="" />
     <Encabezado titulo="Indicadores de Convivencia"
       descripcion="Consulta situaciones, compromisos, seguimientos y cierres de tu escuela según el período que elijas" />
-    <FiltrosIndicadores key={JSON.stringify(inicial)} inicial={inicial} opciones={respuesta.datos.opciones}
+    <FiltrosIndicadores key={JSON.stringify(inicial)} inicial={inicial} comparar={entrada.comparar==="1"} opciones={respuesta.datos.opciones}
       error={solicitado && !valido ? "Elige dos fechas válidas, Hasta debe ser igual o posterior a Desde y el período no puede superar 367 días" : undefined} />
-    {datos && <Resultados datos={datos} filtros={inicial} />}
+    {datos && <Resultados datos={datos} filtros={inicial} comparar={entrada.comparar==="1"} />}
   </div>;
 }
 
-function Resultados({ datos, filtros }: { datos: Indicadores; filtros: { desde: string; hasta: string; curso: string; categoria: string } }) {
+function Resultados({ datos, filtros, comparar }: { datos: Indicadores; filtros: { desde: string; hasta: string; curso: string; categoria: string }; comparar: boolean }) {
   const corte = new Intl.DateTimeFormat("es-CL", {
     dateStyle: "long", timeStyle: "short", timeZone: datos.zona_horaria,
   }).format(new Date(datos.calculado_en));
@@ -87,7 +88,7 @@ function Resultados({ datos, filtros }: { datos: Indicadores; filtros: { desde: 
       <Resumen titulo="Seguimientos pendientes" valor={String(datos.seguimientos.pendientes)} ayuda="Programados en el período, aún sin realizar y con fecha futura" />
       <Resumen titulo="Cierres oportunos" valor={porcentaje} ayuda={`${datos.cierres.oportunos} de ${datos.cierres.con_plazo} casos cerrados con plazo, ${datos.cierres.sin_plazo} sin plazo excluidos`} />
     </div>
-    <section className={caja} aria-labelledby="comparacion-periodos">
+    {comparar&&<section className={caja} aria-labelledby="comparacion-periodos">
       <h2 id="comparacion-periodos" className="font-titulo text-xl font-semibold">Comparación entre períodos</h2>
       <p className="mt-2 text-sm text-muted-foreground">Período actual del {fechaCorta(datos.desde)} al {fechaCorta(datos.hasta)}, período anterior del {fechaCorta(datos.comparacion.desde)} al {fechaCorta(datos.comparacion.hasta)}, ambos incluyen {datos.comparacion.dias} {datos.comparacion.dias === 1 ? "día" : "días"} y usan los mismos filtros.</p>
       <div className="mt-4 overflow-x-auto">
@@ -125,8 +126,8 @@ function Resultados({ datos, filtros }: { datos: Indicadores; filtros: { desde: 
           }}
         />
       </div>
-    </section>
-    <div className="grid gap-4 md:grid-cols-3">
+    </section>}
+    <div className="grid gap-3 md:grid-cols-3 [&>section]:p-4 [&_p.text-3xl]:text-2xl">
       <Resumen titulo="Tiempo de gestión promedio"
         valor={datos.gestion.dias_promedio === null ? "Sin datos" : `${datos.gestion.dias_promedio.toLocaleString("es-CL")} días`}
         ayuda={`${datos.gestion.casos_cerrados} casos actualmente cerrados cuyo último cierre está en el período, promedio de días calendario entre apertura y último cierre, en la zona horaria de la escuela, incluye el tiempo antes de una reapertura`} />
@@ -135,6 +136,7 @@ function Resultados({ datos, filtros }: { datos: Indicadores; filtros: { desde: 
       <Resumen titulo="Reaperturas registradas" valor={String(datos.movimientos.reaperturas)}
         ayuda={`${datos.movimientos.casos_reabiertos} casos distintos reabiertos en el período, cada reapertura del historial cuenta`} />
     </div>
+    <p className="text-sm text-muted-foreground">Los seguimientos vencidos tienen una fecha pasada y siguen sin realizar; los pendientes son los programados para fechas futuras. Se muestran por separado.</p>
     <div className="grid gap-4 xl:grid-cols-2">
       <Estados titulo="Compromisos" datos={datos.compromisos} fecha="fecha de vencimiento" />
       <Estados titulo="Seguimientos" datos={datos.seguimientos} fecha="fecha programada" />
@@ -152,7 +154,7 @@ function Resultados({ datos, filtros }: { datos: Indicadores; filtros: { desde: 
     </div>
     <details className={caja}>
       <summary className="cursor-pointer font-titulo text-xl font-semibold">Distribución por día</summary>
-      <div className="mt-4"><Distribucion titulo="Días con situaciones" datos={datos.por_dia.map((x) => ({ nombre: fechaCorta(x.fecha), total: x.total }))} total={datos.total_situaciones} sinBorde /></div>
+      <div className="mt-4"><Distribucion titulo="Días con situaciones" datos={datos.por_dia.map((x) => ({ nombre: x.fecha, total: x.total }))} total={datos.total_situaciones} sinBorde porDia /></div>
     </details>
     <details className={caja}><summary className="cursor-pointer text-sm font-semibold">Definiciones de cálculo del servidor</summary><dl className="mt-4 space-y-4 text-sm">{datos.definiciones.map(d=><div key={d.indicador}><dt className="font-semibold">{d.indicador}</dt><dd className="mt-1 space-y-1 text-muted-foreground"><p>{d.fecha}</p><p>{d.formula}</p><p>{d.denominador}</p></dd></div>)}</dl></details>
   </>;
@@ -169,15 +171,5 @@ function Estados({ titulo, datos, fecha }: { titulo: string; datos: Estado; fech
       {([['Vencidos', datos.vencidos], ['Pendientes', datos.pendientes], ['Completados', datos.completados], ['Cancelados', datos.cancelados]] as const).map(([etiqueta, valor]) =>
         <div key={etiqueta} className="rounded-xl bg-muted p-3"><dt className="text-muted-foreground">{etiqueta}</dt><dd className="mt-1 text-lg font-semibold">{valor}</dd></div>)}
     </dl>
-  </section>;
-}
-
-function Distribucion({ titulo, datos, total, sinBorde = false }: { titulo: string; datos: Grupo; total: number; sinBorde?: boolean }) {
-  return <section className={sinBorde ? "" : caja}><h2 className="font-titulo text-xl font-semibold">{titulo}</h2>
-    {total === 0 ? <p className="mt-3 text-sm text-muted-foreground">Sin datos para este período</p> :
-      <ul className="mt-4 space-y-3">{datos.map((fila) => <li key={fila.nombre}>
-        <div className="mb-1 flex justify-between gap-3 text-sm"><span className="min-w-0 break-words">{fila.nombre}</span><span className="shrink-0 text-muted-foreground">{fila.total} de {total}</span></div>
-        <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${fila.total * 100 / total}%` }} /></div>
-      </li>)}</ul>}
   </section>;
 }

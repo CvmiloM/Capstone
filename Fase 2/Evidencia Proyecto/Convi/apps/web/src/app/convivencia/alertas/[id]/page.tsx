@@ -98,9 +98,9 @@ export default async function DetalleDeAlerta({
           <Dato nombre="Categoría">{a.categoria ?? "Todas las categorías"}</Dato>
           <Calculo explicacion={a.explicacion} />
         </dl>
-        {a.formula && (
-          <p className="mt-4 rounded-lg bg-muted/60 px-3 py-2 font-mono text-sm">
-            {a.formula}
+        {a.resumen && (
+          <p className="mt-4 rounded-lg bg-muted/60 px-3 py-2 text-sm">
+            {a.resumen}
           </p>
         )}
       </Seccion>

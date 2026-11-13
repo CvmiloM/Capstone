@@ -127,8 +127,6 @@ export default async function PaginaAnalitica({
           <GraficoLineas titulo="Situaciones por mes" etiquetas={etiquetasMes}
             marcaCada={Math.max(1, Math.ceil(etiquetasMes.length / 12))}
             series={[{ nombre: "Situaciones", valores: d.por_mes.map((m) => m.total), color: "var(--primary)" }]} />
-          <DatosExactos columnas={["Mes", "Situaciones"]}
-            filas={d.por_mes.map((m, i) => [etiquetasMes[i], m.total])} />
         </>}
       </section>
 
@@ -165,10 +163,6 @@ export default async function PaginaAnalitica({
               <p className="mt-2 text-sm">{elegido}: {situaciones(a.total)} · {comparado}: {situaciones(b.total)}
                 {a.meses.includes(null) && `, ${elegido} todavía no termina`}
                 {b.meses.includes(null) && `, ${comparado} todavía no termina`}</p>
-              <DatosExactos columnas={["Mes", String(elegido), String(comparado), "Diferencia"]}
-                filas={MESES.map((m, i) => [m, a.meses[i] ?? "—", b.meses[i] ?? "—",
-                  a.meses[i] === null || b.meses[i] === null ? "—"
-                    : `${a.meses[i]! - b.meses[i]! > 0 ? "+" : ""}${a.meses[i]! - b.meses[i]!}`])} />
             </>;
           })()}
         </>}

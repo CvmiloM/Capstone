@@ -4,8 +4,7 @@ import { useId, useRef, useState } from "react";
 
 // Analítica de Convivencia: gráfico de líneas con una o dos series. Al pasar
 // el mouse una línea vertical marca el mes y un recuadro muestra sus valores,
-// con el teclado se recorre con las flechas. Los valores exactos están además
-// en la tabla "Ver datos exactos" de cada sección.
+// con el teclado se recorre con las flechas y se anuncian los valores del mes.
 
 export type Serie = {
   nombre: string;
@@ -114,7 +113,7 @@ export function GraficoLineas({
           onBlur={() => setActivo(null)}
           className="w-full touch-none rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
-          <title id={`${id}-t`}>{`${titulo}, usa las flechas para recorrer los meses, los valores exactos están en la tabla`}</title>
+          <title id={`${id}-t`}>{`${titulo}, usa las flechas para recorrer los meses y consultar sus valores`}</title>
           {[0, 1, 2, 3, 4].map((i) => (
             <g key={i}>
               <line x1={IZQ} x2={ANCHO - DER} y1={y(paso * i)} y2={y(paso * i)}

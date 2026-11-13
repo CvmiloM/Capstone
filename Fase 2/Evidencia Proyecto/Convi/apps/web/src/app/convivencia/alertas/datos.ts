@@ -18,6 +18,7 @@ export type AlertaLista = {
   /** Estudiante, curso o caso al que se refiere; null es toda la escuela. */
   referencia: string | null;
   formula: string | null;
+  resumen?: string;
 };
 
 export type PaginaAlertas = {

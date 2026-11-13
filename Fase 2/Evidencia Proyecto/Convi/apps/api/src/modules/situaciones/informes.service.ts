@@ -275,7 +275,6 @@ export class InformesService {
                       'categorias',
                       'niveles',
                       'categorias_mes',
-                      'comparacion',
                     ]
                   : alcance.tipo === 'ESTUDIANTE'
                     ? [

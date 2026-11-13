@@ -34,6 +34,7 @@ export default async function PaginaRegistroHistorico({
         titulo="Registro histórico"
         descripcion="Para incorporar situaciones de años anteriores con su fecha real, quedan como antecedente con su conclusión y marcadas como registro histórico."
       />
+      <p className="mb-6 max-w-3xl text-sm text-muted-foreground">Se guardará como una situación histórica y un antecedente, con la fecha real del hecho. Podrás encontrarla en Expedientes y en el historial de los estudiantes vinculados, según tus permisos.</p>
 
       {situacionGuardada && (
         <div
@@ -45,9 +46,9 @@ export default async function PaginaRegistroHistorico({
             href={`/convivencia/situaciones/${situacionGuardada}`}
             className={claseEnlace}
           >
-            abrirla
+            Ver registro histórico
           </Link>{" "}
-          o registrar otra.
+          o <Link href="/convivencia/expedientes" className={claseEnlace}>Volver a Expedientes</Link>.
         </div>
       )}
 

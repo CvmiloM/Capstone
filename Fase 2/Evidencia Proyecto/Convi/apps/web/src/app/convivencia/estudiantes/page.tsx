@@ -40,7 +40,9 @@ export default async function PaginaEstudiantesConvivencia({
   const buscar = leer(parametros.buscar);
   const pagina = Math.max(1, Number.parseInt(leer(parametros.pagina), 10) || 1);
 
-  const respuesta = await obtenerEstudiantes({ buscar, pagina });
+  const respuesta = buscar.length >= 2
+    ? await obtenerEstudiantes({ buscar, pagina })
+    : { ok: true as const, datos: { estudiantes: [], total: 0, pagina: 1, por_pagina: 10 } };
   if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia" />;
   const lista = respuesta.datos;
 
@@ -79,6 +81,7 @@ export default async function PaginaEstudiantesConvivencia({
             type="search"
             defaultValue={buscar}
             maxLength={100}
+            minLength={2}
             placeholder="Nombre, código o RUT"
             className={claseControl}
           />
@@ -100,9 +103,9 @@ export default async function PaginaEstudiantesConvivencia({
 
       {lista.estudiantes.length === 0 ? (
         <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          {buscar
+          {buscar.length >= 2
             ? "No encontramos estudiantes con esa búsqueda."
-            : "Tu escuela todavía no tiene estudiantes."}
+            : "Busca por nombre, apellido, código o RUT para consultar el historial de un estudiante. Escribe al menos dos caracteres."}
         </p>
       ) : (
         <>

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import { resumenAlerta } from './resumen-alerta.js';
 import {
   prepararAlerta,
   type AlertaParaExplicar,
@@ -67,6 +68,7 @@ export type AlertaLista = {
   ambito: string;
   referencia: string | null;
   formula: string | null;
+  resumen?: string;
 };
 
 type PaginaAlertas = {
@@ -123,7 +125,13 @@ export class AtencionAlertasService {
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
-        const resultado = await db.query<PaginaAlertas>(
+        const resultado = await db.query<
+          Omit<PaginaAlertas, 'alertas'> & {
+            alertas: (AlertaLista & {
+              explicacion?: Record<string, unknown>;
+            })[];
+          }
+        >(
           `WITH filtradas AS MATERIALIZED (
              SELECT a.id, a.generada_en, ${ORDEN_PRIORIDAD} AS orden
              FROM convi.alertas a JOIN convi.reglas r ON r.id = a.regla_id
@@ -145,7 +153,8 @@ export class AtencionAlertasService {
                       r.codigo_regla, r.numero_version, r.nombre AS regla,
                       r.codigo_prioridad AS prioridad, r.tipo_regla, r.codigo_ambito AS ambito,
                       ${REFERENCIA} AS referencia,
-                      a.datos_explicacion->>'formula' AS formula
+                      a.datos_explicacion->>'formula' AS formula,
+                      a.datos_explicacion AS explicacion
                     ${DESDE_ALERTA} JOIN elegidas e ON e.id = a.id) fila) AS alertas,
              (SELECT coalesce(jsonb_object_agg(estado, total), '{}'::jsonb)
               FROM (SELECT estado, count(*)::int AS total FROM convi.alertas GROUP BY estado) c
@@ -153,7 +162,14 @@ export class AtencionAlertasService {
            FROM cuenta`,
           [filtros.estado, filtros.pagina, POR_PAGINA_ALERTAS],
         );
-        return resultado.rows[0];
+        const datos = resultado.rows[0];
+        return {
+          ...datos,
+          alertas: datos.alertas.map(({ explicacion, ...a }) => ({
+            ...a,
+            resumen: resumenAlerta(explicacion),
+          })),
+        };
       },
     );
   }
@@ -222,7 +238,10 @@ export class AtencionAlertasService {
           [id, SITUACIONES_EN_DETALLE],
         );
         if (!resultado.rows[0]) throw new NotFoundException(NO_EXISTE);
-        return resultado.rows[0];
+        return {
+          ...resultado.rows[0],
+          resumen: resumenAlerta(resultado.rows[0].explicacion),
+        };
       },
     );
   }

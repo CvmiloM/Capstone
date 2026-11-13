@@ -6,12 +6,15 @@ import { AvisoError, claseBotonPrimario, claseBotonSecundario } from "@/app/comp
 import { guardarContenidoInforme, publicarInforme } from "./acciones";
 import { AVISO_HALLAZGOS, controlInforme, hallazgosConPosicion, type Informe } from "./datos";
 import { PasosInforme } from "./pasos";
+import { useCambiosSinGuardar } from "./cambios-sin-guardar";
 
 export type DatosContenidoInforme=Pick<Informe,"id"|"revision">&{definiciones_calculo:Pick<Informe["definiciones_calculo"],"escuela"|"alcance"|"sujeto"|"presentacion"|"hallazgos">&{indicadores:{total_situaciones:number};secciones:Pick<Informe["secciones_elegidas"][number],"id"|"titulo"|"descripcion">[]}};
 export function ContenidoInforme({ informe }: { informe:DatosContenidoInforme }) {
   const d=informe.definiciones_calculo;
   const [p,setP]=useState(d.presentacion);
   const [estado,accion,pendiente]=useActionState(guardarContenidoInforme.bind(null,informe.id),{});
+  const cambiado=JSON.stringify(p)!==JSON.stringify(d.presentacion);
+  useCambiosSinGuardar(cambiado,pendiente);
   const secciones=d.secciones.filter(s=>s.id!=="evolucion_dia");
   const hallazgos=hallazgosConPosicion(d.hallazgos);
   const omitidos=p.hallazgos_omitidos??[];
@@ -54,7 +57,8 @@ export function ContenidoInforme({ informe }: { informe:DatosContenidoInforme })
         </fieldset>
         <label className="mt-7 block border-t border-border pt-5 text-sm font-medium">Comentarios del equipo<textarea name="comentarios" rows={5} maxLength={5000} value={p.comentarios} onChange={e=>setP({...p,comentarios:e.target.value})} placeholder="Añade contexto, acuerdos o acciones que quieras dejar por escrito" className={controlInforme}/></label>
         {estado.mensaje && <div className="mt-5"><AvisoError>{estado.mensaje}</AvisoError></div>}
-        <div className="mt-6 flex flex-wrap gap-3"><EnlaceConCarga href="/convivencia/informes" className={claseBotonSecundario}>Cambiar el alcance</EnlaceConCarga><button type="submit" disabled={pendiente||!p.secciones.length} className={claseBotonPrimario}>{pendiente?"Preparando revisión…":"Revisar el informe"}</button></div>
+        <p role="status" className="mt-5 text-xs text-muted-foreground">{cambiado?"Tienes cambios sin guardar. Guárdalos antes de salir para conservarlos.":"Estás viendo la personalización guardada de este borrador."}</p>
+        <div className="mt-6 flex flex-wrap gap-3"><EnlaceConCarga href={`/convivencia/informes?retomar=${informe.id}`} className={claseBotonSecundario}>Cambiar el alcance</EnlaceConCarga><button type="submit" disabled={pendiente||!p.secciones.length} className={claseBotonPrimario}>{pendiente?"Guardando cambios…":"Guardar cambios y revisar"}</button></div>
       </FormularioConCarga>
       <section className="border-t border-border pt-5"><h2 className="font-semibold">Tu informe</h2><dl className="mt-5 space-y-5 text-sm"><div><dt className="text-muted-foreground">Escuela</dt><dd className="mt-1">{d.escuela}</dd></div><div><dt className="text-muted-foreground">Período</dt><dd className="mt-1">{d.alcance.desde} al {d.alcance.hasta}</dd></div>{d.sujeto && <div><dt className="text-muted-foreground">Registro seleccionado</dt><dd className="mt-1 break-words">{d.sujeto}</dd></div>}<div><dt className="text-muted-foreground">Corte preparado</dt><dd className="mt-1">{d.indicadores.total_situaciones} situaciones distintas</dd></div></dl><p className="mt-7 text-xs text-muted-foreground">La personalización usa las cifras de esta consulta, si necesitas datos nuevos vuelve a definir el alcance.</p></section>
     </div>

@@ -112,7 +112,7 @@ export function GrillaCalendario({
                 }}
                 className={`min-h-32 cursor-pointer border-border p-2 transition-colors hover:bg-muted/40 ${i % 7 !== 6 ? "border-r" : ""} ${
                   i >= 7 ? "border-t" : ""
-                } ${fuera ? "bg-muted/30" : ""}`}
+                } ${fuera ? "bg-muted/30" : d < hoy ? "bg-muted/15" : ""}`}
               >
                 <div className="mb-1 flex justify-end">
                   <button
