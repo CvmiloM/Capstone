@@ -34,7 +34,7 @@ export type PaginaAvisos = {
 
 /** A dónde lleva el aviso; null si su registro ya no se puede abrir. */
 type DestinoAviso = {
-  tipo: "alerta" | "situacion" | "caso" | "documento";
+  tipo: "alerta" | "situacion" | "caso" | "documento" | "actividad";
   id: string;
   seccion?: string;
   ancla?: string;
@@ -97,6 +97,8 @@ function rutaDelDestino(destino: NonNullable<DestinoAviso>) {
       return `/convivencia/situaciones/${destino.id}`;
     case "documento":
       return `/convivencia/documentos/versiones/${destino.id}`;
+    case "actividad":
+      return `/convivencia/plan-gestion/actividades/${destino.id}`;
     case "caso": {
       const seccion =
         destino.seccion && SECCION.test(destino.seccion)

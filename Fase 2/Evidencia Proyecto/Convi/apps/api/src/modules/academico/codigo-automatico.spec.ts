@@ -7,6 +7,7 @@ describe('códigos académicos automáticos', () => {
     ['nivel', 'NIV-003'],
     ['curso', 'CUR-0003'],
     ['estudiante', 'EST-000003'],
+    ['protocolo', 'PROT-003'],
   ] as const)(
     'genera %s dentro del ámbito de la escuela',
     async (tipo, esperado) => {

@@ -33,7 +33,6 @@ export async function crearProtocolo(
   formData: FormData,
 ): Promise<EstadoAccion> {
   const valores = {
-    codigo: leerTexto(formData, "codigo"),
     nombre: leerTexto(formData, "nombre"),
   };
   const resultado = await enviarProtocolo(valores);

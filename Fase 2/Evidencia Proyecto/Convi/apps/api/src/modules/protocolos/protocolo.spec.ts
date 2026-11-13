@@ -27,11 +27,12 @@ function camposConError(validar: () => unknown): string[] | null {
 const DOCUMENTO = '77777777-7777-4777-8777-777777777777';
 
 describe('Protocolos (PB-081, HU-070)', () => {
-  it('exige código y nombre, y deja el código en mayúsculas', () => {
-    expect(camposConError(() => validarProtocolo({}))).toEqual([
-      'codigo',
-      'nombre',
-    ]);
+  it('exige nombre, permite generar el código y conserva los códigos manuales válidos', () => {
+    expect(camposConError(() => validarProtocolo({}))).toEqual(['nombre']);
+    expect(validarProtocolo({ nombre: 'Acoso escolar' })).toEqual({
+      codigo: '',
+      nombre: 'Acoso escolar',
+    });
     expect(
       validarProtocolo({ codigo: ' p-acoso ', nombre: ' Acoso escolar ' }),
     ).toEqual({ codigo: 'P-ACOSO', nombre: 'Acoso escolar' });

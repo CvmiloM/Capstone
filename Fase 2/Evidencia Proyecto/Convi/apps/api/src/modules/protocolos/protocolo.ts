@@ -71,8 +71,7 @@ export function validarProtocolo(cuerpo: unknown): NuevoProtocolo {
   const datos = datosDe(cuerpo);
   const errores: Record<string, string> = {};
   const codigo = texto(datos.codigo).toUpperCase();
-  if (!codigo) errores.codigo = 'Escribe un código corto, por ejemplo P-ACOSO.';
-  else if (codigo.length > LARGO_MAXIMO_CODIGO || !CODIGO.test(codigo))
+  if (codigo && (codigo.length > LARGO_MAXIMO_CODIGO || !CODIGO.test(codigo)))
     errores.codigo = `Usa letras, números, guiones o guion bajo, hasta ${LARGO_MAXIMO_CODIGO} caracteres.`;
   const nombre = texto(datos.nombre);
   if (!nombre) errores.nombre = 'Escribe el nombre del protocolo.';

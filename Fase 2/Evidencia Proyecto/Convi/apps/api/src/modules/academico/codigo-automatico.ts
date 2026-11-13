@@ -14,6 +14,12 @@ const TIPOS = {
     prefijo: 'EST',
     digitos: 6,
   },
+  protocolo: {
+    tabla: 'protocolos',
+    columna: 'codigo',
+    prefijo: 'PROT',
+    digitos: 3,
+  },
 } as const;
 
 export async function codigoAutomatico(

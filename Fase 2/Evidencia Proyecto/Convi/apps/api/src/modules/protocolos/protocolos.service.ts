@@ -9,6 +9,8 @@ import type { PoolClient } from 'pg';
 import { rechazoPublicado } from '../../common/publicado.js';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
+import type { Aislamiento } from '../../database/cuenta.service.js';
+import { codigoAutomatico } from '../academico/codigo-automatico.js';
 import {
   validarPaso,
   validarProtocolo,
@@ -126,7 +128,11 @@ export class ProtocolosService {
 
   // PB-150 (HU-129): si la base rechaza cambiar una versión publicada o sus
   // pasos, se responde lo mismo que al intentar editarla desde la API.
-  private operar<T>(sesion: Sesion, trabajo: (db: PoolClient) => Promise<T>) {
+  private operar<T>(
+    sesion: Sesion,
+    trabajo: (db: PoolClient) => Promise<T>,
+    aislamiento: Aislamiento = 'REPEATABLE READ',
+  ) {
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
@@ -137,6 +143,7 @@ export class ProtocolosService {
           throw rechazoPublicado(error, SOLO_BORRADOR);
         }
       },
+      aislamiento,
     );
   }
 
@@ -191,31 +198,38 @@ export class ProtocolosService {
     cuerpo: unknown,
   ): Promise<{ id: string; version_id: string }> {
     const datos = validarProtocolo(cuerpo);
-    return this.operar(sesion, async (db) => {
-      const protocolo = await db
-        .query<{ id: string }>(
-          `INSERT INTO convi.protocolos (establecimiento_id, codigo, nombre)
+    // Tras esperar el bloqueo, la siguiente alta debe ver el correlativo ya confirmado.
+    return this.operar(
+      sesion,
+      async (db) => {
+        const codigo =
+          datos.codigo || (await codigoAutomatico(db, 'protocolo'));
+        const protocolo = await db
+          .query<{ id: string }>(
+            `INSERT INTO convi.protocolos (establecimiento_id, codigo, nombre)
            VALUES (convi.establecimiento_actual(), $1, $2)
            RETURNING id`,
-          [datos.codigo, datos.nombre],
-        )
-        .catch((error: unknown) => {
-          if (codigoError(error).code === '23505')
-            throw new BadRequestException({
-              mensaje: 'Revisa los datos marcados. No se creó el protocolo.',
-              errores: { codigo: 'Ya hay un protocolo con ese código.' },
-            });
-          throw error;
-        });
-      const version = await db.query<{ id: string }>(
-        `INSERT INTO convi.versiones_protocolo
+            [codigo, datos.nombre],
+          )
+          .catch((error: unknown) => {
+            if (codigoError(error).code === '23505')
+              throw new BadRequestException({
+                mensaje: 'Revisa los datos marcados. No se creó el protocolo.',
+                errores: { codigo: 'Ya hay un protocolo con ese código.' },
+              });
+            throw error;
+          });
+        const version = await db.query<{ id: string }>(
+          `INSERT INTO convi.versiones_protocolo
            (establecimiento_id, protocolo_id, numero_version, creado_por)
          VALUES (convi.establecimiento_actual(), $1, 1, convi.membresia_actual())
          RETURNING id`,
-        [protocolo.rows[0].id],
-      );
-      return { id: protocolo.rows[0].id, version_id: version.rows[0].id };
-    });
+          [protocolo.rows[0].id],
+        );
+        return { id: protocolo.rows[0].id, version_id: version.rows[0].id };
+      },
+      'READ COMMITTED',
+    );
   }
 
   detalle(sesion: Sesion, id: string): Promise<DetalleProtocolo> {

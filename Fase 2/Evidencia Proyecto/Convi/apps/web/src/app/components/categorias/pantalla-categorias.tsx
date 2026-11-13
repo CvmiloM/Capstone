@@ -1,3 +1,6 @@
+"use client";
+
+import { useId, useState } from "react";
 import { BotonEstado } from "./boton-estado";
 import type { Categoria } from "./datos";
 import { FormularioCategoria } from "./formulario-categoria";
@@ -10,20 +13,42 @@ export function PantallaCategorias({
 }: {
   categorias: Categoria[];
 }) {
+  const [estado, setEstado] = useState("ACTIVO");
+  const filtroId = useId();
+  const visibles = categorias.filter(
+    (categoria) => estado === "TODAS" || categoria.estado === estado,
+  );
   return (
     <div className="grid gap-6 xl:grid-cols-3">
       <section aria-labelledby="titulo-lista" className="xl:col-span-2">
         <h2 id="titulo-lista" className="sr-only">
           Categorías de la escuela
         </h2>
-        {categorias.length === 0 ? (
+        <label
+          htmlFor={filtroId}
+          className="mb-4 block max-w-xs text-sm font-medium"
+        >
+          Mostrar categorías
+          <select
+            id={filtroId}
+            value={estado}
+            onChange={(evento) => setEstado(evento.target.value)}
+            className="mt-1.5 block w-full rounded-lg border border-input bg-card px-3 py-2 focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <option value="ACTIVO">Activas</option>
+            <option value="INACTIVO">Inactivas</option>
+            <option value="TODAS">Todas</option>
+          </select>
+        </label>
+        {visibles.length === 0 ? (
           <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-            Tu escuela todavía no tiene categorías. Mientras no haya, las
-            situaciones se registran sin categoría.
+            {categorias.length === 0
+              ? "Tu escuela todavía no tiene categorías. Mientras no haya, las situaciones se registran sin categoría."
+              : "No hay categorías para este filtro. Puedes cambiar el estado para consultar las demás."}
           </p>
         ) : (
           <ul className="space-y-3">
-            {categorias.map((categoria) => {
+            {visibles.map((categoria) => {
               const activa = categoria.estado === "ACTIVO";
               return (
                 <li
