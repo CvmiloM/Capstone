@@ -5,7 +5,11 @@ import { BadRequestException } from '@nestjs/common';
 
 // Los apoderados (CA3) se invitarán desde su vínculo con el estudiante, cuando
 // corresponda esa persona, el formulario general invita al equipo de la escuela.
-export const PERFILES_INVITABLES = ['PROFESOR', 'CONVIVENCIA'] as const;
+export const PERFILES_INVITABLES = [
+  'ADMIN',
+  'PROFESOR',
+  'CONVIVENCIA',
+] as const;
 
 // Largos de personas y membresias_establecimiento en el modelo.
 export const LARGO_MAXIMO = {
@@ -64,7 +68,7 @@ export function validarInvitacion(cuerpo: unknown): NuevaInvitacion {
   )
     ? (texto(datos.perfil) as NuevaInvitacion['perfil'])
     : null;
-  if (!perfil) errores.perfil = 'Elige Profesor o Convivencia.';
+  if (!perfil) errores.perfil = 'Elige Administrador, Profesor o Convivencia.';
 
   if (!perfil || Object.keys(errores).length > 0) throw errorDeCampos(errores);
   return { nombres, apellidos, correo, perfil };

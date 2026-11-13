@@ -16,8 +16,9 @@ export const NOMBRE_ESTADO: Record<string, string> = {
   REVOCADO: "Revocada",
 };
 
-/** Perfiles que se invitan desde esta pantalla (los apoderados, más adelante). */
+/** Los apoderados se invitan desde su vínculo con un estudiante. */
 export const PERFILES_INVITABLES = [
+  { valor: "ADMIN", texto: "Administrador" },
   { valor: "PROFESOR", texto: "Profesor" },
   { valor: "CONVIVENCIA", texto: "Convivencia" },
 ] as const;

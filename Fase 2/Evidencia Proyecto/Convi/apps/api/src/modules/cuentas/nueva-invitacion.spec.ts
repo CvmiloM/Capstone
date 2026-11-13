@@ -43,7 +43,14 @@ describe('Invitación de cuentas (PB-010, HU-009)', () => {
     ]);
   });
 
-  it.each(['ADMIN', 'APODERADO', 'profesor', ''])(
+  it.each(['ADMIN', 'PROFESOR', 'CONVIVENCIA'])(
+    'acepta invitar al perfil %s',
+    (perfil) => {
+      expect(validarInvitacion({ ...base, perfil }).perfil).toBe(perfil);
+    },
+  );
+
+  it.each(['APODERADO', 'profesor', 'SUPERADMIN', ''])(
     'no invita con el perfil %j desde esta ruta (CA4)',
     (perfil) => {
       expect(camposConError({ ...base, perfil })).toEqual(['perfil']);
