@@ -48,6 +48,10 @@ export type RegistroPortal = {
   tamano_bytes: number | null;
 };
 
+// El apoderado ve las comunicaciones enviadas o registradas, nunca los
+// borradores ni los correos pendientes o que no se pudieron enviar.
+export const COMUNICACION_VISIBLE = `estado_entrega IN ('NO_APLICA','ENVIADO','ENTREGADO')`;
+
 // Lista cerrada de antecedentes de negocio, nunca las filas técnicas de auditoría o IA.
 export const REGISTROS_PORTAL = `
   SELECT v.origen_id AS id,v.tipo,v.fecha_evento AS fecha,
@@ -60,8 +64,10 @@ export const REGISTROS_PORTAL = `
   LEFT JOIN convi.compromisos co ON v.tipo='COMPROMISO' AND co.id=v.origen_id
   LEFT JOIN convi.evidencias ev ON v.tipo='EVIDENCIA' AND ev.id=v.origen_id
   LEFT JOIN convi.archivos ar ON ar.id=ev.archivo_id
+  LEFT JOIN convi.comunicaciones cm ON v.tipo='COMUNICACION' AND cm.id=v.origen_id
   WHERE v.caso_id=$1 AND v.tipo IN ('APERTURA','SITUACION','REVISION','ESTADO','ACTUACION','COMPROMISO',
     'COMPROMISO_REVISADO','COMUNICACION','EVIDENCIA','PROTOCOLO','ACLARACION','RESPUESTA_ACLARACION')
+    AND (v.tipo<>'COMUNICACION' OR cm.${COMUNICACION_VISIBLE})
   UNION ALL
   SELECT pa.id,'PARTICIPANTE',pa.activo_desde,p.nombres||' '||p.apellidos||' · '||pa.rol_contextual,NULL,NULL,NULL
   FROM convi.participaciones pa JOIN convi.personas p ON p.id=pa.persona_id
