@@ -9,6 +9,13 @@ import {
   REGISTROS_PORTAL,
   type RegistroPortal,
 } from './portal-apoderado.js';
+import {
+  PAGINA_COMUNICACIONES,
+  PAGINA_DOCUMENTOS,
+  PAGINA_HISTORIAL,
+  PAGINA_REUNIONES,
+  RESUMEN_PUPILO,
+} from './pupilo-apoderado.js';
 
 type EstudiantePortal = { id: string; nombre: string; codigo: string };
 type CasoPortal = {
@@ -18,6 +25,13 @@ type CasoPortal = {
   estado: string;
   fecha_inicio: string;
   categoria: string | null;
+};
+
+type PaginaPupilo = {
+  total: number;
+  elementos: unknown[];
+  estudiante: string | null;
+  zona_horaria: string;
 };
 
 const CAMPOS_CASO = `c.id,c.codigo,c.titulo,c.estado_actual AS estado,c.fecha_inicio::text,cat.nombre AS categoria`;
@@ -60,8 +74,11 @@ export class ApoderadoService {
             )
           ).rows[0].total,
         );
-        const { rows } = await db.query<EstudiantePortal>(
-          `SELECT e.id,p.nombres||' '||p.apellidos AS nombre,e.codigo_estudiante AS codigo ${filtro}
+        const { rows } = await db.query<
+          EstudiantePortal & { iniciales: string }
+        >(
+          `SELECT e.id,p.nombres||' '||p.apellidos AS nombre,e.codigo_estudiante AS codigo,
+        upper(left(p.nombres,1)||left(p.apellidos,1)) AS iniciales ${filtro}
         ORDER BY p.apellidos,p.nombres,e.id LIMIT 50 OFFSET $1`,
           [(pagina - 1) * 50],
         );
@@ -153,6 +170,85 @@ export class ApoderadoService {
           pagina,
           por_pagina: 50,
         };
+      },
+    );
+  }
+
+  // Ficha del pupilo con sus conteos, la próxima reunión y el permiso de la cuenta.
+  resumen(sesion: Sesion, estudianteId: string) {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'estudiante', id: estudianteId, perfiles: ['APODERADO'] },
+      async (db) => {
+        const { rows } = await db.query<{ estudiante: unknown }>(
+          RESUMEN_PUPILO,
+          [estudianteId],
+        );
+        if (!rows[0]?.estudiante)
+          throw new NotFoundException('El estudiante no está disponible');
+        return rows[0];
+      },
+    );
+  }
+
+  historial(
+    sesion: Sesion,
+    estudianteId: string,
+    consulta: Record<string, unknown>,
+  ) {
+    return this.paginaPupilo(sesion, estudianteId, consulta, PAGINA_HISTORIAL);
+  }
+
+  documentos(
+    sesion: Sesion,
+    estudianteId: string,
+    consulta: Record<string, unknown>,
+  ) {
+    return this.paginaPupilo(sesion, estudianteId, consulta, PAGINA_DOCUMENTOS);
+  }
+
+  reuniones(
+    sesion: Sesion,
+    estudianteId: string,
+    consulta: Record<string, unknown>,
+  ) {
+    return this.paginaPupilo(sesion, estudianteId, consulta, PAGINA_REUNIONES);
+  }
+
+  comunicaciones(
+    sesion: Sesion,
+    estudianteId: string,
+    consulta: Record<string, unknown>,
+  ) {
+    return this.paginaPupilo(
+      sesion,
+      estudianteId,
+      consulta,
+      PAGINA_COMUNICACIONES,
+    );
+  }
+
+  // Las listas del pupilo comparten forma: 50 por página, con el nombre del
+  // estudiante y la zona horaria de la escuela para mostrar las fechas.
+  private paginaPupilo(
+    sesion: Sesion,
+    estudianteId: string,
+    consulta: Record<string, unknown>,
+    sql: string,
+  ) {
+    const pagina = paginaPortal(consulta);
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'estudiante', id: estudianteId, perfiles: ['APODERADO'] },
+      async (db) => {
+        const { rows } = await db.query<PaginaPupilo>(sql, [
+          estudianteId,
+          (pagina - 1) * 50,
+        ]);
+        const fila = rows[0];
+        if (!fila?.estudiante)
+          throw new NotFoundException('El estudiante no está disponible');
+        return { ...fila, pagina, por_pagina: 50 };
       },
     );
   }
