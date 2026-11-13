@@ -133,6 +133,47 @@ function Lista({
   );
 }
 
+// Revisión de una situación: aviso destacado de que la IA no decide.
+const TITULO_AVISO_SITUACION = "CONVI IA es una ayuda, no tiene la última palabra";
+
+/**
+ * Revisión de una situación: la respuesta como texto plano para copiarla, con
+ * las fuentes de cada parte y el aviso al final. Usa los seudónimos que se ven
+ * en pantalla, nunca los nombres reales.
+ */
+function textoParaCopiar(
+  r: Orientacion,
+  pregunta: string | undefined,
+  aviso: string,
+) {
+  const porId = new Map(r.referencias.map((x) => [x.id, x]));
+  const fuentes = (ids: string[]) => {
+    const etiquetas = ids
+      .map((id) => porId.get(id)?.etiqueta)
+      .filter((e): e is string => Boolean(e));
+    return etiquetas.length ? ` (${etiquetas.join(", ")})` : "";
+  };
+  const lineas: string[] = ["Respuesta de CONVI IA"];
+  if (pregunta) lineas.push(`Pregunta: ${pregunta}`);
+  if (r.respuesta) {
+    lineas.push("", `${r.respuesta.texto}${fuentes(r.respuesta.referencias)}`);
+  } else if (r.texto_sin_disposicion && (r.fuera_de_limite || r.sin_disposicion)) {
+    lineas.push("", r.texto_sin_disposicion);
+  }
+  if (!r.fuera_de_limite && r.pasos.length > 0) {
+    lineas.push("", pregunta ? "Pasos relacionados:" : "Lo que indica la normativa:");
+    r.pasos.forEach((p, i) =>
+      lineas.push(`${i + 1}. ${p.texto}${fuentes(p.referencias)}`),
+    );
+  }
+  if (!r.fuera_de_limite && r.hechos.length > 0) {
+    lineas.push("", "Hechos de la situación considerados:");
+    r.hechos.forEach((h) => lineas.push(`- ${h.texto}${fuentes(h.referencias)}`));
+  }
+  lineas.push("", `${TITULO_AVISO_SITUACION}: ${aviso}`);
+  return lineas.join("\n");
+}
+
 /**
  * PB-120 y PB-121 (HU-103): orientación con IA dentro del expediente. Separa los
  * hechos documentados de los pasos que indica la normativa, con sus fuentes, y se
@@ -183,6 +224,25 @@ function OrientacionIA({
   const pregunta = useRef<HTMLTextAreaElement>(null);
   const respuesta = useRef<HTMLDivElement>(null);
   const resultado = estado.resultado;
+  // Resultado de la última copia, ligado a la respuesta que se copió.
+  const [copia, setCopia] = useState<{ id: string; ok: boolean } | null>(null);
+
+  const copiar = async () => {
+    if (!resultado) return;
+    const id = resultado.solicitud_id;
+    try {
+      await navigator.clipboard.writeText(
+        textoParaCopiar(resultado, estado.pregunta, textos.aviso),
+      );
+      setCopia({ id, ok: true });
+    } catch {
+      setCopia({ id, ok: false });
+    }
+    setTimeout(
+      () => setCopia((actual) => (actual?.id === id ? null : actual)),
+      4000,
+    );
+  };
 
   // PB-136: el botón se desactiva mientras la IA responde y el foco se
   // perdía, al llegar la respuesta el foco va a ella y el lector la anuncia.
@@ -300,9 +360,64 @@ function OrientacionIA({
           tabIndex={-1}
           className="space-y-4 border-t border-border pt-4 outline-none"
         >
-          <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-            {textos.aviso}
-          </p>
+          {ambito === "situacion" ? (
+            <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+              <div className="flex min-w-64 flex-1 gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="mt-0.5 size-4 shrink-0 text-destructive"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7.5v5M12 16.5h.01" />
+                </svg>
+                <div>
+                  <p className="font-semibold text-destructive">
+                    {TITULO_AVISO_SITUACION}
+                  </p>
+                  <p className="mt-0.5 text-foreground">{textos.aviso}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span role="status" className="text-sm text-muted-foreground">
+                  {copia?.id === resultado.solicitud_id
+                    ? copia.ok
+                      ? "Respuesta copiada"
+                      : "No se pudo copiar, selecciona el texto y cópialo a mano"
+                    : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={copiar}
+                  className={`${claseBotonSecundario} gap-2`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="9" y="9" width="11" height="11" rx="2" />
+                    <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+                  </svg>
+                  Copiar respuesta
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+              {textos.aviso}
+            </p>
+          )}
 
           {resultado.fuera_de_limite ? (
             <p className="text-sm">{resultado.texto_sin_disposicion}</p>
