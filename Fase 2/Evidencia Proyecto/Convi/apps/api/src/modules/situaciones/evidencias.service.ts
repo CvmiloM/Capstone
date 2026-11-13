@@ -15,6 +15,7 @@ import type { PoolClient } from 'pg';
 import type { Perfil, Sesion } from '../../common/sesion.js';
 import { CuentaService } from '../../database/cuenta.service.js';
 import { comprobarCasoHijo } from './portal-apoderado.js';
+import { ARCHIVO_SITUACION_PUPILO } from './pupilo-apoderado.js';
 import {
   validarActa,
   validarCorreccion,
@@ -553,6 +554,32 @@ export class EvidenciasService {
             'La evidencia no existe o no tienes permiso para descargarla',
           );
         // La cuenta y el vínculo se comprueban en cada descarga, sin emitir URLs reutilizables.
+        return this.leerArchivo(sesion, rows[0]);
+      },
+    );
+  }
+
+  // Portal del apoderado: archivo de una situación en que participa su pupilo.
+  descargarSituacionApoderado(
+    sesion: Sesion,
+    estudianteId: string,
+    situacionId: string,
+    evidenciaId: string,
+  ) {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'estudiante', id: estudianteId, perfiles: ['APODERADO'] },
+      async (db) => {
+        const { rows } = await db.query<{
+          nombre: string;
+          mime: string;
+          clave: string;
+          espacio: string;
+        }>(ARCHIVO_SITUACION_PUPILO, [estudianteId, situacionId, evidenciaId]);
+        if (!rows[0])
+          throw new NotFoundException(
+            'La evidencia no existe o no tienes permiso para descargarla',
+          );
         return this.leerArchivo(sesion, rows[0]);
       },
     );

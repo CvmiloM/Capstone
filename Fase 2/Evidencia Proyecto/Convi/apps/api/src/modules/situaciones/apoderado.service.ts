@@ -10,10 +10,12 @@ import {
   type RegistroPortal,
 } from './portal-apoderado.js';
 import {
+  DETALLE_SITUACION_PUPILO,
   PAGINA_COMUNICACIONES,
   PAGINA_DOCUMENTOS,
   PAGINA_HISTORIAL,
   PAGINA_REUNIONES,
+  PAGINA_SITUACIONES,
   RESUMEN_PUPILO,
 } from './pupilo-apoderado.js';
 
@@ -197,6 +199,38 @@ export class ApoderadoService {
     consulta: Record<string, unknown>,
   ) {
     return this.paginaPupilo(sesion, estudianteId, consulta, PAGINA_HISTORIAL);
+  }
+
+  situaciones(
+    sesion: Sesion,
+    estudianteId: string,
+    consulta: Record<string, unknown>,
+  ) {
+    return this.paginaPupilo(
+      sesion,
+      estudianteId,
+      consulta,
+      PAGINA_SITUACIONES,
+    );
+  }
+
+  // Una situación del pupilo con su relato y sus archivos.
+  situacion(sesion: Sesion, estudianteId: string, situacionId: string) {
+    return this.cuentas.operar(
+      sesion,
+      { tipo: 'estudiante', id: estudianteId, perfiles: ['APODERADO'] },
+      async (db) => {
+        const { rows } = await db.query<{ id: string }>(
+          DETALLE_SITUACION_PUPILO,
+          [estudianteId, situacionId],
+        );
+        if (!rows[0])
+          throw new NotFoundException(
+            'La situación no está disponible para este estudiante',
+          );
+        return rows[0];
+      },
+    );
   }
 
   documentos(

@@ -1,7 +1,7 @@
 import { COMUNICACION_VISIBLE, PARTICIPA_EN_CASO } from './portal-apoderado.js';
 
 // Consultas de solo lectura del portal del apoderado para un pupilo: resumen,
-// historial, documentos, reuniones y comunicaciones. Todas reciben el
+// historial, situaciones, documentos, reuniones y comunicaciones. Todas reciben el
 // estudiante en $1 y corren dentro de CuentaService.operar, que antes comprueba
 // que la cuenta es de Apoderado, que su permiso sigue vigente y que el
 // estudiante es su pupilo. No cambian nada del modelo de datos.
@@ -12,7 +12,7 @@ const CASOS_HIJO = `casos_hijo AS (
 
 // Situaciones en que participa el pupilo, con caso o sin caso, menos las descartadas.
 const SITUACIONES_HIJO = `situaciones_hijo AS (
-  SELECT s.id,s.codigo,s.ocurrido_en,s.categoria_id,s.estado,s.caso_id FROM convi.situaciones s
+  SELECT s.id,s.codigo,s.ocurrido_en,s.lugar,s.descripcion,s.categoria_id,s.estado,s.caso_id FROM convi.situaciones s
   WHERE s.estado<>'DESCARTADA' AND EXISTS (
     SELECT 1 FROM convi.participaciones pa JOIN convi.estudiantes hijo ON hijo.persona_id=pa.persona_id
     WHERE hijo.id=$1 AND pa.situacion_id=s.id AND pa.activo_hasta IS NULL AND pa.activo_desde<=now()))`;
@@ -25,7 +25,17 @@ const DOCUMENTOS_HIJO = `documentos_hijo AS (
   FROM convi.vw_evidencias_contexto ev JOIN convi.archivos ar ON ar.id=ev.archivo_id
   WHERE ev.caso_contexto_id IN (SELECT id FROM casos_hijo))`;
 
-const CON_PUPILO = `WITH ${CASOS_HIJO},${SITUACIONES_HIJO},${DOCUMENTOS_HIJO}`;
+// Archivos de esas situaciones: los que se adjuntaron a la situación y los de
+// las respuestas a sus aclaraciones, subidos por profesores o por Convivencia.
+const ARCHIVOS_SITUACION = `archivos_situacion AS (
+  SELECT ev.id,coalesce(ev.situacion_id,ac.situacion_id) AS situacion_id,ev.titulo::text AS titulo,
+    ev.tipo_evidencia::text AS tipo,coalesce(ev.fecha_documento,ev.creado_en) AS fecha,
+    ar.nombre_original::text AS archivo,ar.tipo_mime::text AS tipo_mime,ar.tamano_bytes::int AS tamano_bytes
+  FROM convi.evidencias ev JOIN convi.archivos ar ON ar.id=ev.archivo_id
+  LEFT JOIN convi.aclaraciones_situacion ac ON ac.id=ev.aclaracion_id
+  WHERE coalesce(ev.situacion_id,ac.situacion_id) IN (SELECT id FROM situaciones_hijo))`;
+
+const CON_PUPILO = `WITH ${CASOS_HIJO},${SITUACIONES_HIJO},${DOCUMENTOS_HIJO},${ARCHIVOS_SITUACION}`;
 
 const nombreMiembro = (membresia: string) =>
   `(SELECT pm.nombres||' '||pm.apellidos FROM convi.membresias_establecimiento mm
@@ -33,8 +43,8 @@ const nombreMiembro = (membresia: string) =>
 
 // Línea de tiempo del pupilo: sus situaciones, la apertura y el cierre de sus
 // casos, los encuentros realizados con sus actas, los compromisos, las
-// comunicaciones y los demás documentos. De las situaciones sin caso solo se
-// muestran el código, la fecha, la categoría y el estado.
+// comunicaciones y los demás documentos. Cada situación aparece con su código,
+// fecha, categoría y estado, y su relato completo está en la sección Situaciones.
 export const HISTORIAL_PUPILO = `
   SELECT s.id,'SITUACION'::text AS tipo,s.ocurrido_en AS fecha,s.codigo::text AS titulo,cat.nombre::text AS detalle,
     s.estado::text AS estado,NULL::text AS responsable,s.caso_id,ch.codigo::text AS caso_codigo,'[]'::json AS documentos
@@ -79,6 +89,36 @@ const COMUNICACIONES_PUPILO = `
     coalesce(cm.persona_destinataria_id=(SELECT m.persona_id FROM convi.membresias_establecimiento m WHERE m.id=convi.membresia_actual()),false) AS para_usted
   FROM convi.comunicaciones cm JOIN casos_hijo ch ON ch.id=cm.caso_id WHERE cm.${COMUNICACION_VISIBLE}`;
 
+// Sección Situaciones: por decisión del PO el apoderado ve el relato de todas
+// las situaciones en que participa su pupilo, con caso o sin caso, menos las
+// descartadas, y los archivos que les adjuntaron.
+const SITUACIONES_PUPILO = `
+  SELECT s.id,s.codigo::text AS codigo,s.ocurrido_en AS fecha,s.lugar::text AS lugar,cat.nombre::text AS categoria,
+    s.estado::text AS estado,s.descripcion AS relato,s.caso_id,ch.codigo::text AS caso_codigo,
+    (SELECT count(*) FROM archivos_situacion a WHERE a.situacion_id=s.id)::int AS archivos,
+    (SELECT count(*) FROM archivos_situacion a WHERE a.situacion_id=s.id AND a.tipo_mime LIKE 'image/%')::int AS imagenes
+  FROM situaciones_hijo s LEFT JOIN convi.categorias_convivencia cat ON cat.id=s.categoria_id
+  LEFT JOIN casos_hijo ch ON ch.id=s.caso_id`;
+
+// Una situación del pupilo con sus archivos ($2 es la situación).
+export const DETALLE_SITUACION_PUPILO = `${CON_PUPILO}
+  SELECT s.id,s.codigo::text AS codigo,s.ocurrido_en AS fecha,s.lugar::text AS lugar,cat.nombre::text AS categoria,
+    s.estado::text AS estado,s.descripcion AS relato,s.caso_id,ch.codigo::text AS caso_codigo,
+    coalesce((SELECT json_agg(a ORDER BY a.fecha,a.id) FROM (SELECT x.id,x.titulo,x.tipo,x.fecha,x.archivo,x.tipo_mime,x.tamano_bytes
+      FROM archivos_situacion x WHERE x.situacion_id=s.id) a),'[]'::json) AS archivos,
+    (SELECT p.nombres||' '||p.apellidos FROM convi.estudiantes e JOIN convi.personas p ON p.id=e.persona_id WHERE e.id=$1) AS estudiante,
+    (SELECT zona_horaria FROM convi.establecimientos WHERE id=convi.establecimiento_actual()) AS zona_horaria
+  FROM situaciones_hijo s LEFT JOIN convi.categorias_convivencia cat ON cat.id=s.categoria_id
+  LEFT JOIN casos_hijo ch ON ch.id=s.caso_id
+  WHERE s.id=$2`;
+
+// Archivo de una situación del pupilo ($2 la situación y $3 el archivo): solo si
+// la situación es suya y el archivo pertenece a esa situación.
+export const ARCHIVO_SITUACION_PUPILO = `${CON_PUPILO}
+  SELECT ar.nombre_original AS nombre,ar.tipo_mime AS mime,ar.clave_almacenamiento AS clave,ar.bucket_id AS espacio
+  FROM archivos_situacion a JOIN convi.evidencias ev ON ev.id=a.id JOIN convi.archivos ar ON ar.id=ev.archivo_id
+  WHERE a.id=$3 AND a.situacion_id=$2`;
+
 const DOCUMENTOS_PUPILO = `
   SELECT d.id,d.titulo,d.tipo,d.fecha,d.caso_id,ch.codigo::text AS caso_codigo,d.rectifica,d.archivo,d.tipo_mime,d.tamano_bytes
   FROM documentos_hijo d JOIN casos_hijo ch ON ch.id=d.caso_id`;
@@ -99,6 +139,7 @@ export const PAGINA_HISTORIAL = paginada(
   'fecha DESC NULLS LAST,tipo,id',
 );
 export const PAGINA_DOCUMENTOS = paginada(DOCUMENTOS_PUPILO, 'fecha DESC,id');
+export const PAGINA_SITUACIONES = paginada(SITUACIONES_PUPILO, 'fecha DESC,id');
 // Primero las reuniones que vienen, de la más cercana a la más lejana, y
 // después las pasadas, de la más reciente a la más antigua.
 export const PAGINA_REUNIONES = paginada(

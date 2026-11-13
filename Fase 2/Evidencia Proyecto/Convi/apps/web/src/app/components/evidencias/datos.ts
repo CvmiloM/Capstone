@@ -90,7 +90,11 @@ export async function enviarEvidencia(
  * HU-057 CA3: pide el archivo a la API, que vuelve a comprobar el permiso, y
  * lo entrega como descarga. Sin permiso vigente responde 404 sin revelar nada.
  */
-export async function responderDescarga(ruta: string, noDisponible = "La evidencia no existe o no tienes permiso para descargarla.") {
+// La vista previa del portal del apoderado abre imágenes en el navegador:
+// sin scripts ni otros recursos, aunque el archivo dijera otra cosa.
+const POLITICA_VISTA = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox";
+
+export async function responderDescarga(ruta: string, noDisponible = "La evidencia no existe o no tienes permiso para descargarla.", vista = false) {
   const token = await tokenDeSesion();
   let respuesta: Response;
   try {
@@ -118,6 +122,7 @@ export async function responderDescarga(ruta: string, noDisponible = "La evidenc
       "Content-Length": String(contenido.byteLength),
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      ...(vista ? { "Content-Security-Policy": POLITICA_VISTA } : {}),
     },
   });
 }

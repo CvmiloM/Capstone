@@ -10,6 +10,7 @@ const SECCIONES: { parte: string; texto: string; icono: NombreIcono }[] = [
   { parte: "", texto: "Inicio", icono: "inicio" },
   { parte: "estudiante", texto: "Mi estudiante", icono: "persona" },
   { parte: "historial", texto: "Historial de convivencia", icono: "historial" },
+  { parte: "situaciones", texto: "Situaciones", icono: "bandera" },
   { parte: "casos", texto: "Casos", icono: "carpeta" },
   { parte: "documentos", texto: "Documentos y actas", icono: "documentos" },
   { parte: "reuniones", texto: "Reuniones", icono: "anios" },

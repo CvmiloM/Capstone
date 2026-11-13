@@ -168,6 +168,20 @@ const TRAZOS = {
     </>
   ),
   flecha: <path d="m9 6 6 6-6 6" />,
+  bandera: (
+    <>
+      <path d="M5 21V4" />
+      <path d="M5 4h11l-2 4 2 4H5" />
+    </>
+  ),
+  imagen: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-5-5L5 21" />
+    </>
+  ),
+  cerrar: <path d="M6 6l12 12M18 6 6 18" />,
 } satisfies Record<string, ReactNode>;
 
 export type NombreIcono = keyof typeof TRAZOS;

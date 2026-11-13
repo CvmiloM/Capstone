@@ -3,16 +3,23 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { PoolClient } from 'pg';
 import type { CuentaService } from '../../database/cuenta.service.js';
 import type { Sesion } from '../../common/sesion.js';
+import { respuestaArchivo } from './apoderado.controller.js';
 import { ApoderadoService } from './apoderado.service.js';
+import { EvidenciasService } from './evidencias.service.js';
 import { REGISTROS_PORTAL } from './portal-apoderado.js';
 import {
+  ARCHIVO_SITUACION_PUPILO,
+  DETALLE_SITUACION_PUPILO,
   HISTORIAL_PUPILO,
   PAGINA_COMUNICACIONES,
   PAGINA_DOCUMENTOS,
   PAGINA_HISTORIAL,
   PAGINA_REUNIONES,
+  PAGINA_SITUACIONES,
   RESUMEN_PUPILO,
 } from './pupilo-apoderado.js';
 
@@ -20,6 +27,7 @@ const id = '11111111-1111-4111-8111-111111111111';
 const sesion = { codigo_perfil: 'APODERADO' } as Sesion;
 const listas = [
   'historial',
+  'situaciones',
   'documentos',
   'reuniones',
   'comunicaciones',
@@ -73,6 +81,7 @@ describe('Portal del apoderado: ficha y listas del pupilo', () => {
 
   it.each([
     ['historial', PAGINA_HISTORIAL],
+    ['situaciones', PAGINA_SITUACIONES],
     ['documentos', PAGINA_DOCUMENTOS],
     ['reuniones', PAGINA_REUNIONES],
     ['comunicaciones', PAGINA_COMUNICACIONES],
@@ -141,6 +150,7 @@ describe('Portal del apoderado: qué muestran las consultas', () => {
 
   it.each([
     PAGINA_HISTORIAL,
+    PAGINA_SITUACIONES,
     PAGINA_DOCUMENTOS,
     PAGINA_REUNIONES,
     PAGINA_COMUNICACIONES,
@@ -148,4 +158,103 @@ describe('Portal del apoderado: qué muestran las consultas', () => {
     expect(sql).toContain('casos_hijo');
     expect(sql).toContain('LIMIT 50 OFFSET $2');
   });
+});
+
+const situacion = '33333333-3333-4333-8333-333333333333';
+const evidencia = '44444444-4444-4444-8444-444444444444';
+
+describe('Portal del apoderado: situaciones y sus imágenes', () => {
+  it('el detalle de una situación pasa por CuentaService con el estudiante', async () => {
+    const { servicio, operar, query } = servicioCon([{ id: situacion }]);
+    await servicio.situacion(sesion, id, situacion);
+    expect(operar.mock.calls[0][1]).toEqual({
+      tipo: 'estudiante',
+      id,
+      perfiles: ['APODERADO'],
+    });
+    expect(query).toHaveBeenCalledWith(DETALLE_SITUACION_PUPILO, [
+      id,
+      situacion,
+    ]);
+  });
+
+  it('responde 404 si la situación no es del pupilo o está descartada', async () => {
+    const { servicio } = servicioCon([]);
+    await expect(servicio.situacion(sesion, id, situacion)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('por decisión del PO muestra el relato, pero nunca las descartadas', () => {
+    expect(PAGINA_SITUACIONES).toContain('s.descripcion AS relato');
+    expect(DETALLE_SITUACION_PUPILO).toContain('s.descripcion AS relato');
+    expect(PAGINA_SITUACIONES).toContain("s.estado<>'DESCARTADA'");
+    expect(DETALLE_SITUACION_PUPILO).toContain('pa.activo_hasta IS NULL');
+  });
+
+  it('un archivo solo se entrega si pertenece a esa situación del pupilo', () => {
+    expect(ARCHIVO_SITUACION_PUPILO).toContain(
+      'WHERE a.id=$3 AND a.situacion_id=$2',
+    );
+    expect(ARCHIVO_SITUACION_PUPILO).toContain(
+      'IN (SELECT id FROM situaciones_hijo)',
+    );
+  });
+
+  it('no lee Storage si el archivo no corresponde', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const operar = vi.fn(
+      async (
+        _s: Sesion,
+        _a: unknown,
+        trabajo: (db: PoolClient) => Promise<unknown>,
+      ) => trabajo({ query } as unknown as PoolClient),
+    );
+    const from = vi.fn();
+    const evidencias = new EvidenciasService(
+      { operar } as unknown as CuentaService,
+      { storage: { from } } as unknown as SupabaseClient,
+    );
+    await expect(
+      evidencias.descargarSituacionApoderado(sesion, id, situacion, evidencia),
+    ).rejects.toThrow(NotFoundException);
+    expect(operar.mock.calls[0][1]).toEqual({
+      tipo: 'estudiante',
+      id,
+      perfiles: ['APODERADO'],
+    });
+    expect(query).toHaveBeenCalledWith(ARCHIVO_SITUACION_PUPILO, [
+      id,
+      situacion,
+      evidencia,
+    ]);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  const archivo = (mime: string) => ({
+    nombre: 'foto del patio.jpg',
+    mime,
+    contenido: Buffer.from('imagen'),
+  });
+
+  it.each(['image/jpeg', 'image/png', 'image/webp'])(
+    'muestra %s en el navegador como vista previa',
+    (mime) => {
+      const respuesta = respuestaArchivo(archivo(mime), true);
+      expect(respuesta.getHeaders().disposition).toMatch(/^inline; /);
+      expect(respuesta.getHeaders().type).toBe(mime);
+    },
+  );
+
+  it.each(['application/pdf', 'text/html', 'image/svg+xml'])(
+    'no abre %s en el navegador, solo se descarga',
+    (mime) => {
+      expect(() => respuestaArchivo(archivo(mime), true)).toThrow(
+        NotFoundException,
+      );
+      expect(
+        respuestaArchivo(archivo(mime), false).getHeaders().disposition,
+      ).toMatch(/^attachment; /);
+    },
+  );
 });

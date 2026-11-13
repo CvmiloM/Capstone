@@ -3,7 +3,8 @@ import { formatearTamano } from "@/app/components/evidencias/opciones";
 import { Icono } from "@/app/components/icono";
 import { numeroPagina, obtenerDocumentos } from "../../../datos";
 import { Paginacion } from "../../../paginacion";
-import { Descargar, EnlaceCaso, SinAcceso, SinRegistros, SoloLectura, TituloPantalla, fechaCorta, rutaPupilo } from "../../../piezas";
+import { Galeria } from "../../../galeria";
+import { Descargar, EnlaceCaso, SinAcceso, SinRegistros, SoloLectura, TituloPantalla, fechaCorta, rutaArchivoCaso, rutaPupilo, tieneVistaPrevia } from "../../../piezas";
 
 export const metadata: Metadata = { title: "Documentos y actas" };
 
@@ -30,7 +31,7 @@ export default async function Documentos({ params, searchParams }: { params: Pro
   if (!datos) return <SinAcceso />;
   return <>
     <TituloPantalla titulo="Documentos y actas" />
-    <SoloLectura>Puedes descargar los documentos asociados a los casos de {datos.estudiante}</SoloLectura>
+    <SoloLectura>Puedes ver y descargar los documentos asociados a los casos de {datos.estudiante}</SoloLectura>
     {!datos.elementos.length ? <SinRegistros icono="documentos" titulo="No hay documentos" texto="Aquí aparecerán las actas y los documentos que el equipo de Convivencia adjunte a los casos de tu pupilo" /> :
       <ul className="space-y-3">{datos.elementos.map((d) => <li key={d.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-tarjeta sm:flex-nowrap sm:p-5">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-primary"><Icono nombre="documentos" className="size-5" /></span>
@@ -39,7 +40,10 @@ export default async function Documentos({ params, searchParams }: { params: Pro
           <p className="mt-0.5 flex flex-wrap gap-x-1.5 text-sm text-muted-foreground"><span>{fechaCorta(d.fecha, datos.zona_horaria)}</span><span aria-hidden="true">·</span><span>{formato(d.tipo_mime, d.archivo)}</span><span aria-hidden="true">·</span><span>{formatearTamano(d.tamano_bytes)}</span><span aria-hidden="true">·</span><span>Caso <EnlaceCaso id={id} casoId={d.caso_id} codigo={d.caso_codigo} /></span></p>
           {d.rectifica && <p className="mt-1 text-xs text-muted-foreground">Corrige un documento anterior del mismo caso</p>}
         </div>
-        <Descargar id={id} casoId={d.caso_id} documentoId={d.id} titulo={d.titulo} />
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {tieneVistaPrevia(d.tipo_mime) && <Galeria modo="boton" imagenes={[{ id: d.id, titulo: d.titulo, vista: `${rutaArchivoCaso(id, d.caso_id, d.id)}/vista`, descarga: rutaArchivoCaso(id, d.caso_id, d.id), detalle: `${fechaCorta(d.fecha, datos.zona_horaria)} · ${formatearTamano(d.tamano_bytes)}` }]} />}
+          <Descargar href={rutaArchivoCaso(id, d.caso_id, d.id)} titulo={d.titulo} />
+        </div>
       </li>)}</ul>}
     <Paginacion total={datos.total} pagina={datos.pagina} ruta={rutaPupilo(id, "documentos")} />
   </>;
