@@ -1,5 +1,7 @@
 "use client";
 
+import { useCambiosSinGuardar } from "./cambios-sin-guardar";
+import { EnlaceConCarga } from "@/app/components/actividad";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { CargaActiva, FormularioConCarga } from "@/app/components/actividad";
 import { AvisoError, claseBotonPrimario, claseBotonSecundario } from "@/app/components/formulario";
@@ -7,19 +9,23 @@ import { buscarRegistroInforme, prepararInforme } from "./acciones";
 import { controlInforme, PROPOSITOS, type AlcanceInforme, type OpcionInforme, type OpcionesInforme, type TipoInforme } from "./datos";
 import { PasosInforme } from "./pasos";
 
-export function AsistenteInforme({ opciones,solicitud,inicial }: { opciones: OpcionesInforme; solicitud:string; inicial?: Partial<AlcanceInforme> }) {
-  const [paso,setPaso] = useState(1);
+export function AsistenteInforme({ opciones,solicitud,inicial,registroInicial,borrador }: { opciones: OpcionesInforme; solicitud:string; inicial?: Partial<AlcanceInforme>; registroInicial?: OpcionInforme; borrador?: string }) {
+  const [paso,setPaso] = useState(inicial?2:1);
   const tituloPaso=useRef<HTMLHeadingElement>(null);
   useEffect(()=>{if(paso===2)tituloPaso.current?.focus();},[paso]);
   const [tipo,setTipo] = useState<TipoInforme>(inicial?.tipo??"PERIODO");
   const [desde,setDesde] = useState(inicial?.desde??"");
   const [hasta,setHasta] = useState(inicial?.hasta??"");
   const [buscar,setBuscar] = useState("");
-  const [seleccion,setSeleccion] = useState<OpcionInforme | null>(null);
+  const [seleccion,setSeleccion] = useState<OpcionInforme | null>(registroInicial??null);
   const [encontrados,setEncontrados] = useState<{ registros:OpcionInforme[]; pagina:number; hay_mas:boolean } | null>(null);
   const [errorBusqueda,setErrorBusqueda] = useState("");
   const [buscando,iniciarBusqueda] = useTransition();
   const [estado,accion,pendiente] = useActionState(prepararInforme,{});
+  const [nivel,setNivel]=useState(inicial?.nivel??"");
+  const [curso,setCurso]=useState(inicial?.curso??"");
+  const [categoria,setCategoria]=useState(inicial?.categoria??"");
+  useCambiosSinGuardar(paso===2||Boolean(desde||hasta||curso||nivel||categoria||seleccion),pendiente);
   const limite = desde ? new Date(desde+"T12:00:00Z") : null;
   if(limite && Number.isFinite(limite.getTime()))limite.setUTCDate(limite.getUTCDate()+366);
   const maximo=limite && Number.isFinite(limite.getTime())?limite.toISOString().slice(0,10):undefined;
@@ -37,13 +43,14 @@ export function AsistenteInforme({ opciones,solicitud,inicial }: { opciones: Opc
   return <div className="space-y-7">
     <CargaActiva activa={buscando}/>
     <PasosInforme actual={paso}/>
+    {borrador&&<p className="text-sm text-muted-foreground">Retomaste el alcance del borrador. Al consultar se preparará un nuevo corte; el anterior conserva su contenido guardado. <EnlaceConCarga href={`/convivencia/informes/${borrador}?paso=contenido`} className="font-medium text-primary underline">Volver al borrador guardado</EnlaceConCarga></p>}
     <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_16rem]">
       <section className="min-w-0 rounded-2xl border border-border bg-card p-5 sm:p-7" aria-labelledby="tarea-informe">
         {paso===1 ? <>
           <h2 id="tarea-informe" className="text-xl font-semibold">¿Qué necesitas revisar?</h2>
           <p className="mt-2 text-sm text-muted-foreground">Cada propósito tiene sus propios filtros y contenido, podrás personalizar el documento antes de publicarlo.</p>
           <div className="mt-6 divide-y divide-border">
-            {PROPOSITOS.map(p=><button key={p.tipo} type="button" onClick={()=>{setTipo(p.tipo);setSeleccion(null);setEncontrados(null);setPaso(2);}}
+            {PROPOSITOS.map(p=><button key={p.tipo} type="button" onClick={()=>{if(p.tipo!==tipo){setSeleccion(null);setEncontrados(null);}setTipo(p.tipo);setPaso(2);}}
               className="group flex w-full items-center justify-between gap-5 rounded-lg px-2 py-5 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
               <span><span className="block text-base font-semibold text-primary">{p.titulo}</span><span className="mt-1.5 block max-w-2xl text-sm text-muted-foreground">{p.descripcion}</span></span>
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="size-5 shrink-0 text-primary"><path d="m9 5 7 7-7 7"/></svg>
@@ -64,9 +71,9 @@ export function AsistenteInforme({ opciones,solicitud,inicial }: { opciones: Opc
             <button type="button" className="text-sm font-medium text-primary underline-offset-4 hover:underline" onClick={()=>{setDesde(opciones.hoy.slice(0,7)+"-01");setHasta(opciones.hoy);setSeleccion(null);setEncontrados(null);}}>Mes actual hasta hoy</button>
           </div>
           {tipo==="PERIODO" ? <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-medium">Nivel educativo<select name="nivel" defaultValue={inicial?.nivel??""} className={controlInforme}><option value="">Todos los niveles</option>{opciones.niveles.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
-            <label className="text-sm font-medium">Curso<select name="curso" defaultValue={inicial?.curso??""} className={controlInforme}><option value="">Todos los cursos</option>{opciones.cursos.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
-            <label className="text-sm font-medium sm:col-span-2">Categoría<select name="categoria" defaultValue={inicial?.categoria??""} className={controlInforme}><option value="">Todas las categorías</option>{opciones.categorias.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
+            <label className="text-sm font-medium">Nivel educativo<select name="nivel" value={nivel} onChange={e=>setNivel(e.target.value)} className={controlInforme}><option value="">Todos los niveles</option>{opciones.niveles.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
+            <label className="text-sm font-medium">Curso<select name="curso" value={curso} onChange={e=>setCurso(e.target.value)} className={controlInforme}><option value="">Todos los cursos</option>{opciones.cursos.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
+            <label className="text-sm font-medium sm:col-span-2">Categoría<select name="categoria" value={categoria} onChange={e=>setCategoria(e.target.value)} className={controlInforme}><option value="">Todas las categorías</option>{opciones.categorias.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>
           </div> : <div className="mt-6 border-t border-border pt-6">
             <label htmlFor="buscar-registro" className="text-sm font-medium">{tipo==="ESTUDIANTE"?"Selecciona un estudiante":"Selecciona un caso"}</label>
             <div className="mt-1.5 flex flex-wrap items-center gap-3">

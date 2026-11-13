@@ -21,7 +21,7 @@ import {
 // comprueba con convi.puede_ver_estudiante que sea de la escuela de la sesión
 // y que la cuenta pueda verlo, así que otra escuela no se consulta (CA4).
 const PERFILES: Perfil[] = ['CONVIVENCIA'];
-const POR_PAGINA = 50;
+const POR_PAGINA = 10;
 /** Tope de registros que devuelve el historial; los totales cuentan todos. */
 export const MAXIMO_HISTORIAL = 300;
 
@@ -151,7 +151,7 @@ export class HistorialService {
   constructor(@Inject(CuentaService) private readonly cuentas: CuentaService) {}
 
   // Para llegar al historial: estudiantes de la escuela por apellidos, de a
-  // 50, buscando por nombre, código o RUT. Incluye a los que hoy no tienen
+  // 10, buscando por nombre, código o RUT. Incluye a los que hoy no tienen
   // matrícula (retirados o egresados), porque su historial se conserva.
   buscar(
     sesion: Sesion,
@@ -163,8 +163,7 @@ export class HistorialService {
     const texto = `%${filtro.buscar.replace(/[\\%_]/g, '\\$&')}%`;
     const rut = normalizarParcial(filtro.buscar);
     const donde = `
-      WHERE $1 = '%%'
-         OR ${sinTildes(`p.nombres || ' ' || p.apellidos`)} ILIKE ${sinTildes('$1')}
+      WHERE ${sinTildes(`p.nombres || ' ' || p.apellidos`)} ILIKE ${sinTildes('$1')}
          OR ${sinTildes(`p.apellidos || ' ' || p.nombres`)} ILIKE ${sinTildes('$1')}
          OR e.codigo_estudiante ILIKE $1
          OR ($2 <> '' AND replace(p.rut, '-', '') LIKE $2)`;
@@ -172,6 +171,13 @@ export class HistorialService {
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
+        if (filtro.buscar.length < 2)
+          return {
+            estudiantes: [],
+            total: 0,
+            pagina: 1,
+            por_pagina: POR_PAGINA,
+          };
         const total = await db.query<{ total: number }>(
           `SELECT count(*)::int AS total
            FROM convi.estudiantes e

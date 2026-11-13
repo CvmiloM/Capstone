@@ -45,10 +45,10 @@ export async function guardarContenidoInforme(id: string,_estado: EstadoInforme,
   };
   const r = await pedir("/"+encodeURIComponent(id)+"/contenido",entrada);
   if (!r.ok) return { mensaje:r.mensaje };
-  redirect("/convivencia/informes/"+encodeURIComponent(id));
+  redirect("/convivencia/informes/"+encodeURIComponent(id)+"?guardado=1#resultado");
 }
 export async function publicarInforme(id: string,_estado: EstadoInforme,formulario: FormData): Promise<EstadoInforme> {
   const r = await pedir("/"+encodeURIComponent(id)+"/publicar",{revision:formulario.get("revision")});
   if (!r.ok) return { mensaje:r.mensaje };
-  redirect("/convivencia/informes/"+encodeURIComponent(id));
+  redirect("/convivencia/informes/"+encodeURIComponent(id)+"?publicado=1#resultado");
 }

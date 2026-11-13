@@ -114,11 +114,12 @@ export function diasEntre(desde: string, hasta: string) {
   return dias;
 }
 
-/** «viernes, 6 de noviembre», sin correr el día por la zona horaria. */
+/** Fecha completa, sin correr el día por la zona horaria. */
 export const nombreDia = (dia: string) =>
   new Intl.DateTimeFormat("es-CL", {
     weekday: "long",
     day: "numeric",
     month: "long",
+    year: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${dia}T12:00:00Z`));

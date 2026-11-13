@@ -42,10 +42,17 @@ export default async function BandejaAlertas({
       <header>
         <h1 className="font-titulo text-3xl font-semibold">Alertas</h1>
         <p className="mt-2 text-muted-foreground">
-          Las genera el motor según las reglas de aviso de la escuela. Ábrelas
-          para ver por qué se generaron y deja escrito qué se hizo.
+          CONVI genera una alerta cuando los registros cumplen una regla de aviso de la escuela. Ábrela para revisar sus antecedentes y dejar escrito qué se hizo.
         </p>
       </header>
+      <details className="rounded-xl border border-border bg-card p-4 text-sm">
+        <summary className="cursor-pointer font-semibold">¿Qué diferencia hay entre regla, alerta y aviso?</summary>
+        <dl className="mt-4 space-y-3">
+          <div><dt className="font-medium">Regla de aviso</dt><dd>Es la condición que configura la escuela para detectar un patrón de registros.</dd></div>
+          <div><dt className="font-medium">Alerta</dt><dd>Es el registro que se crea al cumplirse la regla. El equipo revisa sus antecedentes y decide cómo actuar; no es una sanción.</dd></div>
+          <div><dt className="font-medium">Aviso de la campanita</dt><dd>Informa a cada usuario sobre una alerta u otro acontecimiento. Leer el aviso no marca la alerta como revisada.</dd></div>
+        </dl>
+      </details>
 
       <nav aria-label="Filtrar alertas por estado">
         <ul className="flex flex-wrap gap-1.5">
@@ -117,9 +124,9 @@ export default async function BandejaAlertas({
                   Generada el {fecha(a.generada_en)} · regla {a.codigo_regla}{" "}
                   (versión {a.numero_version})
                 </p>
-                {a.formula && (
+                {a.resumen && (
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {a.formula}
+                    {a.resumen}
                   </p>
                 )}
               </Link>

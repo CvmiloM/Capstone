@@ -133,11 +133,13 @@ export function ListaGestion({
     <>
       {lista.filas.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-6">
-          <h3 className="font-semibold">
+          <h2 className="font-semibold">
             {lista.total
               ? "Esta página no tiene resultados"
+              : tipo === "planes" && !parametros.q && !parametros.anio
+                ? "Todavía no hay planes de Convivencia"
               : "No hay resultados para esta búsqueda"}
-          </h3>
+          </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             {tipo === "planes"
               ? "Puedes crear un Plan o buscar en otro año."
