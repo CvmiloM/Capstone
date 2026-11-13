@@ -16,9 +16,11 @@ export default async function InicioPupilo({ params }: { params: Promise<{ id: s
   const tarjetas: { parte: string; icono: NombreIcono; tono: string; titulo: string; texto: string }[] = [
     { parte: "estudiante", icono: "persona", tono: "bg-accent text-primary", titulo: "Mi estudiante", texto: [e.nombre, e.curso].filter(Boolean).join(" · ") },
     { parte: "historial", icono: "historial", tono: "bg-verde/10 text-verde", titulo: "Historial de convivencia", texto: c.historial ? plural(c.historial, "registro", "registros") : "Sin registros" },
+    { parte: "situaciones", icono: "bandera", tono: "bg-naranjo/10 text-[color:var(--naranjo-sombra)]", titulo: "Situaciones", texto: c.situaciones ? plural(c.situaciones, "situación registrada", "situaciones registradas") : "Sin situaciones registradas" },
     { parte: "casos", icono: "carpeta", tono: "bg-accent text-primary", titulo: "Casos", texto: c.casos_activos ? plural(c.casos_activos, "caso activo", "casos activos") : c.casos_cerrados ? `Sin casos activos, ${plural(c.casos_cerrados, "cerrado", "cerrados")}` : "Sin casos registrados" },
     { parte: "documentos", icono: "documentos", tono: "bg-amarillo/15 text-[color:var(--naranjo-sombra)]", titulo: "Documentos y actas", texto: c.documentos ? plural(c.documentos, "documento", "documentos") : "Sin documentos" },
     { parte: "reuniones", icono: "anios", tono: "bg-accent text-primary", titulo: "Próxima reunión", texto: reunion ? `${fechaCorta(reunion.fecha, zona)} · ${hora(reunion.fecha, zona)}${reunion.lugar ? ` · ${reunion.lugar}` : ""}` : "Sin reuniones programadas" },
+    { parte: "comunicaciones", icono: "mensaje", tono: "bg-accent text-primary", titulo: "Comunicaciones", texto: c.comunicaciones ? plural(c.comunicaciones, "comunicación", "comunicaciones") : "Sin comunicaciones" },
     { parte: "acceso", icono: "candado", tono: "bg-muted text-pizarra", titulo: "Mi acceso", texto: datos.acceso?.expira_en ? `Vigente hasta el ${fechaCorta(datos.acceso.expira_en, zona)}` : "Vigente" },
   ];
   return <>

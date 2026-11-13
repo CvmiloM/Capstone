@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import { numeroPagina, obtenerHistorial, type Evento } from "../../../datos";
 import { Paginacion } from "../../../paginacion";
 import {
-  Descargar, EnlaceCaso, ESTADOS_CASO, ESTADOS_COMPROMISO, ESTADOS_COMUNICACION, ESTADOS_SITUACION, SinAcceso, SinRegistros,
-  SoloLectura, TIPOS_COMUNICACION, TIPOS_ENCUENTRO, TituloPantalla, fechaCorta, rutaPupilo,
+  Descargar, EnlaceCaso, EnlaceSituacion, ESTADOS_CASO, ESTADOS_COMPROMISO, ESTADOS_COMUNICACION, ESTADOS_SITUACION, SinAcceso, SinRegistros,
+  SoloLectura, TIPOS_COMUNICACION, TIPOS_ENCUENTRO, TituloPantalla, fechaCorta, rutaArchivoCaso, rutaPupilo,
 } from "../../../piezas";
 
 export const metadata: Metadata = { title: "Historial de convivencia" };
@@ -29,7 +29,7 @@ function contenido(id: string, r: Evento): { insignia: string; titulo: ReactNode
   const caso = r.caso_id && r.caso_codigo ? <>Caso <EnlaceCaso id={id} casoId={r.caso_id} codigo={r.caso_codigo} /></> : null;
   switch (r.tipo) {
     case "SITUACION":
-      return { insignia: "Situación", titulo: <>Situación {codigo(r.titulo)}{r.detalle ? ` · ${r.detalle}` : ""}</>, apoyo: [r.estado ? ESTADOS_SITUACION[r.estado] ?? null : null, caso] };
+      return { insignia: "Situación", titulo: <>Situación {codigo(r.titulo)}{r.detalle ? ` · ${r.detalle}` : ""}</>, apoyo: [r.estado ? ESTADOS_SITUACION[r.estado] ?? null : null, caso, <EnlaceSituacion key="ver" id={id} situacionId={r.id} />] };
     case "CASO":
       return { insignia: "Caso iniciado", titulo: <>Caso {codigo(r.titulo)}{r.detalle ? ` · ${r.detalle}` : ""}</>, apoyo: [r.responsable ? `Responsable: ${r.responsable}` : null, r.estado ? `Estado actual: ${ESTADOS_CASO[r.estado] ?? r.estado}` : null, caso && <EnlaceCaso id={id} casoId={r.caso_id!} codigo="Ver el caso" />] };
     case "CIERRE":
@@ -67,7 +67,7 @@ export default async function Historial({ params, searchParams }: { params: Prom
                 <span className={`inline-flex rounded-full border bg-card px-2.5 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wider ${estilo.insignia}`}>{insignia}</span>
                 <h2 className="mt-2 line-clamp-3 font-sans text-[0.95rem] font-medium break-words text-foreground">{titulo}</h2>
                 {datosApoyo.length > 0 && <p className="mt-1 flex flex-wrap gap-x-1.5 text-sm text-muted-foreground">{datosApoyo.map((d, i) => <span key={i} className="flex gap-x-1.5">{i > 0 && <span aria-hidden="true">·</span>}<span>{d}</span></span>)}</p>}
-                {r.documentos.length > 0 && <ul aria-label="Documentos" className="mt-3 flex flex-wrap gap-2">{r.documentos.map((d) => <li key={d.id} className="max-w-full"><Descargar id={id} casoId={d.caso_id} documentoId={d.id} titulo={d.titulo} compacto /></li>)}</ul>}
+                {r.documentos.length > 0 && <ul aria-label="Documentos" className="mt-3 flex flex-wrap gap-2">{r.documentos.map((d) => <li key={d.id} className="max-w-full"><Descargar href={rutaArchivoCaso(id, d.caso_id, d.id)} titulo={d.titulo} compacto /></li>)}</ul>}
               </div>
             </article>
           </li>;

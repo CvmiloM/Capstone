@@ -7,6 +7,11 @@ import { Icono, type NombreIcono } from "@/app/components/icono";
 // globals.css y las fechas siempre en la zona horaria de la escuela.
 
 export const rutaPupilo = (id: string, parte = "") => `/apoderado/estudiantes/${id}${parte ? `/${parte}` : ""}`;
+/** Descarga protegida de un archivo de un caso o de una situación, la vista previa agrega /vista. */
+export const rutaArchivoCaso = (id: string, casoId: string, archivoId: string) => rutaPupilo(id, `casos/${casoId}/evidencias/${archivoId}`);
+export const rutaArchivoSituacion = (id: string, situacionId: string, archivoId: string) => rutaPupilo(id, `situaciones/${situacionId}/evidencias/${archivoId}`);
+/** Solo las imágenes se abren en el navegador, igual que en la API, los PDF se descargan. */
+export const tieneVistaPrevia = (mime: string) => ["image/jpeg", "image/png", "image/webp"].includes(mime);
 
 function formato(opciones: Intl.DateTimeFormatOptions) {
   return (valor: string, zona: string) => new Intl.DateTimeFormat("es-CL", { timeZone: zona, ...opciones }).format(new Date(valor));
@@ -103,6 +108,16 @@ export function SinAcceso() {
   return <AvisoError>No tienes acceso disponible a este pupilo, pide al administrador de la escuela que revise tu permiso</AvisoError>;
 }
 
+/** Estado de una situación: las que siguen en revisión en azul, las demás en gris. */
+export function EstadoSituacion({ valor }: { valor: string }) {
+  const revision = ["NUEVA", "EN_REVISION", "INFORMACION_SOLICITADA"].includes(valor);
+  return (
+    <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${revision ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+      {ESTADOS_SITUACION[valor] ?? valor.toLowerCase().replaceAll("_", " ")}
+    </span>
+  );
+}
+
 /** Enlace a un caso del pupilo, en el texto de apoyo de una tarjeta. */
 export function EnlaceCaso({ id, casoId, codigo }: { id: string; casoId: string; codigo: string }) {
   return (
@@ -112,9 +127,17 @@ export function EnlaceCaso({ id, casoId, codigo }: { id: string; casoId: string;
   );
 }
 
-/** Botón para descargar un documento con la descarga protegida de cada caso. */
-export function Descargar({ id, casoId, documentoId, titulo, compacto = false }: { id: string; casoId: string; documentoId: string; titulo: string; compacto?: boolean }) {
-  const ruta = rutaPupilo(id, `casos/${casoId}/evidencias/${documentoId}`);
+/** Enlace a una situación del pupilo, con su relato y sus imágenes. */
+export function EnlaceSituacion({ id, situacionId }: { id: string; situacionId: string }) {
+  return (
+    <Link href={rutaPupilo(id, `situaciones/${situacionId}`)} prefetch={false} className="font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+      Ver la situación
+    </Link>
+  );
+}
+
+/** Botón para descargar un archivo con la descarga protegida de su caso o su situación. */
+export function Descargar({ href: ruta, titulo, compacto = false }: { href: string; titulo: string; compacto?: boolean }) {
   if (compacto)
     return (
       <a href={ruta} className="presion inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-primary/15 bg-accent px-3 py-1 text-xs font-medium text-accent-foreground hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">

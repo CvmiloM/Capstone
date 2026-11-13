@@ -28,6 +28,9 @@ export type DocumentoBreve = { id: string; titulo: string; caso_id: string };
 export type Evento = { id: string; tipo: string; fecha: string | null; titulo: string; detalle: string | null; estado: string | null; responsable: string | null; caso_id: string | null; caso_codigo: string | null; documentos: DocumentoBreve[] };
 export type Documento = { id: string; titulo: string; tipo: string; fecha: string; caso_id: string; caso_codigo: string; rectifica: boolean; archivo: string; tipo_mime: string; tamano_bytes: number };
 export type Reunion = { id: string; tipo: string; estado: string; programado_en: string | null; fin_programado_en: string | null; realizado_en: string | null; fin_real_en: string | null; lugar: string | null; motivo: string; profesional: string | null; caso_id: string; caso_codigo: string; fecha: string; proxima: boolean };
+export type Archivo = { id: string; titulo: string; tipo: string; fecha: string; archivo: string; tipo_mime: string; tamano_bytes: number };
+export type SituacionBreve = { id: string; codigo: string; fecha: string; lugar: string | null; categoria: string | null; estado: string; relato: string; caso_id: string | null; caso_codigo: string | null; archivos: number; imagenes: number };
+export type SituacionDetalle = Omit<SituacionBreve, "archivos" | "imagenes"> & { archivos: Archivo[]; estudiante: string; zona_horaria: string };
 export type Comunicacion = { id: string; tipo: string; asunto: string | null; resumen: string; fecha: string; estado: string; caso_id: string; caso_codigo: string; para_usted: boolean };
 
 async function pedir<T>(ruta: string): Promise<T | null> {
@@ -51,6 +54,8 @@ export const obtenerDetalle = (id: string, caso: string, pagina: number) => pedi
 // Con cache, el menú lateral y la página piden el resumen una sola vez por carga.
 export const obtenerResumen = cache((id: string) => pedir<Resumen>(rutaPupilo(id, "resumen")));
 export const obtenerHistorial = (id: string, pagina: number) => pedir<ListaPupilo<Evento>>(`${rutaPupilo(id, "historial")}?pagina=${pagina}`);
+export const obtenerSituaciones = (id: string, pagina: number) => pedir<ListaPupilo<SituacionBreve>>(`${rutaPupilo(id, "situaciones")}?pagina=${pagina}`);
+export const obtenerSituacion = (id: string, situacion: string) => pedir<SituacionDetalle>(`${rutaPupilo(id, "situaciones")}/${encodeURIComponent(situacion)}`);
 export const obtenerDocumentos = (id: string, pagina: number) => pedir<ListaPupilo<Documento>>(`${rutaPupilo(id, "documentos")}?pagina=${pagina}`);
 export const obtenerReuniones = (id: string, pagina: number) => pedir<ListaPupilo<Reunion>>(`${rutaPupilo(id, "reuniones")}?pagina=${pagina}`);
 export const obtenerComunicaciones = (id: string, pagina: number) => pedir<ListaPupilo<Comunicacion>>(`${rutaPupilo(id, "comunicaciones")}?pagina=${pagina}`);
