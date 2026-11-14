@@ -37,7 +37,13 @@ export type SituacionBandeja = {
 
 export type Bandeja = {
   situaciones: SituacionBandeja[];
-  conteo: { estado: string; urgencia: string; total: number }[];
+  /** Por estado, urgencia y responsable: las mías, las abiertas sin responsable y las demás. */
+  conteo: {
+    estado: string;
+    urgencia: string;
+    responsable: "mias" | "sin" | "otras";
+    total: number;
+  }[];
   limite: number;
   pagina: number;
   total: number;
@@ -176,11 +182,12 @@ export async function pedir<T>(ruta: string): Promise<Respuesta<T>> {
   return { ok: true, datos: (await respuesta.json()) as T };
 }
 
-/** HU-037 CA1: filtros opcionales de la bandeja. */
-export function obtenerBandeja(filtros: { estado?: string; urgencia?: string; q?: string; pagina?: string }) {
+/** HU-037 CA1: filtros opcionales de la bandeja, también Mis situaciones y Sin responsable. */
+export function obtenerBandeja(filtros: { estado?: string; urgencia?: string; responsable?: string; q?: string; pagina?: string }) {
   const parametros = new URLSearchParams();
   if (filtros.estado) parametros.set("estado", filtros.estado);
   if (filtros.urgencia) parametros.set("urgencia", filtros.urgencia);
+  if (filtros.responsable) parametros.set("responsable", filtros.responsable);
   if (filtros.q) parametros.set("q", filtros.q);
   if (filtros.pagina) parametros.set("pagina", filtros.pagina);
   const consulta = parametros.toString();
@@ -292,6 +299,14 @@ export function enviarCambioResponsable(
     "PATCH",
     `/convivencia/situaciones/${encodeURIComponent(id)}/responsable`,
     cambio,
+  );
+}
+
+/** Desde la bandeja: quien consulta queda como responsable de una situación sin responsable. */
+export function enviarToma(id: string) {
+  return enviar(
+    "POST",
+    `/convivencia/situaciones/${encodeURIComponent(id)}/tomar`,
   );
 }
 

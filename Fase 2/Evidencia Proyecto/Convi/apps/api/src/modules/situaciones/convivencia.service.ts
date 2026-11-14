@@ -85,6 +85,19 @@ export const ESTADOS = [
 // Estados en que la situación sigue abierta y su urgencia todavía se ajusta.
 const ESTADOS_ABIERTOS = ['NUEVA', 'EN_REVISION', 'INFORMACION_SOLICITADA'];
 
+// Filtro por responsable de la bandeja: las situaciones a cargo de quien
+// consulta, o las abiertas que nadie ha tomado. Una cerrada sin responsable no
+// cuenta como "sin responsable" porque ya no se toma.
+const RESPONSABLES = ['mias', 'sin'] as const;
+const GRUPO_RESPONSABLE = `CASE
+    WHEN s.asignado_a_membresia_id = (SELECT convi.membresia_actual()) THEN 'mias'
+    WHEN s.asignado_a_membresia_id IS NULL
+      AND s.estado IN ('NUEVA', 'EN_REVISION', 'INFORMACION_SOLICITADA') THEN 'sin'
+    ELSE 'otras' END`;
+
+const YA_TOMADA =
+  'Esta situación ya tiene responsable. Recarga la página para ver quién quedó a cargo.';
+
 /** Tope de filas de la bandeja; los totales siempre cuentan todas (CA4). */
 export const MAXIMO_BANDEJA = 20;
 
@@ -110,8 +123,16 @@ export type SituacionBandeja = {
 
 export type Bandeja = {
   situaciones: SituacionBandeja[];
-  /** Cantidad de situaciones por estado y urgencia, sin filtros. */
-  conteo: { estado: string; urgencia: string; total: number }[];
+  /**
+   * Cantidad de situaciones por estado, urgencia y responsable (las mías, las
+   * abiertas sin responsable y las demás), sin filtros.
+   */
+  conteo: {
+    estado: string;
+    urgencia: string;
+    responsable: 'mias' | 'sin' | 'otras';
+    total: number;
+  }[];
   limite: number;
   pagina: number;
   total: number;
@@ -281,6 +302,7 @@ export class ConvivenciaService {
 
   // CA1 y CA4: bandeja filtrada por estado y urgencia, la más urgente primero.
   // La lista y los totales se leen en la misma transacción, así que coinciden.
+  // También se filtra por responsable: Mis situaciones o Sin responsable.
   bandeja(
     sesion: Sesion,
     estadoPedido: unknown,
@@ -289,6 +311,7 @@ export class ConvivenciaService {
   ): Promise<Bandeja> {
     const estado = filtro(estadoPedido, ESTADOS);
     const urgencia = filtro(urgenciaPedida, [...URGENCIAS, 'PRIORITARIA']);
+    const responsable = filtro(consulta.responsable, RESPONSABLES);
     const f = leerBusquedaBandeja(consulta);
     const busqueda = `($3::text = '' OR position(lower($3) in lower(s.codigo)) > 0 OR EXISTS (
       SELECT 1 FROM convi.participaciones pa
@@ -308,16 +331,18 @@ export class ConvivenciaService {
              AND ($2::text IS NULL OR s.urgencia = $2 OR ($2='PRIORITARIA' AND s.urgencia IN ('URGENTE','INMEDIATA')))
              AND ($2::text IS DISTINCT FROM 'PRIORITARIA' OR s.estado IN ('NUEVA','EN_REVISION','INFORMACION_SOLICITADA'))
              AND ${busqueda}
+             AND ($7::text IS NULL OR ${GRUPO_RESPONSABLE} = $7)
            ORDER BY CASE s.urgencia WHEN 'INMEDIATA' THEN 0
                                     WHEN 'URGENTE' THEN 1 ELSE 2 END,
                     s.reportado_en DESC
            LIMIT $5 OFFSET $6`,
-          [estado, urgencia, f.buscar, f.rut, MAXIMO_BANDEJA, (f.pagina - 1) * MAXIMO_BANDEJA],
+          [estado, urgencia, f.buscar, f.rut, MAXIMO_BANDEJA, (f.pagina - 1) * MAXIMO_BANDEJA, responsable],
         );
         const conteo = db.query<Bandeja['conteo'][number]>(
-          `SELECT s.estado, s.urgencia, count(*)::int AS total
+          `SELECT s.estado, s.urgencia, ${GRUPO_RESPONSABLE} AS responsable,
+                  count(*)::int AS total
            FROM convi.situaciones s WHERE ${busqueda.replaceAll('$3', '$1').replaceAll('$4', '$2')}
-           GROUP BY s.estado, s.urgencia`,
+           GROUP BY 1, 2, 3`,
           [f.buscar, f.rut],
         );
         const datos = await todasLasLecturas({ situaciones, conteo });
@@ -328,7 +353,8 @@ export class ConvivenciaService {
           pagina: f.pagina,
           total: datos.conteo.rows.filter(fila =>
             (estado ? fila.estado === estado : fila.estado !== 'DESCARTADA') &&
-            (!urgencia || (urgencia === 'PRIORITARIA' ? ['URGENTE','INMEDIATA'].includes(fila.urgencia) && ESTADOS_ABIERTOS.includes(fila.estado) : fila.urgencia === urgencia)),
+            (!urgencia || (urgencia === 'PRIORITARIA' ? ['URGENTE','INMEDIATA'].includes(fila.urgencia) && ESTADOS_ABIERTOS.includes(fila.estado) : fila.urgencia === urgencia)) &&
+            (!responsable || fila.responsable === responsable),
           ).reduce((suma, fila) => suma + fila.total, 0),
         };
       },
@@ -611,6 +637,24 @@ export class ConvivenciaService {
         return asignado;
       },
     );
+  }
+
+  // Bandeja: quien consulta toma una situación abierta que nadie revisa. Es la
+  // primera asignación de PB-046 hecha a sí mismo, con las mismas reglas y el
+  // mismo historial, sin motivo y sin aviso propio. Si alguien la tomó antes,
+  // se rechaza en vez de reemplazarlo.
+  tomar(sesion: Sesion, id: string): Promise<ResponsableAsignado> {
+    return this.asignarResponsable(sesion, id, {
+      responsable_id: sesion.membresia_id,
+      responsable_anterior_id: null,
+    }).catch((error: unknown) => {
+      if (
+        error instanceof ConflictException &&
+        error.message === RESPONSABLE_SIMULTANEO
+      )
+        throw new ConflictException(YA_TOMADA);
+      throw error;
+    });
   }
 
   // PB-155 (HU-134): registra lo que indica el reglamento o el protocolo
