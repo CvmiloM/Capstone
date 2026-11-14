@@ -77,3 +77,105 @@ describe('lecturas agrupadas de Situaciones', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 });
+
+// Mis situaciones y Sin responsable en la bandeja, y el botón Tomar.
+describe('responsable en la bandeja', () => {
+  const YO = '11111111-1111-4111-8111-111111111111';
+  const OTRA = '22222222-2222-4222-8222-222222222222';
+  const sesion = { membresia_id: YO } as Sesion;
+  const conteo = [
+    { estado: 'NUEVA', urgencia: 'NORMAL', responsable: 'mias', total: 2 },
+    {
+      estado: 'EN_REVISION',
+      urgencia: 'URGENTE',
+      responsable: 'mias',
+      total: 1,
+    },
+    { estado: 'DESCARTADA', urgencia: 'NORMAL', responsable: 'mias', total: 4 },
+    { estado: 'NUEVA', urgencia: 'NORMAL', responsable: 'sin', total: 5 },
+    {
+      estado: 'ANTECEDENTE',
+      urgencia: 'NORMAL',
+      responsable: 'otras',
+      total: 7,
+    },
+  ];
+
+  it.each([
+    ['mias', 3, "('mias'::text IS NULL OR CASE"],
+    ['sin', 5, "('sin'::text IS NULL OR CASE"],
+    [undefined, 15, '(NULL::text IS NULL OR CASE'],
+  ])(
+    'con responsable %s filtra la lista y el total cuenta solo ese grupo',
+    async (responsable, total, filtroEnviado) => {
+      const { convivencia, query } = servicio(async () => [
+        { rows: [] },
+        { rows: conteo },
+      ]);
+      const bandeja = await convivencia.bandeja(
+        sesion,
+        undefined,
+        undefined,
+        responsable ? { responsable } : {},
+      );
+      expect(bandeja.total).toBe(total);
+      expect(bandeja.conteo).toEqual(conteo);
+      expect(query.mock.calls[0][0]).toContain(filtroEnviado);
+    },
+  );
+
+  it('rechaza un responsable desconocido antes de consultar la base', () => {
+    const { convivencia, operar } = servicio(async () => ({ rows: [] }));
+    expect(() =>
+      convivencia.bandeja(sesion, undefined, undefined, { responsable: 'yo' }),
+    ).toThrow('Filtro no válido');
+    expect(operar).not.toHaveBeenCalled();
+  });
+
+  function situacion(estado: string, responsable_id: string | null) {
+    return servicio(async (sql) => {
+      if (sql.includes('FOR UPDATE'))
+        return { rows: [{ estado, responsable_id }] };
+      if (sql.includes('FROM convi.membresias_establecimiento'))
+        return { rows: [{}], rowCount: 1 };
+      if (sql.startsWith('UPDATE convi.situaciones'))
+        return {
+          rows: [{ id: 's', estado, responsable_id: YO, codigo: 'SIT-1' }],
+        };
+      return { rows: [], rowCount: 0 };
+    });
+  }
+
+  it('Tomar deja como responsable a quien consulta, como primera asignación', async () => {
+    const { convivencia, query } = situacion('NUEVA', null);
+    await expect(convivencia.tomar(sesion, 's')).resolves.toEqual({
+      id: 's',
+      estado: 'NUEVA',
+      responsable_id: YO,
+    });
+    const llamada = (inicio: string) =>
+      query.mock.calls.find(([sql]) => String(sql).includes(inicio));
+    expect(llamada('UPDATE convi.situaciones')?.[1]).toEqual(['s', YO]);
+    expect(llamada('app.motivo_cambio')?.[1]).toEqual([
+      'Primera asignación del responsable de la revisión.',
+    ]);
+  });
+
+  it.each([
+    ['NUEVA', 'de otra persona', OTRA, 'Esta situación ya tiene responsable.'],
+    ['NUEVA', 'propio', YO, 'Esta situación ya tiene responsable.'],
+    ['ANTECEDENTE', 'vacío', null, 'La revisión de esta situación ya terminó'],
+  ])(
+    'Tomar no cambia una situación %s con responsable %s',
+    async (estado, _nombre, responsable, mensaje) => {
+      const { convivencia, query } = situacion(estado, responsable);
+      await expect(convivencia.tomar(sesion, 's')).rejects.toMatchObject({
+        status: 409,
+        message: expect.stringContaining(mensaje),
+      });
+      expect(
+        query.mock.calls.some(([sql]) => String(sql).startsWith('UPDATE')),
+      ).toBe(false);
+    },
+  );
+});

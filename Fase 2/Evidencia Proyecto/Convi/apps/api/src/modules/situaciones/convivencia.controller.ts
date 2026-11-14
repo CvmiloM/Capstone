@@ -110,6 +110,16 @@ export class ConvivenciaController {
     return this.convivencia.asignarResponsable(peticion.sesion, id, cuerpo);
   }
 
+  // Desde la bandeja: quien consulta queda como responsable. Sin cuerpo.
+  @Post('situaciones/:id/tomar')
+  @HttpCode(200)
+  tomar(
+    @Req() peticion: PeticionConSesion,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.convivencia.tomar(peticion.sesion, id);
+  }
+
   // PB-047, PB-048 y PB-051: el cuerpo trae { resultado, fundamento,
   // motivo_descarte, codigo_original, revision_anterior_id }; responde 201.
   @Post('situaciones/:id/decisiones')
