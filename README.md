@@ -130,7 +130,6 @@ Capstone/
 | `Convi/SUPABASE-CLOUD.md` | Cómo conectar el entorno local a Supabase en la nube |
 | `Convi/AZURE.md` | Publicación en Azure con HTTPS y dominio propio |
 | `Convi/RESPALDOS.md` | Respaldo de la base de datos y los archivos, y ensayo de restauración |
-| `Convi/PB-128.md` | Protección de contraseñas y secretos |
 
 ## Equipo
 
