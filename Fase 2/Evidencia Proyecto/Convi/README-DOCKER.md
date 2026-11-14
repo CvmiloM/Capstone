@@ -144,7 +144,7 @@ docker compose ps
 
 ## D. Git y el trabajo con compañeros
 
-**Subir:** `.env.example`, `compose.yaml`, `Dockerfile.dev`, `.dockerignore`, `README-DOCKER.md`, `scripts/`, `supabase/config.toml`, `supabase/seed.sql`, `supabase/migrations/README.md`.
+**Subir:** `.env.example`, `compose.yaml`, `Dockerfile.dev`, `.dockerignore`, `README-DOCKER.md`, `scripts/`, `supabase/config.toml`, `supabase/seed.sql`, `supabase/migrations/`.
 
 **No subir:** `.env`, `*.env.local`, backups, `node_modules`, `.next`, archivos de credenciales, datos personales reales, `supabase/.temp/`.
 

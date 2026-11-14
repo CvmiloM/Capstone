@@ -127,9 +127,8 @@ Comprobar que la clave anterior se rechaza y la nueva permite el login normal.
 No compartir el enlace ni los códigos. Perder TOTP requiere PB-154, no se
 soluciona eliminando el factor para cambiar la contraseña.
 
-El comportamiento, archivos, datos utilizados y pruebas están en
-`apps/web/PB-005.md`. La recepción cloud no se considera comprobada hasta que
-Sebastián complete la prueba manual. La plantilla anterior de invitación no cambia.
+La recepción cloud no se considera comprobada hasta que Sebastián complete la
+prueba manual. La plantilla anterior de invitación no cambia.
 
 ### SMTP y plantillas existentes
 
