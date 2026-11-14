@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import logo from "@/assets/convi-logo-trim.png";
 import { AvatarUsuario } from "@/app/components/avatar-usuario";
 import { BotonCerrarSesion } from "@/app/components/boton-cerrar-sesion";
+import { MarcaCompacta } from "@/app/components/marca";
 import { MenuPortal } from "@/app/components/menu-portal";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { obtenerContextoAdmin } from "./datos";
@@ -19,7 +20,7 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
   // PB-009 comprueba el acceso en proxy y al leer datos del portal.
   return (
     <div className="group/admin flex flex-1 flex-col lg:flex-row">
-      <aside className="group-has-[[data-modo-guia]]/admin:hidden border-b border-border material-menu lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-b-0">
+      <aside className="menu-tinta group-has-[[data-modo-guia]]/admin:hidden border-b border-border material-menu lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-b-0">
         <MenuPortal
           claseCabecera="gap-0.5"
           marca={
@@ -28,16 +29,9 @@ export default function LayoutAdmin({ children }: LayoutProps<"/admin">) {
                 href="/admin"
                 className="rounded-lg focus-visible:outline-2 focus-visible:outline-ring"
               >
-                {/* La imagen trae margen transparente: los márgenes negativos lo recortan. */}
-                <Image
-                  src={logo}
-                  alt="Convi, ir al inicio del portal"
-                  priority
-                  sizes="101px"
-                  className="-my-3 -ml-2 block h-14 w-auto"
-                />
+                <MarcaCompacta />
               </Link>
-              <span className="translate-y-2.5 rounded bg-accent px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-accent-foreground">
+              <span className="ml-2 rounded bg-accent px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-accent-foreground">
                 Admin
               </span>
             </>

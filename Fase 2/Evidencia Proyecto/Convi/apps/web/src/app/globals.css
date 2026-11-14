@@ -9,20 +9,22 @@
 :root {
   color-scheme: light;
 
-  --background: #f8f7f4; /* fondo general, color papel */
-  --foreground: #1f2937; /* texto principal */
-  --card: #ffffff; /* tarjetas y formularios */
-  --card-foreground: #1f2937;
-  --primary: #1e3a5f; /* azul marino institucional: botones y enlaces */
-  --primary-foreground: #ffffff;
-  --muted: #f1f0ec; /* fondos secundarios */
-  --muted-foreground: #6b7280; /* textos de apoyo */
-  --accent: #eaf0f7; /* avisos informativos y texto seleccionado */
-  --accent-foreground: #1e3a5f;
-  --highlight: #c8963e; /* dorado: solo detalles decorativos, nunca texto */
-  --border: #e4e2dc; /* bordes de tarjetas y separadores */
-  --input: #d6d3cc; /* bordes de campos */
-  --ring: #3b5b85; /* foco del teclado */
+  /* Los portales usan la paleta de la landing (más abajo), igual que el
+     login: fondo crema, texto y botones en tinta, apoyo en pizarra. */
+  --background: #fbf7f0; /* crema: fondo general */
+  --foreground: #13254a; /* tinta: texto principal */
+  --card: #ffffff; /* tarjetas y formularios, sobre el crema */
+  --card-foreground: #13254a;
+  --primary: #13254a; /* tinta: filtros activos, enlaces y menú */
+  --primary-foreground: #fbf7f0;
+  --muted: color-mix(in oklab, #13254a 6%, #fbf7f0); /* fondos secundarios */
+  --muted-foreground: #3d4d6e; /* pizarra: textos de apoyo */
+  --accent: color-mix(in oklab, #4fbf8b 20%, #fbf7f0); /* menta suave: avisos y selección */
+  --accent-foreground: #13254a;
+  --highlight: #f7b815; /* amarillo: solo detalles decorativos, nunca texto */
+  --border: color-mix(in oklab, #13254a 12%, #fbf7f0); /* bordes y separadores */
+  --input: color-mix(in oklab, #13254a 40%, #fbf7f0); /* bordes de campos, 3:1 */
+  --ring: #2b8a62; /* verde: foco del teclado */
   --destructive: #b42318; /* errores */
 
   /* Paleta de la landing (marca Convi): bg-tinta, text-verde, bg-naranjo... */
@@ -69,8 +71,10 @@
   --font-titulo: var(--font-outfit);
   --font-cuerpo: var(--font-figtree);
 
-  --font-sans: var(--font-geist-sans);
-  --font-serif: var(--font-source-serif);
+  /* La app usa las fuentes de la landing: Figtree para el texto y Outfit
+     para los títulos; font-serif queda como otro nombre de Outfit. */
+  --font-sans: var(--font-figtree);
+  --font-serif: var(--font-outfit);
   --font-mono: var(--font-geist-mono);
 
   /* Sombra suave teñida de azul para tarjetas: shadow-tarjeta */
@@ -86,6 +90,12 @@
  * leading-* en el elemento sigue mandando sobre estos valores.
  */
 @theme {
+  /* Esquinas más rectas, cerca de las carpetas de la landing: todos los
+     rounded-lg, rounded-xl y rounded-2xl de la app toman estos valores. */
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.625rem;
+
   --text-xs--letter-spacing: 0.01em;
   --text-lg--letter-spacing: -0.005em;
   --text-xl--letter-spacing: -0.01em;
@@ -111,13 +121,13 @@
   body {
     background: var(--background);
     color: var(--foreground);
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
   }
 
-  /* Títulos con serif: el toque institucional de toda la app */
+  /* Títulos en Outfit, la letra de la landing */
   h1,
   h2 {
-    font-family: var(--font-source-serif), ui-serif, Georgia, serif;
+    font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
     letter-spacing: -0.01em;
     text-wrap: balance;
   }
@@ -339,4 +349,28 @@
   background-size: 24px 24px;
   background-position: center;
   mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 100%);
+}
+
+/*
+ * Menú de los portales en tinta, como la barra de la landing. Dentro del menú
+ * los colores con nombre cambian de valor: el texto pasa a crema, el de apoyo
+ * a niebla y la sección activa queda en crema con texto tinta, como una
+ * pestaña. Uso: <aside className="menu-tinta ..."> (también la barra del
+ * portal de apoderados). Va fuera de las capas para ganarle a material-menu.
+ */
+.menu-tinta {
+  --foreground: var(--crema);
+  --card: var(--tinta);
+  --card-foreground: var(--crema);
+  --muted: color-mix(in oklab, var(--crema) 10%, var(--tinta));
+  --muted-foreground: var(--niebla);
+  --primary: var(--crema);
+  --primary-foreground: var(--tinta);
+  --accent: color-mix(in oklab, var(--menta) 28%, var(--tinta));
+  --accent-foreground: var(--crema);
+  --border: color-mix(in oklab, var(--crema) 14%, var(--tinta));
+  --input: color-mix(in oklab, var(--crema) 35%, var(--tinta));
+  --ring: var(--menta);
+  background-color: var(--tinta);
+  color: var(--foreground);
 }

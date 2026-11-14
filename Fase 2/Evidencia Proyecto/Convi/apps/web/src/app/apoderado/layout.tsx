@@ -11,7 +11,7 @@ import { SaltarContenido } from "@/app/components/saltar-contenido";
 export default function LayoutApoderado({ children }: { children: ReactNode }) {
   return <div className="flex flex-1 flex-col">
     <SaltarContenido />
-    <header className="sticky top-0 z-30 border-b border-border material-menu">
+    <header className="menu-tinta sticky top-0 z-30 border-b border-border material-menu">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-8">
         <Link href="/apoderado" prefetch={false} className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-ring">
           <MarcaCompacta />
