@@ -29,7 +29,7 @@ export default async function InicioPupilo({ params }: { params: Promise<{ id: s
       <p className="mt-1.5 text-sm text-niebla">{diaConSemana(datos.hoy)} · {datos.escuela}</p>
       <p className="mt-5 rounded-xl bg-white/10 p-4 text-sm leading-relaxed text-white/90">Tu acceso está asociado a <strong className="font-semibold text-white">{e.nombre}</strong> y te permite consultar, en modo solo lectura, su historial de convivencia registrado en CONVI mientras tu autorización esté vigente</p>
     </section>
-    <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+    <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
       {tarjetas.map((t) => <li key={t.parte}>
         <Link href={rutaPupilo(id, t.parte)} prefetch={false} className="presion group flex h-full items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-tarjeta hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring sm:p-5">
           <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${t.tono}`}><Icono nombre={t.icono} className="size-5" /></span>

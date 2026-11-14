@@ -2,7 +2,7 @@
 // MarcaCompacta la versión en línea para encabezados.
 
 import Image from "next/image";
-import logo from "@/assets/convi-logo-trim.png";
+import mascota from "@/assets/convi-favicon.png";
 
 function IconoLibro({ className }: { className: string }) {
   return (
@@ -39,8 +39,15 @@ export function Marca() {
   );
 }
 
+// La mascota y el nombre, como en la landing y el login. El nombre toma el
+// color del texto: tinta sobre crema y crema dentro de menu-tinta.
 export function MarcaCompacta() {
   return (
-    <Image src={logo} alt="Convi" sizes="101px" className="-my-3 -ml-2 block h-14 w-auto" />
+    <span className="flex items-center gap-2">
+      <Image src={mascota} alt="" sizes="36px" className="block size-9" />
+      <span className="font-titulo text-[1.4rem] leading-none font-extrabold tracking-tight text-foreground">
+        Convi
+      </span>
+    </span>
   );
 }

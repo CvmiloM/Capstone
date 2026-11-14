@@ -12,7 +12,9 @@ export function Encabezado({
 }) {
   return (
     <div className="mb-6">
-      <h1 className="text-2xl font-semibold">{titulo}</h1>
+      <h1 className="font-titulo text-[1.75rem] leading-tight font-extrabold tracking-tight">
+        {titulo}
+      </h1>
       {descripcion && (
         <p className="mt-1.5 text-sm text-muted-foreground">{descripcion}</p>
       )}
@@ -109,13 +111,13 @@ export function AvisoError({ children }: { children: ReactNode }) {
 }
 
 export const claseEnlace =
-  "font-medium text-primary underline-offset-4 hover:underline";
+  "font-medium text-primary underline decoration-verde/50 decoration-2 underline-offset-4 hover:decoration-verde";
 
 // Estilos de botón, para <button> y también para <Link> con forma de botón.
 // Al presionarlo responde en el acto (se oscurece y se achica un poco) y al
 // soltarlo vuelve con un resorte, como un botón físico (presion, en globals.css).
 const clasePresion = "select-none presion";
 
-export const claseBotonPrimario = `inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground ${clasePresion} hover:bg-primary/90 active:bg-primary/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60`;
+export const claseBotonPrimario = `inline-flex items-center justify-center rounded-lg bg-naranjo px-4 py-2.5 text-sm font-bold text-tinta shadow-[inset_0_-3px_0_var(--naranjo-sombra)] ${clasePresion} hover:bg-amarillo hover:shadow-none active:bg-amarillo focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60`;
 
 export const claseBotonSecundario = `inline-flex items-center justify-center rounded-lg border border-input bg-card px-4 py-2.5 text-sm font-medium text-foreground ${clasePresion} hover:bg-muted active:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`;
