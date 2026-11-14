@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState } from "react";
@@ -129,11 +130,15 @@ export function FormularioNuevoEncuentro({
   responsables,
   asistentes,
   acciones,
+  realizada = false,
+  entrevista = false,
 }: {
   casoId: string;
   responsables: { id: string; nombre: string }[];
   asistentes: Posible[];
   acciones: { id: string; descripcion: string }[];
+  realizada?: boolean;
+  entrevista?: boolean;
 }) {
   const [estado, accion, pendiente] = useActionState(
     programarEncuentro,
@@ -145,13 +150,14 @@ export function FormularioNuevoEncuentro({
   return (
     <FormularioConCarga action={accion} noValidate className="space-y-4">
       <input type="hidden" name="caso_id" value={casoId} />
+      {realizada && <input type="hidden" name="realizado" value="1" />}
       <ErrorGeneral estado={estado} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo id="encuentro_tipo" etiqueta="Tipo de encuentro" error={errores.tipo}>
           <select
             {...propsControl("encuentro_tipo", errores.tipo, false, "tipo")}
-            defaultValue={valores.tipo ?? ""}
+            defaultValue={valores.tipo ?? (entrevista ? "ENTREVISTA" : "")}
           >
             <option value="" disabled>
               Elige un tipo
@@ -228,7 +234,7 @@ export function FormularioNuevoEncuentro({
         </Campo>
         <Campo
           id="encuentro_inicio"
-          etiqueta="Fecha y hora programadas"
+          etiqueta={realizada ? "Fecha y hora de inicio real" : "Fecha y hora programadas"}
           error={errores.programado_en}
         >
           <input
@@ -244,7 +250,7 @@ export function FormularioNuevoEncuentro({
         </Campo>
         <Campo
           id="encuentro_fin"
-          etiqueta="Término programado (opcional)"
+          etiqueta={realizada ? "Término real (opcional)" : "Término programado (opcional)"}
           error={errores.fin_programado_en}
         >
           <input
@@ -259,6 +265,13 @@ export function FormularioNuevoEncuentro({
           />
         </Campo>
       </div>
+
+      {realizada && (
+        <Campo id="encuentro_resultado" etiqueta="Resultado" error={errores.resultado}>
+          <textarea {...propsControl("encuentro_resultado", errores.resultado, false, "resultado")}
+            rows={3} maxLength={LARGO_MAXIMO_RESULTADO} defaultValue={valores.resultado} />
+        </Campo>
+      )}
 
       {acciones.length > 0 && (
         <Campo
@@ -293,7 +306,9 @@ export function FormularioNuevoEncuentro({
       />
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Programando…" : "Programar encuentro"}
+        <EtiquetaAccion icono={realizada ? "guardar" : "anios"}>
+          {pendiente ? "Guardando…" : realizada ? "Guardar encuentro realizado" : "Programar encuentro"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -328,7 +343,9 @@ export function FormularioAgregarAsistentes({
       />
       {posibles.length > 0 && (
         <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-          {pendiente ? "Agregando…" : "Agregar asistentes"}
+          <EtiquetaAccion icono="agregar">
+            {pendiente ? "Agregando…" : "Agregar asistentes"}
+          </EtiquetaAccion>
         </button>
       )}
     </FormularioConCarga>
@@ -415,7 +432,9 @@ export function FormularioReprogramacion({
         />
       </Campo>
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Reprogramar"}
+        <EtiquetaAccion icono="anios">
+          {pendiente ? "Guardando…" : "Reprogramar"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -521,7 +540,9 @@ export function FormularioRealizacion({
         })}
       </fieldset>
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Registrar como realizado"}
+        <EtiquetaAccion icono="confirmar">
+          {pendiente ? "Guardando…" : "Registrar como realizado"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -563,7 +584,9 @@ export function FormularioCancelacionEncuentro({
         />
       </Campo>
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Cancelando…" : "Cancelar encuentro"}
+        <EtiquetaAccion icono="cerrar">
+          {pendiente ? "Cancelando…" : "Cancelar encuentro"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );

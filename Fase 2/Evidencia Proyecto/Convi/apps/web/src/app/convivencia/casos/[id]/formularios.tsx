@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, type ReactNode } from "react";
@@ -137,7 +138,9 @@ export function FormularioEstado({
       </Campo>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Cambiar estado"}
+        <EtiquetaAccion icono="guardar">
+          {pendiente ? "Guardando…" : "Cambiar estado"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -251,7 +254,9 @@ export function FormularioCierre({
       </p>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Cerrando…" : "Cerrar caso"}
+        <EtiquetaAccion icono="candado">
+          {pendiente ? "Cerrando…" : "Cerrar caso"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -316,7 +321,9 @@ export function FormularioAplicarProtocolo({
       </Campo>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Aplicando…" : "Aplicar protocolo"}
+        <EtiquetaAccion icono="protocolos">
+          {pendiente ? "Aplicando…" : "Aplicar protocolo"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );

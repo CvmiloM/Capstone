@@ -30,6 +30,8 @@ export class AuditoriaService {
       sesion,
       { tipo: 'establecimiento', perfiles: ['ADMIN'] },
       async (db) => {
+        if (!Object.values(filtros).some(Boolean))
+          return paginaAuditoria([], false);
         const { rows } = await db.query<FilaAuditoria>(
           `SELECT e.id, e.codigo_accion AS tipo, e.tipo_recurso AS recurso,
                 e.recurso_id AS referencia, e.codigo_resultado AS resultado,

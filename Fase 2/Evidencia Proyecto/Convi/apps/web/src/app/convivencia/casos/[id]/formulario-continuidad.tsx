@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, useId, useState } from "react";
@@ -102,7 +103,7 @@ export function FormularioContinuidad({
         pendiente={pendiente}
         textoPendiente={reasignar ? "Reasignando…" : "Reabriendo…"}
       >
-        {reasignar ? "Confirmar reasignación" : "Reabrir caso"}
+        <EtiquetaAccion icono={reasignar ? "persona" : "reabrir"}>{reasignar ? "Confirmar reasignación" : "Reabrir caso"}</EtiquetaAccion>
       </BotonEnviar>
     </FormularioConCarga>
   );

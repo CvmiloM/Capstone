@@ -53,11 +53,13 @@ export async function programarEncuentro(
     programado_en: leerTexto(formData, "programado_en"),
     fin_programado_en: leerTexto(formData, "fin_programado_en"),
     accion_plan_id: leerTexto(formData, "accion_plan_id"),
+    resultado: leerTexto(formData, "resultado"),
   };
   const conAsistentes = { ...valores, asistentes: asistentes.texto };
   if (!UUID.test(casoId)) return { mensaje: NO_VALIDO, valores: conAsistentes };
   const resultado = await enviarNuevoEncuentro(casoId, {
     ...valores,
+    realizado: formData.get("realizado") === "1",
     asistentes: asistentes.lista,
   });
   if (!resultado.ok)

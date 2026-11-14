@@ -133,8 +133,18 @@ describe('PB-116: autorización de las consultas', () => {
     query.mockResolvedValue({ rows: [fila()] });
   });
 
-  it('revalida ADMIN y escuela en CuentaService, con una selección explícita sin contenido', async () => {
+  it('revalida ADMIN sin consultar eventos antes de aplicar un filtro', async () => {
     await servicio.administrativa(sesion, undefined);
+    expect(operar).toHaveBeenCalledWith(
+      sesion,
+      { tipo: 'establecimiento', perfiles: ['ADMIN'] },
+      expect.any(Function),
+    );
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('consulta con una selección explícita sin contenido y limita a la escuela', async () => {
+    await servicio.administrativa(sesion, { desde: '2026-10-01' });
     expect(operar).toHaveBeenCalledWith(
       sesion,
       { tipo: 'establecimiento', perfiles: ['ADMIN'] },
@@ -148,19 +158,7 @@ describe('PB-116: autorización de las consultas', () => {
     expect(sql).not.toContain("->>'resumen'");
     expect(sql).not.toContain("->>'descripcion'");
     expect(sql).not.toContain('SELECT *');
-    expect(parametros.slice(0, 11)).toEqual([
-      null,
-      null,
-      null,
-      51,
-      '',
-      null,
-      null,
-      [],
-      null,
-      null,
-      null,
-    ]);
+    expect(parametros.slice(0, 4)).toEqual([null, null, null, 51]);
   });
 
   it('comprueba el permiso específico del caso antes de leer la cronología', async () => {
@@ -180,6 +178,7 @@ describe('PB-116: autorización de las consultas', () => {
   it('envía el cursor como parámetros, sin interpolarlo en SQL', async () => {
     await servicio.administrativa(sesion, {
       antes: codificar([fecha, id, 'MODIFICACION']),
+      desde: '2026-10-01',
     });
     expect(query.mock.calls[0][1].slice(0, 4)).toEqual([
       fecha,

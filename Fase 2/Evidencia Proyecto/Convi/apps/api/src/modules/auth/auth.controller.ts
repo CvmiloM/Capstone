@@ -20,12 +20,21 @@ export class AuthController {
       async (db) => {
         const resultado = await db.query(
           `SELECT p.nombres, p.apellidos, m.codigo_perfil,
+          e.nombre AS escuela, e.comuna, CASE WHEN m.codigo_perfil <> 'APODERADO' THEN e.codigo END AS codigo_escuela,
+          (SELECT max(anio) FROM convi.anios_academicos
+            WHERE establecimiento_id = m.establecimiento_id AND estado = 'ACTIVO') AS anio_activo,
           CASE WHEN m.codigo_perfil = 'CONVIVENCIA' THEN (
             SELECT count(*)::int FROM convi.notificaciones n
             WHERE n.membresia_destinatario_id = m.id AND n.leido_en IS NULL
               AND (n.expira_en IS NULL OR n.expira_en > now())
+          ) WHEN m.codigo_perfil = 'PROFESOR' THEN (
+            SELECT count(*)::int FROM convi.aclaraciones_situacion a
+            JOIN convi.situaciones s ON s.id = a.situacion_id
+            WHERE a.profesor_destinatario_id = m.id AND a.estado = 'PENDIENTE'
+              AND s.reportado_por_membresia_id = m.id
           ) ELSE 0 END AS avisos_no_leidos
           FROM convi.membresias_establecimiento m JOIN convi.personas p ON p.id = m.persona_id
+          JOIN convi.establecimientos e ON e.id = m.establecimiento_id
           WHERE m.id = $1 AND m.establecimiento_id = $2`,
           [peticion.sesion.membresia_id, peticion.sesion.establecimiento_id],
         );

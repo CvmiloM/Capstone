@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
@@ -347,7 +348,7 @@ function OrientacionIA({
             pendiente={pendiente}
             textoPendiente={textos.pendiente}
           >
-            {textos.boton}
+            <EtiquetaAccion icono="buscar">{textos.boton}</EtiquetaAccion>
           </BotonEnviar>
         </div>
       </FormularioConCarga>

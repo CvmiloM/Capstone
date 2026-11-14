@@ -94,7 +94,7 @@ export async function enviarEvidencia(
 // sin scripts ni otros recursos, aunque el archivo dijera otra cosa.
 const POLITICA_VISTA = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox";
 
-export async function responderDescarga(ruta: string, noDisponible = "La evidencia no existe o no tienes permiso para descargarla.", vista = false) {
+export async function responderDescarga(ruta: string, noDisponible = "La evidencia no existe o no tienes permiso para descargarla.", vista: boolean | "imagen" = false) {
   const token = await tokenDeSesion();
   let respuesta: Response;
   try {
@@ -112,13 +112,15 @@ export async function responderDescarga(ruta: string, noDisponible = "La evidenc
       ? texto(noDisponible, 404)
       : texto("No pudimos descargar el archivo. Inténtalo de nuevo en unos minutos.", 503);
 
+  const tipo = respuesta.headers.get("Content-Type") ?? "application/octet-stream";
+  if (vista === "imagen" && !["image/jpeg", "image/png", "image/webp"].includes(tipo))
+    return texto("Este archivo no tiene vista previa.", 404);
   const contenido = await respuesta.arrayBuffer();
   return new Response(contenido, {
     headers: {
-      "Content-Type":
-        respuesta.headers.get("Content-Type") ?? "application/octet-stream",
+      "Content-Type": tipo,
       "Content-Disposition":
-        respuesta.headers.get("Content-Disposition") ?? "attachment",
+        vista === "imagen" ? "inline" : respuesta.headers.get("Content-Disposition") ?? "attachment",
       "Content-Length": String(contenido.byteLength),
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",

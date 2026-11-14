@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, useState } from "react";
@@ -168,11 +169,13 @@ export function FormularioCorreo({
       </p>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente
-          ? "Guardando…"
-          : correo
-            ? "Guardar cambios"
-            : "Guardar borrador"}
+        <EtiquetaAccion icono="guardar">
+          {pendiente
+            ? "Guardando…"
+            : correo
+              ? "Guardar cambios"
+              : "Guardar borrador"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -207,7 +210,9 @@ export function BotonDescartarCorreo({
         disabled={pendiente}
         className={claseBotonSecundario}
       >
-        {pendiente ? "Descartando…" : "Descartar borrador"}
+        <EtiquetaAccion icono="cerrar">
+          {pendiente ? "Descartando…" : "Descartar borrador"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );

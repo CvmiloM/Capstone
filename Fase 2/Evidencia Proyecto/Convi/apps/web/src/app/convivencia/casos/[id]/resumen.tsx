@@ -1,3 +1,5 @@
+import { EtiquetaAccion } from "./etiqueta-accion";
+import { claseBotonSecundario } from "@/app/components/formulario";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseEnlace } from "@/app/components/formulario";
 import { formatearDia, type DetalleCaso } from "../datos";
@@ -103,6 +105,26 @@ export function ResumenCaso({
         </section>
       </div>
       <aside className="space-y-6" aria-label="Datos y participantes del caso">
+        {caso.estado_actual !== "CERRADO" && (
+          <section aria-label="Acciones rápidas" className="rounded-2xl border border-border bg-card p-6">
+            <h2 className="mb-3 text-base font-semibold">Acciones rápidas</h2>
+            <div className="flex flex-wrap gap-2">
+              {([
+                ["Redactar correo al apoderado", "mensaje", "comunicaciones&accion=correo#redactar-correo"],
+                ["Programar entrevista", "anios", "encuentros&accion=programar#nuevo-encuentro"],
+                ["Guardar entrevista realizada", "documentos", "encuentros&accion=realizada#nuevo-encuentro"],
+                ["Marcar encuentro realizado", "confirmar", "encuentros&accion=marcar#elegir-encuentro"],
+                ["Adjuntar acta firmada", "adjuntar", "encuentros&accion=acta#elegir-encuentro"],
+                ["Programar seguimiento", "anios", "seguimientos&nuevo=1#nuevo-seguimiento"],
+                ["Agregar evidencia", "agregar", "evidencias&adjuntar=1#agregar-evidencia"],
+              ] as const).map(([titulo, icono, destino]) => (
+                <Link key={destino} href={`${ruta}?seccion=${destino}`} className={claseBotonSecundario}>
+                  <EtiquetaAccion icono={icono}>{titulo}</EtiquetaAccion>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
         <section className={panel}>
           <h2 className="text-base font-semibold">Datos del expediente</h2>
           <dl className="mt-4 space-y-3 text-sm">

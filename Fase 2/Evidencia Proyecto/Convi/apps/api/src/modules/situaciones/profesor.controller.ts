@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { PerfilesPermitidos } from '../../common/acceso.decorator.js';
@@ -47,8 +48,8 @@ export class ProfesorController {
   }
 
   @Get('situaciones')
-  situaciones(@Req() peticion: PeticionConSesion) {
-    return this.profesor.situaciones(peticion.sesion);
+  situaciones(@Req() peticion: PeticionConSesion, @Query() filtros: Record<string, unknown>) {
+    return this.profesor.situaciones(peticion.sesion, filtros);
   }
 
   @Get('situaciones/:id')

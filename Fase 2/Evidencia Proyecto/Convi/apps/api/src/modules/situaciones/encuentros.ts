@@ -56,6 +56,7 @@ export type NuevoEncuentro = {
   responsable_id: string;
   lugar: string;
   /** AAAA-MM-DDTHH:MM en la hora de la escuela. */
+  resultado?: string;
   programado_en: string;
   fin_programado_en: string | null;
   accion_plan_id: string | null;
@@ -185,8 +186,14 @@ export function validarNuevoEncuentro(cuerpo: unknown): NuevoEncuentro {
     LARGO_MAXIMO_LUGAR,
   );
   if (errorLugar) errores.lugar = errorLugar;
+  const realizado = datos.realizado === true;
+  const resultado = realizado ? texto(datos.resultado) : undefined;
+  if (realizado) {
+    const errorResultado = revisarTexto(resultado ?? '', 'Escribe el resultado del encuentro.', LARGO_MAXIMO_RESULTADO);
+    if (errorResultado) errores.resultado = errorResultado;
+  }
   const inicio = fechaHora(datos.programado_en);
-  if (!inicio) errores.programado_en = 'Indica la fecha y hora programadas.';
+  if (!inicio) errores.programado_en = realizado ? 'Indica cuándo empezó el encuentro.' : 'Indica la fecha y hora programadas.';
   const termino = revisarTermino(
     inicio,
     datos.fin_programado_en,
@@ -224,6 +231,7 @@ export function validarNuevoEncuentro(cuerpo: unknown): NuevoEncuentro {
     descripcion: descripcion || null,
     responsable_id: responsable.toLowerCase(),
     lugar,
+    ...(resultado ? { resultado } : {}),
     programado_en: inicio,
     fin_programado_en: termino,
     accion_plan_id: accionId,

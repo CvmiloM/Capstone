@@ -1,3 +1,4 @@
+import { claseAccionPrincipal, claseAccionSecundaria, EtiquetaAccion } from "./etiqueta-accion";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseEnlace } from "@/app/components/formulario";
 import type { DetalleCaso } from "../datos";
@@ -38,8 +39,9 @@ export function SeguimientoCaso({
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Registra los acuerdos y revisa su cumplimiento en los seguimientos, abre
-        una tarjeta para ver detalles y opciones
+        {vista === "compromisos"
+          ? "Un compromiso es un acuerdo con una persona responsable y un plazo para cumplirlo"
+          : "Un seguimiento sirve para revisar qué cambió desde la última intervención y decidir qué hacer a continuación"}
       </p>
       {vista === "compromisos" && (
         <>
@@ -49,6 +51,16 @@ export function SeguimientoCaso({
               Ver seguimientos en el calendario
             </Link>
           </div>
+          {abierto && (
+            <details className="rounded-2xl border border-border">
+              <summary className={claseAccionPrincipal}>
+                <EtiquetaAccion icono="agregar">Registrar un compromiso</EtiquetaAccion>
+              </summary>
+              <div className="border-t border-border p-4">
+                <FormularioSeguimiento caso={caso} modo="compromiso" />
+              </div>
+            </details>
+          )}
           {caso.compromisos.length === 0 && (
             <p className="text-sm text-muted-foreground">
               Todavía no hay compromisos registrados
@@ -92,21 +104,25 @@ export function SeguimientoCaso({
               </div>
             </details>
           ))}
-          {abierto && (
-            <details className="rounded-2xl border border-border">
-              <summary className={resumen + " font-medium text-primary"}>
-                Registrar un compromiso
-              </summary>
-              <div className="border-t border-border p-4">
-                <FormularioSeguimiento caso={caso} modo="compromiso" />
-              </div>
-            </details>
-          )}
         </>
       )}
       {vista === "seguimientos" && (
         <>
           <h3 className="font-semibold">Seguimientos</h3>
+          {abierto && (
+            <details
+              open={nuevo}
+              id="nuevo-seguimiento"
+              className="rounded-2xl border border-border"
+            >
+              <summary className={claseAccionPrincipal}>
+                <EtiquetaAccion icono="anios">Programar un seguimiento</EtiquetaAccion>
+              </summary>
+              <div className="border-t border-border p-4">
+                <FormularioSeguimiento caso={caso} modo="programar" />
+              </div>
+            </details>
+          )}
           {caso.seguimientos.length === 0 && (
             <p className="text-sm text-muted-foreground">
               Todavía no hay seguimientos programados
@@ -167,8 +183,8 @@ export function SeguimientoCaso({
                 {abierto && ["PLANIFICADA", "POSPUESTA"].includes(s.estado) && (
                   <>
                     <details>
-                      <summary className="min-h-11 cursor-pointer py-2 font-medium text-primary">
-                        Registrar resultado y revisar compromisos
+                      <summary className={claseAccionSecundaria}>
+                        <EtiquetaAccion icono="confirmar">Registrar resultado y revisar compromisos</EtiquetaAccion>
                       </summary>
                       <FormularioSeguimiento
                         caso={caso}
@@ -177,8 +193,8 @@ export function SeguimientoCaso({
                       />
                     </details>
                     <details>
-                      <summary className="min-h-11 cursor-pointer py-2 font-medium text-primary">
-                        Reprogramar seguimiento
+                      <summary className={claseAccionSecundaria}>
+                        <EtiquetaAccion icono="anios">Reprogramar seguimiento</EtiquetaAccion>
                       </summary>
                       <FormularioSeguimiento
                         caso={caso}
@@ -196,8 +212,8 @@ export function SeguimientoCaso({
                     )
                     .map((c) => (
                       <details key={c.id}>
-                        <summary className="min-h-11 cursor-pointer py-2 font-medium text-primary">
-                          Revisar compromiso: {c.descripcion}
+                        <summary className={claseAccionSecundaria}>
+                          <EtiquetaAccion icono="editar">Revisar compromiso: {c.descripcion}</EtiquetaAccion>
                         </summary>
                         <FormularioSeguimiento
                           caso={caso}
@@ -210,20 +226,7 @@ export function SeguimientoCaso({
               </div>
             </details>
           ))}
-          {abierto ? (
-            <details
-              open={nuevo}
-              id="nuevo-seguimiento"
-              className="rounded-2xl border border-border"
-            >
-              <summary className={resumen + " font-medium text-primary"}>
-                Programar un seguimiento
-              </summary>
-              <div className="border-t border-border p-4">
-                <FormularioSeguimiento caso={caso} modo="programar" />
-              </div>
-            </details>
-          ) : (
+          {!abierto && (
             <p className="text-sm text-muted-foreground">
               El caso está cerrado, sus compromisos y seguimientos se conservan
             </p>

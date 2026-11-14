@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { EnlaceConCarga as Link } from "@/app/components/actividad";
-import { claseBotonPrimario, Encabezado } from "@/app/components/formulario";
+import { EnlaceConCarga as Link, FormularioBusqueda } from "@/app/components/actividad";
+import { claseFiltroProfesor } from "../busqueda";
+import { claseBotonPrimario, claseBotonSecundario, Encabezado } from "@/app/components/formulario";
 import { AvisoSinPermiso } from "../aviso-sin-permiso";
 import {
   obtenerFormatoFecha,
@@ -12,10 +13,32 @@ import {
 export const metadata: Metadata = { title: "Mis registros" };
 
 // HU-034 CA2: las situaciones que registró el profesor, la más reciente primero.
-export default async function PaginaMisRegistros() {
-  const [respuesta, formatearFecha] = await Promise.all([obtenerSituaciones(), obtenerFormatoFecha()]);
+export default async function PaginaMisRegistros({ searchParams }: PageProps<"/profesor/situaciones">) {
+  const filtros = await searchParams;
+  const texto = (valor: string | string[] | undefined) => typeof valor === "string" ? valor.trim() : "";
+  const curso = texto(filtros.curso);
+  const fecha = texto(filtros.fecha);
+  const categoria = texto(filtros.categoria);
+  const estudiante = texto(filtros.estudiante);
+  const pendientes = filtros.pendientes === "1";
+  const parametros = new URLSearchParams();
+  for (const [clave, valor] of Object.entries({ curso, fecha, categoria, estudiante, pendientes: pendientes ? "1" : "" })) {
+    if (valor) parametros.set(clave, valor);
+  }
+  const filtrado = parametros.size > 0;
+  const paginaPedida = texto(filtros.pagina);
+  if (paginaPedida) parametros.set("pagina", paginaPedida);
+  const [respuesta, formatearFecha] = await Promise.all([
+    obtenerSituaciones(parametros), obtenerFormatoFecha(),
+  ]);
   if (!respuesta.ok) return <AvisoSinPermiso volverA="/profesor" />;
-  const situaciones = respuesta.datos;
+  const { registros: situaciones, pagina, haySiguiente, cursos, categorias } = respuesta.datos;
+
+  function enlacePagina(numero: number) {
+    const destino = new URLSearchParams(parametros);
+    destino.set("pagina", String(numero));
+    return `/profesor/situaciones?${destino}`;
+  }
 
   return (
     <>
@@ -30,15 +53,45 @@ export default async function PaginaMisRegistros() {
         </Link>
       </div>
 
+      <FormularioBusqueda action="/profesor/situaciones" className="mb-6 flex flex-wrap items-end gap-3">
+        <label className="min-w-40 flex-1 text-sm">Estudiante participante
+          <input type="search" name="estudiante" defaultValue={estudiante} className={claseFiltroProfesor} />
+        </label>
+        <label className="text-sm">Curso
+          <select name="curso" defaultValue={curso} className={claseFiltroProfesor}>
+            <option value="">Todos</option>
+            {cursos.map((valor) => <option key={valor}>{valor}</option>)}
+          </select>
+        </label>
+        <label className="text-sm">Categoría
+          <select name="categoria" defaultValue={categoria} className={claseFiltroProfesor}>
+            <option value="">Todas</option>
+            {categorias.map((valor) => <option key={valor}>{valor}</option>)}
+          </select>
+        </label>
+        <label className="text-sm">Fecha de la situación
+          <input type="date" name="fecha" defaultValue={fecha} className={claseFiltroProfesor} />
+        </label>
+        <label className="flex items-center gap-2 self-center text-sm">
+          <input type="checkbox" name="pendientes" value="1" defaultChecked={pendientes} />
+          Aclaraciones pendientes
+        </label>
+        <button className={claseBotonPrimario}>Buscar</button>
+        <Link href="/profesor/situaciones" className="self-center text-sm text-primary">Limpiar</Link>
+      </FormularioBusqueda>
+
       {situaciones.length === 0 ? (
         <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-                    Todavía no has registrado situaciones. Para registrar una, elige
-          uno de tus cursos.
+          {filtrado || pagina > 1 ? "No hay registros en esta página." : "Todavía no has registrado situaciones. Elige uno de tus cursos para registrar la primera."}
         </p>
       ) : (
         <ul className="space-y-3">
           {situaciones.map((situacion) => {
             const urgencia = URGENCIA[situacion.urgencia] ?? URGENCIA.NORMAL;
+            const nombres = (rol: string) => situacion.estudiantes?.filter((e) => e.rol === rol).map((e) => e.nombre).join(", ");
+            const involucrados = nombres("INVOLUCRADO");
+            const afectados = nombres("AFECTADO");
+            const testigos = nombres("TESTIGO");
             return (
               <li key={situacion.id}>
                 <Link
@@ -50,13 +103,15 @@ export default async function PaginaMisRegistros() {
                       {situacion.codigo}
                     </p>
                     <p className="mt-1 font-semibold">
-                      {situacion.categoria ?? "Sin categoría"}
+                      {situacion.categoria ?? "Sin categoría"}{involucrados && ` — ${involucrados}`}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {[situacion.curso, `Ocurrió el ${formatearFecha(situacion.ocurrido_en)}`]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    {afectados && <p className="mt-1 text-sm text-muted-foreground">Afectados: {afectados}</p>}
+                    {testigos && <p className="mt-1 text-sm text-muted-foreground">Testigos: {testigos}</p>}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
                     {situacion.aclaraciones_pendientes > 0 && (
@@ -78,6 +133,13 @@ export default async function PaginaMisRegistros() {
             );
           })}
         </ul>
+      )}
+      {(pagina > 1 || haySiguiente) && (
+        <nav aria-label="Páginas de Mis registros" className="mt-6 flex flex-wrap items-center gap-3">
+          {pagina > 1 && <Link className={claseBotonSecundario} href={enlacePagina(pagina - 1)}>Anterior</Link>}
+          <span className="text-sm text-muted-foreground">Página {pagina}</span>
+          {haySiguiente && <Link className={claseBotonSecundario} href={enlacePagina(pagina + 1)}>Siguiente</Link>}
+        </nav>
       )}
     </>
   );

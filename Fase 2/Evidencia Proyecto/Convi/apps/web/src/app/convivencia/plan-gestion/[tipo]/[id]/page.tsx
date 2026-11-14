@@ -83,7 +83,7 @@ function Dato({
           : valor}
       </dd>
       {campo && d.editable && (
-        <dd className="[&>details>summary]:absolute [&>details>summary]:right-0 [&>details>summary]:top-0">
+        <dd className="[&>details>summary]:absolute [&>details>summary]:right-0 [&>details>summary]:top-0 [&>details>summary]:-mt-3">
           <PanelFormulario
             key={`${d.version}-${campo}`}
             compacto

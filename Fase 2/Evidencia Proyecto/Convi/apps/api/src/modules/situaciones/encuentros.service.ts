@@ -71,19 +71,33 @@ export class EncuentrosService {
         if (!(await sonAsistentesDelCaso(db, casoId, datos.asistentes)))
           errores.asistentes =
             'Alguno de los asistentes ya no está disponible. Recarga la página.';
+        const realizado = datos.resultado !== undefined;
+        if (realizado) {
+          const futuras = await db.query<{ inicio: boolean; termino: boolean }>(
+            `SELECT ${EN_LA_ESCUELA('$1')} > now() AS inicio,
+                    ${EN_LA_ESCUELA('$2')} > now() AS termino`,
+            [datos.programado_en, datos.fin_programado_en],
+          );
+          if (futuras.rows[0].inicio) errores.programado_en = 'El inicio real no puede ser futuro.';
+          if (futuras.rows[0].termino) errores.fin_programado_en = 'El término real no puede ser futuro.';
+        }
         if (Object.keys(errores).length > 0)
           throw new BadRequestException({
-            mensaje: 'Revisa los datos marcados. No se programó el encuentro.',
+            mensaje: 'Revisa los datos marcados. No se guardó el encuentro.',
             errores,
           });
         const encuentro = await db.query<{ id: string }>(
           `INSERT INTO convi.actuaciones
              (establecimiento_id, caso_id, accion_plan_id, tipo_actuacion,
               membresia_responsable_id, objetivo, descripcion, lugar,
-              programado_en, fin_programado_en, creado_por)
+              programado_en, fin_programado_en, creado_por, estado, realizado_en, fin_real_en, resultado)
            VALUES (convi.establecimiento_actual(), $1, $2, $3, $4, $5, $6, $7,
-                   ${EN_LA_ESCUELA('$8')}, ${EN_LA_ESCUELA('$9')},
-                   convi.membresia_actual())
+                   CASE WHEN NOT $10::boolean THEN ${EN_LA_ESCUELA('$8')} END,
+                   CASE WHEN NOT $10::boolean THEN ${EN_LA_ESCUELA('$9')} END,
+                   convi.membresia_actual(),
+                   CASE WHEN $10::boolean THEN 'REALIZADA' ELSE 'PLANIFICADA' END,
+                   CASE WHEN $10::boolean THEN ${EN_LA_ESCUELA('$8')} END,
+                   CASE WHEN $10::boolean THEN ${EN_LA_ESCUELA('$9')} END, $11)
            RETURNING id`,
           [
             casoId,
@@ -95,9 +109,11 @@ export class EncuentrosService {
             datos.lugar,
             datos.programado_en,
             datos.fin_programado_en,
+            realizado,
+            datos.resultado ?? null,
           ],
         );
-        await insertarAsistentes(db, encuentro.rows[0].id, datos.asistentes);
+        await insertarAsistentes(db, encuentro.rows[0].id, datos.asistentes, realizado ? "ASISTIO" : "PENDIENTE");
         return encuentro.rows[0];
       },
       'READ COMMITTED',
@@ -355,12 +371,13 @@ async function insertarAsistentes(
   db: PoolClient,
   encuentroId: string,
   asistentes: Asistente[],
+  estado = 'PENDIENTE',
 ) {
   await db.query(
     `INSERT INTO convi.participaciones
        (establecimiento_id, persona_id, actuacion_id, rol_contextual,
         estado_asistencia)
-     SELECT convi.establecimiento_actual(), x.persona, $1::uuid, x.rol, 'PENDIENTE'
+     SELECT convi.establecimiento_actual(), x.persona, $1::uuid, x.rol, $4
      FROM unnest($2::uuid[], $3::text[]) AS x(persona, rol)
      WHERE NOT EXISTS (
        SELECT 1 FROM convi.participaciones pa
@@ -370,6 +387,7 @@ async function insertarAsistentes(
       encuentroId,
       asistentes.map((a) => a.persona_id),
       asistentes.map((a) => a.rol),
+      estado,
     ],
   );
 }

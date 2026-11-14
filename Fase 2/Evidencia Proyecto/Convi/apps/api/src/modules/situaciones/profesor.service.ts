@@ -35,6 +35,7 @@ export type CursoAsignado = {
   anio: number;
   roles: string[];
   estudiantes: number;
+  activo: boolean;
 };
 
 export type EstudianteDelCurso = {
@@ -55,6 +56,7 @@ export type SituacionPropia = {
   curso: string | null;
   categoria: string | null;
   aclaraciones_pendientes: number;
+  estudiantes?: { nombre: string; rol: string }[];
 };
 
 export type DetalleSituacion = SituacionPropia & {
@@ -133,7 +135,7 @@ export class ProfesorService {
     @Inject(EvaluacionReglas) private readonly reglas: EvaluacionReglas,
   ) {}
 
-  // CA1: solo cursos con una asignación vigente hoy, con la cantidad de matrículas activas.
+  // El catálogo incluye asignaciones pasadas del profesor para identificar sus cursos históricos.
   cursos(sesion: Sesion): Promise<CursoAsignado[]> {
     return this.cuentas.operar(
       sesion,
@@ -143,6 +145,10 @@ export class ProfesorService {
           // PB-144: solo lo que muestran Mis cursos y el formulario, sin ficha administrativa.
           `SELECT c.id, c.nombre, n.nombre AS nivel, an.anio,
                   array_agg(DISTINCT ad.rol_asignacion) AS roles,
+                  (c.estado = 'ACTIVO' AND an.estado = 'ACTIVO' AND bool_or(
+                    (ad.fecha_inicio IS NULL OR ad.fecha_inicio <= current_date)
+                    AND (ad.fecha_fin IS NULL OR ad.fecha_fin >= current_date)
+                  )) AS activo,
                   (SELECT count(*) FROM convi.matriculas m
                     WHERE m.curso_id = c.id AND m.estado = 'ACTIVO')::int AS estudiantes
            FROM convi.asignaciones_docentes ad
@@ -151,8 +157,7 @@ export class ProfesorService {
            JOIN convi.anios_academicos an ON an.id = c.anio_academico_id
            WHERE ad.membresia_id = convi.membresia_actual()
              AND (ad.fecha_inicio IS NULL OR ad.fecha_inicio <= current_date)
-             AND (ad.fecha_fin IS NULL OR ad.fecha_fin >= current_date)
-           GROUP BY c.id, n.nombre, n.orden, an.anio
+           GROUP BY c.id, n.nombre, n.orden, an.anio, an.estado
            ORDER BY an.anio DESC, n.orden, c.seccion NULLS FIRST, c.nombre`,
         );
         return resultado.rows;
@@ -273,18 +278,92 @@ export class ProfesorService {
   }
 
   // CA2: las situaciones que registró este profesor, de la más reciente a la más antigua.
-  situaciones(sesion: Sesion): Promise<SituacionPropia[]> {
+  situaciones(sesion: Sesion, filtros: Record<string, unknown>) {
+    const texto = (valor: unknown) => typeof valor === 'string' ? valor.trim() : '';
+    const pedida = Number(texto(filtros.pagina));
+    const tamano = 20;
+    const pagina = Number.isSafeInteger(pedida) && pedida > 0 &&
+      pedida <= Math.floor(Number.MAX_SAFE_INTEGER / tamano) ? pedida : 1;
+    const fecha = texto(filtros.fecha);
+    const palabras = texto(filtros.estudiante).normalize('NFD').replace(/\p{M}/gu, '')
+      .toLowerCase().split(/\s+/).filter(Boolean);
+
     return this.cuentas.operar(
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
-        const resultado = await db.query<SituacionPropia>(
-          `SELECT ${COLUMNAS_SITUACION}
-           ${DESDE_SITUACIONES}
-           WHERE s.reportado_por_membresia_id = convi.membresia_actual()
-           ORDER BY s.reportado_en DESC`,
+        const opciones = await db.query<{ cursos: string[]; categorias: string[] }>(
+          `WITH opciones AS MATERIALIZED (
+             SELECT DISTINCT curso_contexto_id, categoria_id
+             FROM convi.situaciones
+             WHERE reportado_por_membresia_id = convi.membresia_actual()
+           )
+           SELECT
+             coalesce(array_agg(DISTINCT c.nombre ORDER BY c.nombre)
+               FILTER (WHERE c.nombre IS NOT NULL), '{}') AS cursos,
+             coalesce(array_agg(DISTINCT cat.nombre ORDER BY cat.nombre)
+               FILTER (WHERE cat.nombre IS NOT NULL), '{}') AS categorias
+           FROM opciones o
+           LEFT JOIN convi.cursos c ON c.id = o.curso_contexto_id
+           LEFT JOIN convi.categorias_convivencia cat ON cat.id = o.categoria_id`,
         );
-        return resultado.rows;
+        const resultado = await db.query<SituacionPropia>(
+          `WITH pagina AS MATERIALIZED (
+             SELECT ${COLUMNAS_SITUACION}
+             ${DESDE_SITUACIONES}
+             WHERE s.reportado_por_membresia_id = convi.membresia_actual()
+               AND ($1 = '' OR c.nombre = $1)
+               AND ($2 = '' OR cat.nombre = $2)
+               AND ($3 = '' OR to_char(s.ocurrido_en, 'YYYY-MM-DD') = $3)
+               AND (NOT $4::boolean OR EXISTS (
+                 SELECT 1 FROM convi.aclaraciones_situacion a
+                 WHERE a.situacion_id = s.id
+                   AND a.profesor_destinatario_id = convi.membresia_actual()
+                   AND a.estado = 'PENDIENTE'
+               ))
+               AND (cardinality($5::text[]) = 0 OR EXISTS (
+                 SELECT 1 FROM convi.participaciones pa
+                 JOIN LATERAL (
+                   SELECT regexp_replace(lower(normalize(p.nombres || ' ' || p.apellidos, NFD)),
+                     '[' || chr(768) || '-' || chr(879) || ']', '', 'g') AS nombre
+                   FROM convi.personas p
+                   JOIN convi.estudiantes e ON e.persona_id = p.id
+                   WHERE p.id = pa.persona_id
+                   LIMIT 1
+                 ) participante ON true
+                 WHERE pa.situacion_id = s.id AND pa.activo_hasta IS NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM unnest($5::text[]) palabra
+                     WHERE strpos(participante.nombre, palabra) = 0
+                   )
+               ))
+             ORDER BY s.reportado_en DESC, s.id DESC
+             LIMIT $6 OFFSET $7
+           )
+           SELECT s.*,
+                  coalesce((SELECT jsonb_agg(jsonb_build_object(
+                    'nombre', p.nombres || ' ' || p.apellidos, 'rol', pa.rol_contextual
+                  ) ORDER BY p.apellidos, p.nombres, pa.id)
+                    FROM convi.participaciones pa
+                    JOIN LATERAL (
+                      SELECT persona.nombres, persona.apellidos
+                      FROM convi.personas persona
+                      JOIN convi.estudiantes e ON e.persona_id = persona.id
+                      WHERE persona.id = pa.persona_id
+                      LIMIT 1
+                    ) p ON true
+                    WHERE pa.situacion_id = s.id AND pa.activo_hasta IS NULL), '[]') AS estudiantes
+           FROM pagina s
+           ORDER BY s.reportado_en DESC, s.id DESC`,
+          [texto(filtros.curso), texto(filtros.categoria), fecha,
+            filtros.pendientes === '1', palabras, tamano + 1, (pagina - 1) * tamano],
+        );
+        return {
+          registros: resultado.rows.slice(0, tamano),
+          pagina,
+          haySiguiente: resultado.rows.length > tamano,
+          ...opciones.rows[0],
+        };
       },
     );
   }
