@@ -1,3 +1,4 @@
+import { Icono } from "@/app/components/icono";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseEnlace } from "@/app/components/formulario";
 import { FormularioCarga } from "../importaciones/formulario-carga";
@@ -90,7 +91,7 @@ export function PasoEstudiantes({
             download
             className={claseEnlace}
           >
-            Descargar la plantilla
+            <span className="inline-flex items-center gap-1.5"><Icono nombre="descargar" className="size-4 shrink-0" />Descargar la plantilla</span>
           </a>
           . Al cargarla se abre la importación: relacionas las columnas, revisas
           la vista previa y confirmas solo las filas válidas. Después vuelve a la

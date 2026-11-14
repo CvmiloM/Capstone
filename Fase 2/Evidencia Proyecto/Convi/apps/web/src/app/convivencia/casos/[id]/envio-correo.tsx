@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, useState } from "react";
@@ -106,7 +107,9 @@ export function BotonEnviarCorreo({
         disabled={pendiente || !completo || (advertencia && !aceptada)}
         className={claseBotonPrimario}
       >
-        {pendiente ? "Enviando…" : "Confirmar y enviar"}
+        <EtiquetaAccion icono="enviar">
+          {pendiente ? "Enviando…" : "Confirmar y enviar"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -135,7 +138,9 @@ export function BotonRevisarEntrega({
         disabled={pendiente}
         className={claseBotonSecundario}
       >
-        {pendiente ? "Revisando…" : "Revisar entrega"}
+        <EtiquetaAccion icono="ojo">
+          {pendiente ? "Revisando…" : "Revisar entrega"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -164,7 +169,9 @@ export function BotonCopiarCorreo({
         disabled={pendiente}
         className={claseBotonSecundario}
       >
-        {pendiente ? "Copiando…" : "Usar como borrador nuevo"}
+        <EtiquetaAccion icono="copiar">
+          {pendiente ? "Copiando…" : "Usar como borrador nuevo"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );

@@ -2,8 +2,9 @@
 
 import { FormularioConCarga } from "@/app/components/actividad";
 
-import { useActionState, type ReactNode } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
+import { coincideBusqueda } from "../../../busqueda";
 import type { Categoria, EstudianteDelCurso } from "../../../datos";
 import {
   LARGO_MAXIMO_SITUACION,
@@ -33,6 +34,7 @@ export function FormularioSituacion({
   estudiantes: EstudianteDelCurso[];
   categorias: Categoria[];
 }) {
+  const [busqueda, buscar] = useState("");
   const [estado, accion, pendiente] = useActionState(
     registrarSituacion,
     estadoInicial,
@@ -156,6 +158,12 @@ export function FormularioSituacion({
             id="participantes"
             ayuda="Elige el rol de cada estudiante que participó. Los demás quedan como «No participa»."
           />
+          <label className="mt-3 block text-sm">
+            Buscar estudiante por nombre
+            <input type="search" value={busqueda} onChange={(e) => buscar(e.target.value)} className={claseControl} />
+          </label>
+          {!estudiantes.some((e) => coincideBusqueda(`${e.nombres} ${e.apellidos}`, busqueda)) &&
+            <p role="status" className="mt-2 text-sm text-muted-foreground">No hay estudiantes con ese nombre.</p>}
           <ul
             className={`mt-3 divide-y divide-border rounded-xl border ${
               errores.participantes ? "border-destructive" : "border-border"
@@ -166,7 +174,7 @@ export function FormularioSituacion({
               return (
                 <li
                   key={estudiante.id}
-                  className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className={coincideBusqueda(`${estudiante.nombres} ${estudiante.apellidos}`, busqueda) ? "flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" : "hidden"}
                 >
                   <label htmlFor={campo} className="text-sm font-medium">
                     {estudiante.apellidos}, {estudiante.nombres}

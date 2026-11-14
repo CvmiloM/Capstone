@@ -9,6 +9,10 @@ type PerfilPortal = {
   apellidos: string;
   codigo_perfil: string;
   avisos_no_leidos: number;
+  escuela: string;
+  comuna: string | null;
+  codigo_escuela: string | null;
+  anio_activo: number | null;
 };
 
 // En el celular la persona aparece en la barra de arriba y en el computador
@@ -35,6 +39,24 @@ const leerUsuarioPortal = cache(async () => {
     : null;
   return { correo, perfil };
 });
+
+export async function FichaEscuelaPortal({ familia = false }: { familia?: boolean }) {
+  const perfil = (await leerUsuarioPortal())?.perfil;
+  if (!perfil?.escuela) return null;
+  const detalle = [!familia && perfil.codigo_escuela && `Código ${perfil.codigo_escuela}`, perfil.comuna]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <div className={`rounded-xl border border-border px-3 py-2.5 ${familia ? "min-w-0" : "mx-3"}`}>
+      <p className={`text-sm font-semibold ${familia ? "break-words" : "truncate"}`} title={perfil.escuela}>{perfil.escuela}</p>
+      {detalle && <p className="text-xs text-muted-foreground">{detalle}</p>}
+      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span aria-hidden="true" className={`size-1.5 rounded-full ${perfil.anio_activo ? "bg-primary" : "bg-input"}`} />
+        {perfil.anio_activo ? `Año académico ${perfil.anio_activo}` : "Sin año académico activo"}
+      </p>
+    </div>
+  );
+}
 
 /** Identidad de la sesión y avisos propios, consultados solo en el servidor. */
 export async function UsuarioPortal({
@@ -70,10 +92,10 @@ export async function UsuarioPortal({
           </p>
         )}
       </div>
-      {perfil?.codigo_perfil === "CONVIVENCIA" && (
+      {(perfil?.codigo_perfil === "CONVIVENCIA" || perfil?.codigo_perfil === "PROFESOR") && (
         <Link
-          href="/convivencia/avisos"
-          aria-label={`Avisos, ${perfil.avisos_no_leidos} sin leer`}
+          href={perfil.codigo_perfil === "PROFESOR" ? "/profesor/situaciones?pendientes=1" : "/convivencia/avisos"}
+          aria-label={perfil.codigo_perfil === "PROFESOR" ? `${perfil.avisos_no_leidos} aclaraciones pendientes` : `Avisos, ${perfil.avisos_no_leidos} sin leer`}
           className="relative shrink-0 rounded-lg p-2 text-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
         >
           <Icono nombre="avisos" className="size-5" />

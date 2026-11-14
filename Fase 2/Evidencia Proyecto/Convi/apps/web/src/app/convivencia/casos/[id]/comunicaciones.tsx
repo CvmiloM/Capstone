@@ -1,94 +1,67 @@
+import { Icono } from "@/app/components/icono";
 import { claseEnlace } from "@/app/components/formulario";
 import type { DetalleCaso } from "../datos";
+import { AccionesComunicacion } from "./paneles-comunicacion";
 import { Correos } from "./correos";
 import { FormularioComunicacion } from "./formulario-comunicacion";
 import { NOMBRE_ROL_ASISTENTE, NOMBRE_TIPO_COMUNICACION } from "./opciones";
 
-// PB-067 (HU-058): llamadas, conversaciones presenciales, comunicaciones
-// institucionales y otros contactos del caso, de la más reciente a la más
-// antigua. Decisión del PO (por defecto): una comunicación no se edita ni se
-// borra, y un caso cerrado no recibe nuevas.
 export function Comunicaciones({
   caso,
   formatearFecha,
+  redactar,
 }: {
   caso: DetalleCaso;
+  redactar: boolean;
   formatearFecha: (iso: string) => string;
 }) {
-  const abierto = caso.estado_actual !== "CERRADO";
-
   return (
-    <>
-      {caso.comunicaciones.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          El caso todavía no tiene comunicaciones registradas.
-        </p>
-      ) : (
-        <ul className="divide-y divide-border border-y border-border text-sm">
-          {caso.comunicaciones.map((c) => (
-            <li key={c.id} className="py-3">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-                  {NOMBRE_TIPO_COMUNICACION[c.tipo] ?? c.tipo}
-                </span>
-                {c.advertencia && (
-                  <span className="rounded-full bg-naranjo/15 px-2.5 py-0.5 text-xs font-medium text-foreground">
-                    Contacto con advertencia
-                  </span>
-                )}
-              </div>
-              <p className="mt-2">
-                <span className="font-medium">{c.destinatario}</span>
-                <span className="ml-2 text-xs text-muted-foreground">
+    <div className="space-y-6">
+      <section aria-labelledby="registros-comunicacion" className="rounded-xl border border-border bg-muted/25 p-4 sm:p-5">
+        <h3 id="registros-comunicacion" className="text-base font-semibold">Registros de comunicación</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Llamadas, conversaciones y otros contactos del caso.</p>
+        {caso.estado_actual !== "CERRADO" && (
+          <div className="mt-4">
+            <AccionesComunicacion acciones={[{
+              clave: "registrar",
+              titulo: "Registrar una comunicación",
+              principal: true,
+              formulario: <FormularioComunicacion casoId={caso.id} destinatarios={caso.destinatarios_comunicacion} ahora={caso.ahora} />,
+            }]} />
+          </div>
+        )}
+        {caso.comunicaciones.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">Todavía no hay comunicaciones registradas.</p>
+        ) : (
+          <ul className="mt-4 space-y-3 text-sm">
+            {caso.comunicaciones.map((c) => (
+              <li key={c.id} className="rounded-lg border border-border bg-card p-4">
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+                  <h4 className="font-semibold">{NOMBRE_TIPO_COMUNICACION[c.tipo] ?? c.tipo} · {c.destinatario}</h4>
+                  <p className="text-xs text-muted-foreground">{formatearFecha(c.ocurrido_en)}</p>
+                </div>
+                <p className="mt-2 whitespace-pre-line break-words">{c.resumen}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
                   {c.rol ? (NOMBRE_ROL_ASISTENTE[c.rol] ?? c.rol) : "Fuera del caso"}
-                </span>
-              </p>
-              <p className="mt-1 whitespace-pre-line">{c.resumen}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Ocurrió el {formatearFecha(c.ocurrido_en)} · registrada por{" "}
-                {c.creado_por} el {formatearFecha(c.creado_en)}
-              </p>
-              {c.advertencia && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  El vínculo indica que este apoderado no puede ser contactado;
-                  la advertencia quedó en la auditoría.
+                  {" · "}Registró {c.creado_por} el {formatearFecha(c.creado_en)}
                 </p>
-              )}
-              {c.respaldo && (
-                <p className="mt-1 break-all text-xs text-muted-foreground">
-                  Respaldo: {c.respaldo} ·{" "}
-                  <a
-                    href={`/convivencia/comunicaciones/${c.id}/respaldo`}
-                    className={claseEnlace}
-                  >
-                    Descargar
+                {c.advertencia && (
+                  <p className="mt-2 rounded-lg bg-naranjo/15 px-3 py-2 text-xs">
+                    El vínculo indica que este apoderado no puede ser contactado. La advertencia quedó en la auditoría.
+                  </p>
+                )}
+                {c.respaldo && (
+                  <a href={`/convivencia/comunicaciones/${c.id}/respaldo`} className={`mt-2 inline-flex items-center gap-1.5 ${claseEnlace}`} aria-label={`Descargar respaldo: ${c.respaldo}`}>
+                    <Icono nombre="descargar" className="size-4 shrink-0" />
+                    Descargar respaldo
                   </a>
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {abierto ? (
-        <div className="mt-4 border-t border-border pt-4">
-          <h3 className="mb-3 text-sm font-semibold">Registrar una comunicación</h3>
-          <FormularioComunicacion
-            casoId={caso.id}
-            destinatarios={caso.destinatarios_comunicacion}
-            ahora={caso.ahora}
-          />
-        </div>
-      ) : (
-        caso.comunicaciones.length > 0 && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            El caso está cerrado: sus comunicaciones se conservan como quedaron.
-          </p>
-        )
-      )}
-
-      {/* PB-151 y PB-086 (HU-130 y HU-075): correos al apoderado. */}
-      <Correos caso={caso} formatearFecha={formatearFecha} />
-    </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <Correos key={redactar ? "redactar" : "correos"} caso={caso} formatearFecha={formatearFecha} redactar={redactar} />
+    </div>
   );
 }

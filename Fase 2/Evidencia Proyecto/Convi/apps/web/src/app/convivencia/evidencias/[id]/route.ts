@@ -6,11 +6,12 @@ import { responderDescarga } from "@/app/components/evidencias/datos";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(
-  _peticion: Request,
+  peticion: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   if (!UUID.test(id))
     return new Response("La evidencia no existe.", { status: 404 });
-  return responderDescarga(`/convivencia/evidencias/${id}/archivo`);
+  const vista = new URL(peticion.url).searchParams.get("vista") === "1";
+  return responderDescarga(`/convivencia/evidencias/${id}/archivo`, undefined, vista ? "imagen" : false);
 }

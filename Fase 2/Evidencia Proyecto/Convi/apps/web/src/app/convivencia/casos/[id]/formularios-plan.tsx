@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, useState } from "react";
@@ -110,7 +111,9 @@ export function FormularioNuevoPlan({
       </div>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Creando…" : "Crear plan"}
+        <EtiquetaAccion icono="agregar">
+          {pendiente ? "Creando…" : "Crear plan"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -189,7 +192,9 @@ export function FormularioEstadoPlan({
       </Campo>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Cambiar estado del plan"}
+        <EtiquetaAccion icono="guardar">
+          {pendiente ? "Guardando…" : "Cambiar estado del plan"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -231,7 +236,9 @@ export function FormularioNuevaAccion({
       />
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Agregando…" : "Agregar acción"}
+        <EtiquetaAccion icono="agregar">
+          {pendiente ? "Agregando…" : "Agregar acción"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -449,7 +456,9 @@ export function FormularioAvanceAccion({
       )}
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Guardar avance"}
+        <EtiquetaAccion icono="guardar">
+          {pendiente ? "Guardando…" : "Guardar avance"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -538,7 +547,9 @@ export function FormularioCorreccionAccion({
       </Campo>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Guardar corrección"}
+        <EtiquetaAccion icono="guardar">
+          {pendiente ? "Guardando…" : "Guardar corrección"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );

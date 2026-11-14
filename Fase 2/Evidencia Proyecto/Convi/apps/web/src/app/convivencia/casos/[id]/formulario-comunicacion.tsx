@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, useState } from "react";
@@ -196,7 +197,9 @@ export function FormularioComunicacion({
       </p>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Registrando…" : "Registrar comunicación"}
+        <EtiquetaAccion icono="confirmar">
+          {pendiente ? "Registrando…" : "Registrar comunicación"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );

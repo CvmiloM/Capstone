@@ -70,6 +70,14 @@ describe('Programación de encuentros (PB-063, HU-055)', () => {
     });
   });
 
+  it('exige resultado para guardar un encuentro ya realizado', () => {
+    expect(errores(() => validarNuevoEncuentro({ ...encuentro, realizado: true })))
+      .toHaveProperty('resultado');
+    expect(validarNuevoEncuentro({
+      ...encuentro, realizado: true, resultado: 'Se acordó una reunión de seguimiento.',
+    })).toHaveProperty('resultado', 'Se acordó una reunión de seguimiento.');
+  });
+
   it('rechaza un término anterior al inicio (CA2)', () => {
     expect(
       errores(() =>

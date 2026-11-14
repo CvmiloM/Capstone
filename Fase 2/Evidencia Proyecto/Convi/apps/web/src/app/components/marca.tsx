@@ -1,6 +1,9 @@
 // Logo de CONVI. Marca es la insignia vertical (acceso, inicio) y
 // MarcaCompacta la versión en línea para encabezados.
 
+import Image from "next/image";
+import logo from "@/assets/convi-logo-trim.png";
+
 function IconoLibro({ className }: { className: string }) {
   return (
     <svg
@@ -38,13 +41,6 @@ export function Marca() {
 
 export function MarcaCompacta() {
   return (
-    <span className="flex items-center gap-2.5">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <IconoLibro className="size-4.5" />
-      </span>
-      <span className="font-serif text-lg font-semibold tracking-[0.18em] text-primary">
-        CONVI
-      </span>
-    </span>
+    <Image src={logo} alt="Convi" sizes="101px" className="-my-3 -ml-2 block h-14 w-auto" />
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState } from "react";
@@ -102,7 +103,9 @@ export function FormularioAvancePaso({
       </Campo>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Registrar avance"}
+        <EtiquetaAccion icono="confirmar">
+          {pendiente ? "Guardando…" : "Registrar avance"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -176,7 +179,9 @@ export function FormularioAsignacionPaso({
       </Campo>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Guardar responsable y plazo"}
+        <EtiquetaAccion icono="guardar">
+          {pendiente ? "Guardando…" : "Guardar responsable y plazo"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -261,7 +266,9 @@ export function FormularioEstadoProtocolo({
       </Campo>
 
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente ? "Guardando…" : "Cambiar estado del protocolo"}
+        <EtiquetaAccion icono="guardar">
+          {pendiente ? "Guardando…" : "Cambiar estado del protocolo"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );

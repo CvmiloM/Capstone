@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { useActionState, useEffect, useState } from "react";
 import { FormularioConCarga } from "@/app/components/actividad";
 import {
@@ -166,7 +167,9 @@ export function FormularioBorradorIA({
           disabled={pendiente}
           className={claseBotonPrimario}
         >
-          {pendiente ? "Redactando…" : "Preparar borrador con IA"}
+          <EtiquetaAccion icono="documentos">
+            {pendiente ? "Redactando…" : "Preparar borrador con IA"}
+          </EtiquetaAccion>
         </button>
       </FormularioConCarga>
     </div>
@@ -219,7 +222,9 @@ export function FormularioEdicionBorrador({
         disabled={pendiente}
         className={claseBotonPrimario}
       >
-        {pendiente ? "Guardando…" : "Guardar como nueva edición"}
+        <EtiquetaAccion icono="guardar">
+          {pendiente ? "Guardando…" : "Guardar como nueva edición"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );
@@ -264,7 +269,9 @@ export function BotonesRevisionBorrador({
           disabled={pendiente}
           className={claseBotonPrimario}
         >
-          Marcar como revisado
+          <EtiquetaAccion icono="confirmar">
+            Marcar como revisado
+          </EtiquetaAccion>
         </button>
         <button
           type="submit"
@@ -273,7 +280,9 @@ export function BotonesRevisionBorrador({
           disabled={pendiente}
           className={claseBotonSecundario}
         >
-          Descartar
+          <EtiquetaAccion icono="cerrar">
+            Descartar
+          </EtiquetaAccion>
         </button>
       </div>
     </FormularioConCarga>

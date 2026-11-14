@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, useEffect, useState } from "react";
@@ -131,7 +132,9 @@ export function FormularioCorreoIA({
           disabled={pendiente}
           className={claseBotonPrimario}
         >
-          {pendiente ? "Preparando…" : "Preparar borrador con IA"}
+          <EtiquetaAccion icono="documentos">
+            {pendiente ? "Preparando…" : "Preparar borrador con IA"}
+          </EtiquetaAccion>
         </button>
       </FormularioConCarga>
     </div>

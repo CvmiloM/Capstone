@@ -1,3 +1,4 @@
+import { claseAccionPrincipal, claseAccionSecundaria, EtiquetaAccion } from "./etiqueta-accion";
 import type { Metadata } from "next";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import type { ReactNode } from "react";
@@ -26,7 +27,7 @@ import { Comunicaciones } from "./comunicaciones";
 import { BorradoresIA, type BorradoresDelCaso } from "./borradores-ia";
 import { Encuentros } from "./encuentros";
 import { OrientacionCaso } from "./orientacion";
-import { PlanIntervencion } from "./plan-intervencion";
+import { Desplegable, PlanIntervencion } from "./plan-intervencion";
 import { ProtocolosAplicados } from "./protocolo-aplicado";
 import { PropuestaProtocolo } from "./propuesta-protocolo";
 import { ResumenCaso } from "./resumen";
@@ -180,9 +181,11 @@ export default async function PaginaCaso({
     antes?: string | string[];
     nuevo?: string;
     adjuntar?: string;
+    accion?: string;
+    encuentro?: string;
   }>;
 }) {
-  const [{ id }, { aviso, seccion: solicitada, antes, nuevo, adjuntar }] =
+  const [{ id }, { aviso, seccion: solicitada, antes, nuevo, adjuntar, accion, encuentro }] =
     await Promise.all([params, searchParams]);
   const secciones: [string, string][] = [
     ["resumen", "Resumen"],
@@ -244,7 +247,7 @@ export default async function PaginaCaso({
         </div>
       )}
 
-      <div className="mt-4 mb-6">
+      <div className="mt-4 mb-5">
         <p className="font-mono text-sm text-muted-foreground">{caso.codigo}</p>
         <h1 className="mt-1 text-2xl font-semibold">
           {caso.titulo}
@@ -263,32 +266,11 @@ export default async function PaginaCaso({
             </span>
           )}
         </div>
-      </div>
-
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm">
-        <p className="text-muted-foreground">
+        <p className="mt-3 text-sm text-muted-foreground">
           Responsable:{" "}
           <span className="text-foreground">{caso.responsable}</span> · Inicio{" "}
           {formatearDia(caso.fecha_inicio)}
         </p>
-        <div className="flex flex-wrap gap-2">
-          {caso.estado_actual !== "CERRADO" && (
-            <Link
-              href={`${ruta}?seccion=seguimientos&nuevo=1#nuevo-seguimiento`}
-              className={claseBotonSecundario}
-            >
-              Programar seguimiento
-            </Link>
-          )}
-          {caso.estado_actual !== "CERRADO" && (
-            <Link
-              href={`${ruta}?seccion=evidencias&adjuntar=1#agregar-evidencia`}
-              className={claseBotonPrimario}
-            >
-              Agregar evidencia
-            </Link>
-          )}
-        </div>
       </div>
       {/* El resaltado se desliza al instante y la pestaña muestra un esqueleto
           mientras llegan sus datos (pestanas-caso.tsx). */}
@@ -400,7 +382,7 @@ export default async function PaginaCaso({
                     href="/convivencia?estado=EN_REVISION"
                     className={claseBotonSecundario}
                   >
-                    Vincular otra situación
+                    <EtiquetaAccion icono="vincular">Vincular otra situación</EtiquetaAccion>
                   </Link>
                 </div>
               )}
@@ -444,17 +426,7 @@ export default async function PaginaCaso({
               titulo="Evidencias del expediente"
               className="lg:col-span-3"
             >
-              <ListaEvidencias
-                evidencias={caso.evidencias}
-                rutaDescarga="/convivencia/evidencias"
-                vacio="Todavía no hay evidencias en el caso ni en sus situaciones."
-                corregir={
-                  caso.estado_actual === "CERRADO"
-                    ? undefined
-                    : { destino: "convivencia-correccion-caso", registroId: caso.id }
-                }
-              />
-              <div className="mt-4 border-t border-border pt-4">
+              <div className="mb-4">
                 {caso.estado_actual === "CERRADO" ? (
                   <p className="text-sm text-muted-foreground">
                     El caso está cerrado: conserva sus evidencias, pero no
@@ -466,8 +438,8 @@ export default async function PaginaCaso({
                     id="agregar-evidencia"
                     className="group rounded-xl bg-muted/50 p-4 open:bg-card [&:target]:outline-2 [&:target]:outline-ring"
                   >
-                    <summary className="min-h-11 cursor-pointer py-3 font-semibold text-primary">
-                      Agregar evidencia
+                    <summary className={claseAccionPrincipal}>
+                      <EtiquetaAccion icono="agregar">Agregar evidencia</EtiquetaAccion>
                     </summary>
                     <div className="pt-4">
                       <FormularioEvidencia
@@ -478,12 +450,58 @@ export default async function PaginaCaso({
                   </details>
                 )}
               </div>
+              <ListaEvidencias
+                vistaImagen
+                evidencias={caso.evidencias}
+                rutaDescarga="/convivencia/evidencias"
+                vacio="Todavía no hay evidencias en el caso ni en sus situaciones."
+                corregir={
+                  caso.estado_actual === "CERRADO"
+                    ? undefined
+                    : { destino: "convivencia-correccion-caso", registroId: caso.id }
+                }
+              />
             </Seccion>
           )}
 
           {/* PB-082 (HU-071): protocolo aplicado al caso, o por qué sigue sin uno. */}
           {seccion === "protocolo" && (
             <Seccion titulo="Protocolo" className="lg:col-span-3">
+              {caso.estado_actual !== "CERRADO" && (
+                <div className="mb-4 grid gap-4 lg:grid-cols-2">
+                  <Desplegable icono="protocolos" principal titulo="Aplicar un protocolo">
+                    {caso.protocolos_aplicables.length > 0 ? (
+                      <FormularioAplicarProtocolo
+                        casoId={caso.id}
+                        protocolos={caso.protocolos_aplicables}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No hay protocolos publicados y vigentes, se preparan y
+                        publican en{" "}
+                        <Link
+                          href="/convivencia/protocolos"
+                          className={claseEnlace}
+                        >
+                          Protocolos
+                        </Link>
+                        .
+                      </p>
+                    )}
+                  </Desplegable>
+                  <Desplegable icono="documentos" titulo="Registrar por qué sigue sin protocolo">
+                    <p className="mt-1 mb-3 text-sm text-muted-foreground">
+                      Indica si la norma es aplicable y por qué no se aplica un
+                      protocolo, no se crea una aplicación ficticia.
+                    </p>
+                    <FormularioRevisionNormativa
+                      casoId={caso.id}
+                      protocolos={caso.opciones_normativa.protocolos}
+                      documentos={caso.opciones_normativa.documentos}
+                    />
+                  </Desplegable>
+                </div>
+              )}
               {caso.protocolos_aplicados.length === 0 &&
                 caso.revisiones_normativas.length === 0 && (
                   <p className="text-sm text-muted-foreground">
@@ -544,47 +562,6 @@ export default async function PaginaCaso({
                   </p>
                 </div>
               ))}
-              {caso.estado_actual !== "CERRADO" && (
-                <div className="mt-4 grid gap-6 border-t border-border pt-4 lg:grid-cols-2">
-                  <div>
-                    <h3 className="mb-3 text-sm font-semibold">
-                      Aplicar un protocolo
-                    </h3>
-                    {caso.protocolos_aplicables.length > 0 ? (
-                      <FormularioAplicarProtocolo
-                        casoId={caso.id}
-                        protocolos={caso.protocolos_aplicables}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No hay protocolos publicados y vigentes, se preparan y
-                        publican en{" "}
-                        <Link
-                          href="/convivencia/protocolos"
-                          className={claseEnlace}
-                        >
-                          Protocolos
-                        </Link>
-                        .
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">
-                      O registrar que sigue sin protocolo
-                    </h3>
-                    <p className="mt-1 mb-3 text-sm text-muted-foreground">
-                      Indica si la norma es aplicable y por qué no se aplica un
-                      protocolo, no se crea una aplicación ficticia.
-                    </p>
-                    <FormularioRevisionNormativa
-                      casoId={caso.id}
-                      protocolos={caso.opciones_normativa.protocolos}
-                      documentos={caso.opciones_normativa.documentos}
-                    />
-                  </div>
-                </div>
-              )}
               {/* PB-124 (HU-105): sin un protocolo oficial activo, la IA puede proponer uno. */}
               {caso.estado_actual !== "CERRADO" &&
                 !caso.protocolos_aplicados.some(
@@ -622,6 +599,8 @@ export default async function PaginaCaso({
                 caso={caso}
                 formatearFecha={formatearFecha}
                 adjuntar={adjuntar}
+                accion={accion}
+                seleccionado={encuentro}
               />
             </Seccion>
           )}
@@ -652,7 +631,7 @@ export default async function PaginaCaso({
               className="lg:col-span-3"
               id="comunicaciones"
             >
-              <Comunicaciones caso={caso} formatearFecha={formatearFecha} />
+              <Comunicaciones caso={caso} formatearFecha={formatearFecha} redactar={accion === "correo"} />
             </Seccion>
           )}
 
@@ -722,38 +701,44 @@ export default async function PaginaCaso({
                     caso para continuar el acompañamiento
                   </p>
                   <div className="mt-4">
-                    <FormularioContinuidad
-                      casoId={caso.id}
-                      modo="reapertura"
-                      ultimoMovimientoId={caso.ultimo_movimiento_id}
-                    />
+                    <Desplegable titulo="Reabrir caso" icono="reabrir">
+                      <FormularioContinuidad
+                        casoId={caso.id}
+                        modo="reapertura"
+                        ultimoMovimientoId={caso.ultimo_movimiento_id}
+                      />
+                    </Desplegable>
                   </div>
                 </Seccion>
               ) : (
                 <>
                   {caso.estados_permitidos.length > 0 && (
                     <Seccion titulo="Cambiar estado">
-                      <FormularioEstado
-                        casoId={caso.id}
-                        ultimoMovimientoId={caso.ultimo_movimiento_id}
-                        opciones={caso.estados_permitidos.map((valor) => ({
-                          valor,
-                          texto: nombreEstado(valor),
-                        }))}
-                      />
+                      <Desplegable titulo="Cambiar estado" icono="editar">
+                        <FormularioEstado
+                          casoId={caso.id}
+                          ultimoMovimientoId={caso.ultimo_movimiento_id}
+                          opciones={caso.estados_permitidos.map((valor) => ({
+                            valor,
+                            texto: nombreEstado(valor),
+                          }))}
+                        />
+                      </Desplegable>
                     </Seccion>
                   )}
                   {caso.puede_cerrar && (
                     <Seccion titulo="Cerrar caso">
-                      <FormularioCierre
-                        casoId={caso.id}
-                        ultimoMovimientoId={caso.ultimo_movimiento_id}
-                        pendientes={textosPendientes(caso.pendientes)}
-                        actas={caso.actas_cierre.map((acta) => ({
-                          id: acta.id,
-                          texto: `${acta.titulo} (${formatearFecha(acta.fecha_documento)})`,
-                        }))}
-                      />
+                      <Desplegable titulo="Cerrar caso" icono="candado">
+                        <FormularioCierre
+                          casoId={caso.id}
+                          ultimoMovimientoId={caso.ultimo_movimiento_id}
+                          pendientes={textosPendientes(caso.pendientes)}
+                          actas={caso.actas_cierre.map((acta) => ({
+                            id: acta.id,
+                            texto: `${acta.titulo} (${formatearFecha(acta.fecha_documento)})`,
+                          }))}
+                        />
+                      </Desplegable>
                     </Seccion>
                   )}
                 </>
@@ -764,8 +749,8 @@ export default async function PaginaCaso({
                   <span className="font-medium">{caso.responsable}</span>
                 </p>
                 <details className="mt-3 rounded-xl border border-border p-4">
-                  <summary className="min-h-11 cursor-pointer py-2 font-medium text-primary">
-                    Reasignar responsable
+                  <summary className={claseAccionSecundaria}>
+                    <EtiquetaAccion icono="persona">Reasignar responsable</EtiquetaAccion>
                   </summary>
                   <p className="mt-2 mb-4 text-sm text-muted-foreground">
                     Puedes elegir a otra persona activa de Convivencia de esta

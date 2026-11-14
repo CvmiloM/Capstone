@@ -1,7 +1,9 @@
+import { EtiquetaAccion } from "./etiqueta-accion";
+import { Icono } from "@/app/components/icono";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import type { ReactNode } from "react";
 import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evidencia";
-import { claseEnlace } from "@/app/components/formulario";
+import { claseBotonPrimario, claseBotonSecundario, claseEnlace } from "@/app/components/formulario";
 import { formatearDia, type DetalleCaso, type Encuentro } from "../datos";
 import {
   FormularioAgregarAsistentes,
@@ -29,11 +31,15 @@ export function Encuentros({
   caso,
   formatearFecha,
   adjuntar,
+  accion,
+  seleccionado,
 }: {
   caso: DetalleCaso;
   formatearFecha: (iso: string) => string;
   /** Encuentro cuyo formulario de acta se muestra (?adjuntar=). */
   adjuntar?: string;
+  accion?: string;
+  seleccionado?: string;
 }) {
   const abierto = caso.estado_actual !== "CERRADO";
   const ruta = `/convivencia/casos/${caso.id}`;
@@ -42,8 +48,49 @@ export function Encuentros({
   const rango = (inicio: string | null, fin: string | null) =>
     inicio ? `${formatearFecha(inicio)}${fin ? ` hasta ${formatearFecha(fin)}` : ""}` : "Sin fecha";
 
+  const elegirActa = accion === "acta";
+  const elegir = abierto && (elegirActa || accion === "marcar") && !seleccionado;
+  const opciones = elegirActa ? caso.encuentros.filter(conActa) : caso.encuentros.filter((e) => ABIERTO.includes(e.estado));
+  const modo = accion === "realizada" ? "realizada" : accion === "programar" ? "programar" : undefined;
   return (
     <>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Los encuentros sirven para programar entrevistas o reuniones y registrar quién asistió y qué se conversó
+      </p>
+      {abierto && (
+        <div className="mb-5 space-y-3" id="nuevo-encuentro">
+          <div className="flex flex-wrap gap-4 text-sm">
+            <Link className={claseBotonPrimario} href={`${ruta}?seccion=encuentros&accion=programar#nuevo-encuentro`}><EtiquetaAccion icono="anios">Programar un encuentro</EtiquetaAccion></Link>
+            <Link className={claseBotonSecundario} href={`${ruta}?seccion=encuentros&accion=realizada#nuevo-encuentro`}><EtiquetaAccion icono="documentos">Guardar un encuentro realizado</EtiquetaAccion></Link>
+          </div>
+          {modo && (
+            <div className="rounded-xl border border-border p-4">
+              <Link href={`${ruta}?seccion=encuentros#nuevo-encuentro`} className={`mb-3 block w-fit text-sm ${claseEnlace}`}>Cerrar formulario</Link>
+              <FormularioNuevoEncuentro key={modo} casoId={caso.id} responsables={caso.opciones_encuentro.responsables}
+                asistentes={caso.opciones_encuentro.asistentes} acciones={caso.opciones_encuentro.acciones_plan}
+                entrevista realizada={modo === "realizada"} />
+            </div>
+          )}
+        </div>
+      )}
+      {elegir && (
+        <section id="elegir-encuentro" className="mb-4 rounded-xl border border-border bg-muted/50 p-4 text-sm">
+          <h3 className="font-semibold">{elegirActa ? "Elige dónde adjuntar el acta" : "Elige el encuentro realizado"}</h3>
+          {opciones.length === 0 ? (
+            <p className="mt-2 text-muted-foreground">{elegirActa ? "Todavía no hay entrevistas o reuniones realizadas." : "No hay encuentros programados por marcar."}</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {opciones.map((e) => (
+                <li key={e.id}>
+                  <Link className={claseEnlace} href={`${ruta}?seccion=encuentros&${elegirActa ? "adjuntar" : "encuentro"}=${e.id}#encuentro-${e.id}`}>
+                    {e.objetivo} · {rango(e.realizado_en ?? e.programado_en, null)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
       {caso.encuentros.length === 0 && (
         <p className="text-sm text-muted-foreground">
           El caso todavía no tiene entrevistas, reuniones ni otros encuentros.
@@ -51,12 +98,19 @@ export function Encuentros({
       )}
 
       {caso.encuentros.map((encuentro) => (
-        <div
+        <details
+          open={adjuntar === encuentro.id || seleccionado === encuentro.id}
           key={encuentro.id}
           id={`encuentro-${encuentro.id}`}
           className="mb-4 rounded-xl border border-border p-4 text-sm"
         >
-          <div className="flex flex-wrap items-center gap-1.5">
+          <summary className="cursor-pointer">
+            <span className="ml-2 font-medium">{encuentro.objetivo}</span>
+            <span className="ml-2 text-xs text-muted-foreground">
+              {NOMBRE_TIPO_ENCUENTRO[encuentro.tipo] ?? encuentro.tipo} · {NOMBRE_ESTADO_ENCUENTRO[encuentro.estado] ?? encuentro.estado} · {rango(encuentro.realizado_en ?? encuentro.programado_en, null)}
+            </span>
+          </summary>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
               {NOMBRE_TIPO_ENCUENTRO[encuentro.tipo] ?? encuentro.tipo}
             </span>
@@ -64,7 +118,6 @@ export function Encuentros({
               {NOMBRE_ESTADO_ENCUENTRO[encuentro.estado] ?? encuentro.estado}
             </span>
           </div>
-          <p className="mt-2 whitespace-pre-line font-medium">{encuentro.objetivo}</p>
           {encuentro.descripcion && (
             <p className="mt-1 whitespace-pre-line text-muted-foreground">{encuentro.descripcion}</p>
           )}
@@ -165,7 +218,7 @@ export function Encuentros({
                           href={`/convivencia/evidencias/${acta.id}`}
                           className={`shrink-0 ${claseEnlace}`}
                         >
-                          Descargar
+                          <span className="inline-flex items-center gap-1.5"><Icono nombre="descargar" className="size-4 shrink-0" />Descargar</span>
                         </a>
                       )}
                     </li>
@@ -189,42 +242,28 @@ export function Encuentros({
                   <Link
                     href={`${ruta}?seccion=encuentros&adjuntar=${encuentro.id}#encuentro-${encuentro.id}`}
                     scroll={false}
-                    className={`mt-2 inline-block text-sm font-medium ${claseEnlace}`}
+                    className={`mt-2 ${claseBotonSecundario}`}
                   >
-                    Adjuntar acta firmada
+                    <EtiquetaAccion icono="adjuntar">Adjuntar acta firmada</EtiquetaAccion>
                   </Link>
                 ))}
             </>
           )}
 
           {abierto && ABIERTO.includes(encuentro.estado) && (
-            <AccionesEncuentro caso={caso} encuentro={encuentro} />
+            <AccionesEncuentro caso={caso} encuentro={encuentro} abrirRealizacion={seleccionado === encuentro.id} />
           )}
-        </div>
+        </details>
       ))}
-
-      {abierto ? (
-        <div className="mt-4 border-t border-border pt-4">
-          <h3 className="mb-3 text-sm font-semibold">Programar un encuentro</h3>
-          <FormularioNuevoEncuentro
-            casoId={caso.id}
-            responsables={caso.opciones_encuentro.responsables}
-            asistentes={caso.opciones_encuentro.asistentes}
-            acciones={caso.opciones_encuentro.acciones_plan}
-          />
-        </div>
-      ) : (
-        caso.encuentros.length > 0 && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            El caso está cerrado: sus encuentros se conservan como quedaron.
-          </p>
-        )
-      )}
     </>
   );
 }
 
-function AccionesEncuentro({ caso, encuentro }: { caso: DetalleCaso; encuentro: Encuentro }) {
+function AccionesEncuentro({ caso, encuentro, abrirRealizacion }: {
+  caso: DetalleCaso;
+  encuentro: Encuentro;
+  abrirRealizacion: boolean;
+}) {
   // Solo se ofrecen las personas que todavía no asisten con ese rol.
   const posibles = caso.opciones_encuentro.asistentes.filter(
     (p) =>
@@ -234,7 +273,7 @@ function AccionesEncuentro({ caso, encuentro }: { caso: DetalleCaso; encuentro: 
   );
   return (
     <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-      <Desplegable titulo="Registrar como realizado">
+      <Desplegable icono="confirmar" titulo="Registrar como realizado" abierto={abrirRealizacion}>
         <FormularioRealizacion
           casoId={caso.id}
           encuentroId={encuentro.id}
@@ -243,7 +282,7 @@ function AccionesEncuentro({ caso, encuentro }: { caso: DetalleCaso; encuentro: 
           asistentes={encuentro.asistentes}
         />
       </Desplegable>
-      <Desplegable titulo="Reprogramar">
+      <Desplegable icono="anios" titulo="Reprogramar">
         <FormularioReprogramacion
           casoId={caso.id}
           encuentroId={encuentro.id}
@@ -252,14 +291,14 @@ function AccionesEncuentro({ caso, encuentro }: { caso: DetalleCaso; encuentro: 
           finProgramado={encuentro.fin_programado_local}
         />
       </Desplegable>
-      <Desplegable titulo="Agregar asistentes">
+      <Desplegable icono="agregar" titulo="Agregar asistentes">
         <FormularioAgregarAsistentes
           casoId={caso.id}
           encuentroId={encuentro.id}
           posibles={posibles}
         />
       </Desplegable>
-      <Desplegable titulo="Cancelar">
+      <Desplegable icono="cerrar" titulo="Cancelar">
         <FormularioCancelacionEncuentro
           casoId={caso.id}
           encuentroId={encuentro.id}

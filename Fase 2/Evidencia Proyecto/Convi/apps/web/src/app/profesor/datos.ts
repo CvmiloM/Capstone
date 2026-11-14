@@ -22,6 +22,7 @@ export type CursoAsignado = {
   anio: number;
   roles: string[];
   estudiantes: number;
+  activo: boolean;
 };
 
 export type EstudianteDelCurso = {
@@ -219,6 +220,7 @@ export type SituacionPropia = {
   curso: string | null;
   categoria: string | null;
   aclaraciones_pendientes: number;
+  estudiantes?: { nombre: string; rol: string }[];
 };
 
 export type DetalleSituacion = SituacionPropia & {
@@ -242,8 +244,14 @@ export type DetalleSituacion = SituacionPropia & {
   }[];
 };
 
-export function obtenerSituaciones() {
-  return pedir<SituacionPropia[]>("/profesor/situaciones");
+export function obtenerSituaciones(filtros: URLSearchParams) {
+  return pedir<{
+    registros: SituacionPropia[];
+    pagina: number;
+    haySiguiente: boolean;
+    cursos: string[];
+    categorias: string[];
+  }>(`/profesor/situaciones?${filtros}`);
 }
 
 export function obtenerSituacion(situacionId: string) {
@@ -270,7 +278,7 @@ export const URGENCIA: Record<string, { texto: string; clase: string }> = {
 };
 
 // Solo se comparte dentro de la misma petición, nunca entre escuelas o usuarios.
-export const obtenerFormatoFecha = cache(async () => {
+const obtenerZonaHoraria = cache(async () => {
   const token = await tokenDeSesion();
   const respuesta = await fetch(`${URL_API}/auth/zona-horaria`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -281,6 +289,11 @@ export const obtenerFormatoFecha = cache(async () => {
   if (!respuesta.ok) throw new Error("No pudimos consultar el horario de tu escuela");
   const { zona_horaria } = await respuesta.json();
   if (typeof zona_horaria !== "string") throw new Error("Horario de escuela no disponible");
+  return zona_horaria;
+});
+
+export const obtenerFormatoFecha = cache(async () => {
+  const zona_horaria = await obtenerZonaHoraria();
   const formato = new Intl.DateTimeFormat("es-CL", {
     day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: zona_horaria,
   });

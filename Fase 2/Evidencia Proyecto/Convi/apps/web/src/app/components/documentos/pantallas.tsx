@@ -1,3 +1,4 @@
+import { Icono } from "@/app/components/icono";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { notFound } from "next/navigation";
 import {
@@ -191,7 +192,7 @@ export async function DetalleDocumento({
                     className={claseBotonSecundario}
                     href={`/${portal}/documentos/versiones/${v.id}/archivo`}
                   >
-                    Descargar original
+                    <span className="inline-flex items-center gap-1.5"><Icono nombre="descargar" className="size-4 shrink-0" />Descargar original</span>
                   </a>
                   {v.estado === "ARCHIVADO" && (
                     <AccionesVersion portal={portal} version={v} hoy={d.hoy} />
@@ -271,7 +272,7 @@ export async function VerVersion({
       </div>
       <div className="mb-5 flex flex-wrap gap-3">
         <a href={archivo} className={claseBotonPrimario}>
-          Descargar original
+          <span className="inline-flex items-center gap-1.5"><Icono nombre="descargar" className="size-4 shrink-0" />Descargar original</span>
         </a>
         {v.tipo_mime === "application/pdf" && (
           <a

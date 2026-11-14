@@ -181,6 +181,14 @@ const TRAZOS = {
       <path d="m21 15-5-5L5 21" />
     </>
   ),
+  agregar: <path d="M12 5v14M5 12h14" />,
+  confirmar: <path d="m5 12 4 4L19 6" />,
+  guardar: <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2ZM7 3v6h10V3M7 21v-8h10v8" />,
+  adjuntar: <path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L15 3a3 3 0 0 1 4 4l-9 9a1 1 0 0 1-1.5-1.5L17 6" />,
+  vincular: <path d="m10 13 4-4M8 16l-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0M13 13a3.5 3.5 0 0 0 5 0l4-4a3.5 3.5 0 0 0-5-5l-1 1" />,
+  copiar: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
+  enviar: <path d="m22 2-7 20-4-9-9-4 20-7ZM11 13 22 2" />,
+  reabrir: <path d="M3 10h6M3 10V4m0 6 4-4a8 8 0 1 1-1 12" />,
   cerrar: <path d="M6 6l12 12M18 6 6 18" />,
 } satisfies Record<string, ReactNode>;
 

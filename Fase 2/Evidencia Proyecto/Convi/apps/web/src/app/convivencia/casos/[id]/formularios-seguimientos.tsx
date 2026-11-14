@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, useId, useState } from "react";
@@ -283,17 +284,19 @@ export function FormularioSeguimiento({
         </>
       )}
       <button type="submit" disabled={pendiente} className={claseBotonPrimario}>
-        {pendiente
-          ? "Guardando…"
-          : modo === "compromiso"
-            ? "Registrar compromiso"
-            : modo === "programar"
-              ? "Programar seguimiento"
-              : modo === "resultado"
-                ? "Guardar resultado"
-                : modo === "reprogramacion"
-                  ? "Guardar nueva fecha"
-                  : "Guardar revisión"}
+        <EtiquetaAccion icono={modo === "compromiso" ? "agregar" : modo === "programar" ? "anios" : "guardar"}>
+          {pendiente
+            ? "Guardando…"
+            : modo === "compromiso"
+              ? "Registrar compromiso"
+              : modo === "programar"
+                ? "Programar seguimiento"
+                : modo === "resultado"
+                  ? "Guardar resultado"
+                  : modo === "reprogramacion"
+                    ? "Guardar nueva fecha"
+                    : "Guardar revisión"}
+        </EtiquetaAccion>
       </button>
     </FormularioConCarga>
   );

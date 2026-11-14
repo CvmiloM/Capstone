@@ -1,5 +1,6 @@
 "use client";
 
+import { EtiquetaAccion } from "./etiqueta-accion";
 import { useActionState, useEffect, useState } from "react";
 import { FormularioConCarga } from "@/app/components/actividad";
 import { AvisoError, BotonEnviar } from "@/app/components/formulario";
@@ -74,7 +75,7 @@ export function PropuestaProtocolo({ casoId }: { casoId: string }) {
         {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
         <div className="sm:w-72">
           <BotonEnviar pendiente={pendiente} textoPendiente="Preparando la propuesta…">
-            Proponer un protocolo con IA
+            <EtiquetaAccion icono="documentos">Proponer un protocolo con IA</EtiquetaAccion>
           </BotonEnviar>
         </div>
       </FormularioConCarga>

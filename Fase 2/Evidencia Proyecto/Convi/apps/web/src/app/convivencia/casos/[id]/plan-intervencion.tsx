@@ -1,3 +1,5 @@
+import type { NombreIcono } from "@/app/components/icono";
+import { claseAccionPrincipal, claseAccionSecundaria, EtiquetaAccion } from "./etiqueta-accion";
 import type { ReactNode } from "react";
 import { formatearDia, type AccionPlan, type DetalleCaso } from "../datos";
 import {
@@ -31,6 +33,20 @@ export function PlanIntervencion({
 
   return (
     <>
+      <p className="mb-4 text-sm text-muted-foreground">
+        El plan de intervención organiza las acciones del equipo para atender el caso y deja claro quién se encarga de cada tarea y en qué plazo
+      </p>
+      {abierto && !hayVigente && (
+        <Desplegable icono="agregar" principal titulo={caso.planes_intervencion.length === 0 ? "Crear el plan" : "Crear un plan nuevo"}>
+          <FormularioNuevoPlan
+            casoId={caso.id}
+            protocolos={caso.protocolos_aplicados.map((p) => ({
+              id: p.id,
+              nombre: `${p.protocolo} · versión ${p.numero_version}`,
+            }))}
+          />
+        </Desplegable>
+      )}
       {caso.planes_intervencion.length === 0 && (
         <p className="text-sm text-muted-foreground">
           El caso todavía no tiene un plan de intervención.
@@ -117,7 +133,7 @@ export function PlanIntervencion({
                     {editable && accion.estado !== "CANCELADO" && (
                       <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
                         {ABIERTA.includes(accion.estado) && (
-                          <Desplegable titulo="Registrar avance">
+                          <Desplegable icono="confirmar" titulo="Registrar avance">
                             <FormularioAvanceAccion
                               casoId={caso.id}
                               accionId={accion.id}
@@ -127,7 +143,7 @@ export function PlanIntervencion({
                             />
                           </Desplegable>
                         )}
-                        <Desplegable titulo="Corregir">
+                        <Desplegable icono="editar" titulo="Corregir">
                           <FormularioCorreccionAccion
                             casoId={caso.id}
                             accion={accion}
@@ -144,15 +160,14 @@ export function PlanIntervencion({
 
             {editable && (
               <div className="mt-4 grid gap-6 border-t border-border pt-4 lg:grid-cols-2">
-                <div>
-                  <h3 className="mb-3 text-sm font-semibold">Agregar una acción</h3>
+                <Desplegable icono="agregar" principal titulo="Agregar una acción">
                   <FormularioNuevaAccion
                     casoId={caso.id}
                     planId={plan.id}
                     responsables={caso.responsables_accion}
                     hoy={caso.hoy}
                   />
-                </div>
+                </Desplegable>
                 <div>
                   <h3 className="mb-3 text-sm font-semibold">Estado del plan</h3>
                   <FormularioEstadoPlan
@@ -168,20 +183,6 @@ export function PlanIntervencion({
         );
       })}
 
-      {abierto && !hayVigente && (
-        <div className="mt-4 border-t border-border pt-4">
-          <h3 className="mb-3 text-sm font-semibold">
-            {caso.planes_intervencion.length === 0 ? "Crear el plan" : "Crear un plan nuevo"}
-          </h3>
-          <FormularioNuevoPlan
-            casoId={caso.id}
-            protocolos={caso.protocolos_aplicados.map((p) => ({
-              id: p.id,
-              nombre: `${p.protocolo} · versión ${p.numero_version}`,
-            }))}
-          />
-        </div>
-      )}
       {!abierto && caso.planes_intervencion.length > 0 && (
         <p className="mt-2 text-sm text-muted-foreground">
           El caso está cerrado: su plan y sus acciones se conservan como quedaron.
@@ -204,11 +205,18 @@ function Etiqueta({ vencida, children }: { vencida: boolean; children: ReactNode
 }
 
 /** PB-063 y PB-064: también la usan los encuentros. */
-export function Desplegable({ titulo, children }: { titulo: string; children: ReactNode }) {
+export function Desplegable({ titulo, children, id, abierto, icono, principal }: {
+  titulo: ReactNode;
+  children: ReactNode;
+  id?: string;
+  abierto?: boolean;
+  icono: NombreIcono;
+  principal?: boolean;
+}) {
   return (
-    <details className="group w-full sm:w-auto sm:min-w-80">
-      <summary className="cursor-pointer text-sm font-medium text-primary underline-offset-4 hover:underline">
-        {titulo}
+    <details id={id} open={abierto} className="group w-full">
+      <summary className={principal ? claseAccionPrincipal : claseAccionSecundaria}>
+        <EtiquetaAccion icono={icono}>{titulo}</EtiquetaAccion>
       </summary>
       <div className="mt-3 rounded-xl border border-border bg-card p-4">{children}</div>
     </details>

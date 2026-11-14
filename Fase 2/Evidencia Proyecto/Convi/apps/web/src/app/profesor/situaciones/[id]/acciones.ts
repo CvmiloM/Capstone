@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { enviarRespuesta } from "../../datos";
 
@@ -41,5 +42,6 @@ export async function responderAclaracion(
       respuesta,
     };
   }
+  revalidatePath("/profesor", "layout");
   redirect(`/profesor/situaciones/${situacionId}?respondida=1`);
 }

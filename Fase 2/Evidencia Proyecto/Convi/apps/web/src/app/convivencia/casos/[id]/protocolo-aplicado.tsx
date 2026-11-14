@@ -1,7 +1,9 @@
+import { EtiquetaAccion } from "./etiqueta-accion";
+import { Icono } from "@/app/components/icono";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evidencia";
 import { NOMBRE_TIPO_EVIDENCIA } from "@/app/components/evidencias/opciones";
-import { claseEnlace } from "@/app/components/formulario";
+import { claseBotonSecundario, claseEnlace } from "@/app/components/formulario";
 import type { DetalleCaso, PasoProtocolo } from "../datos";
 import {
   FormularioAsignacionPaso,
@@ -171,7 +173,7 @@ export function ProtocolosAplicados({
                             href={`/convivencia/evidencias/${respaldo.id}`}
                             className={claseEnlace}
                           >
-                            Descargar
+                            <span className="inline-flex items-center gap-1.5"><Icono nombre="descargar" className="size-4 shrink-0" />Descargar</span>
                           </a>
                         )}
                       </li>
@@ -181,10 +183,10 @@ export function ProtocolosAplicados({
 
                 {editable && (
                   <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
-                    <Desplegable titulo="Registrar avance">
+                    <Desplegable icono="confirmar" titulo="Registrar avance">
                       <FormularioAvancePaso casoId={caso.id} paso={paso} />
                     </Desplegable>
-                    <Desplegable titulo="Responsable y plazo">
+                    <Desplegable icono="editar" titulo="Responsable y plazo">
                       <FormularioAsignacionPaso
                         casoId={caso.id}
                         paso={paso}
@@ -196,23 +198,17 @@ export function ProtocolosAplicados({
                       <Link
                         href={`${ruta}?seccion=protocolo&adjuntar=${paso.id}#paso-${paso.id}`}
                         scroll={false}
-                        className={`text-sm font-medium ${claseEnlace}`}
+                        className={claseBotonSecundario}
                       >
-                        Adjuntar respaldo
+                        <EtiquetaAccion icono="adjuntar">Adjuntar respaldo</EtiquetaAccion>
                       </Link>
                     )}
                   </div>
                 )}
                 {editable && adjuntar === paso.id && (
                   <div className="mt-3 rounded-xl border border-border bg-card p-4">
-                    <h3 className="mb-3 text-sm font-semibold">
-                      Adjuntar respaldo al paso
-                    </h3>
-                    <FormularioEvidencia
-                      destino="convivencia-paso"
-                      registroId={caso.id}
-                      pasoId={paso.id}
-                    />
+                    <h3 className="mb-3 text-sm font-semibold">Adjuntar respaldo al paso</h3>
+                    <FormularioEvidencia destino="convivencia-paso" registroId={caso.id} pasoId={paso.id} />
                   </div>
                 )}
               </li>
@@ -222,15 +218,14 @@ export function ProtocolosAplicados({
 
         {abierto && (
           <div className="mt-4 border-t border-border pt-4 lg:max-w-xl">
-            <h3 className="mb-3 text-sm font-semibold">
-              {activo ? "Terminar el protocolo" : "Reabrir el protocolo"}
-            </h3>
-            <FormularioEstadoProtocolo
-              casoId={caso.id}
-              protocoloId={aplicado.id}
-              version={aplicado.version}
-              estadoActual={aplicado.estado}
-            />
+            <Desplegable icono={activo ? "confirmar" : "reabrir"} titulo={activo ? "Terminar el protocolo" : "Reabrir el protocolo"}>
+              <FormularioEstadoProtocolo
+                casoId={caso.id}
+                protocoloId={aplicado.id}
+                version={aplicado.version}
+                estadoActual={aplicado.estado}
+              />
+            </Desplegable>
           </div>
         )}
         {!abierto && (

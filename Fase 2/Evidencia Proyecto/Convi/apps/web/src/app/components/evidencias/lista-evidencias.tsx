@@ -1,5 +1,6 @@
+import { Icono } from "@/app/components/icono";
 import { Fragment } from "react";
-import { claseEnlace } from "@/app/components/formulario";
+import { claseBotonSecundario, claseEnlace } from "@/app/components/formulario";
 // Mismo formato de fecha que el resto de los portales.
 import { obtenerFormatoFecha } from "@/app/profesor/datos";
 import { FormularioEvidencia } from "./formulario-evidencia";
@@ -19,10 +20,12 @@ export async function ListaEvidencias({
   rutaDescarga,
   vacio,
   corregir,
+  vistaImagen = false,
 }: {
   evidencias: Evidencia[];
   rutaDescarga: string;
   vacio: string;
+  vistaImagen?: boolean;
   /** PB-073: Convivencia corrige desde la situación o el caso abierto. */
   corregir?: {
     destino: "convivencia-correccion-situacion" | "convivencia-correccion-caso";
@@ -103,17 +106,24 @@ export async function ListaEvidencias({
               </p>
             )}
           </div>
+          {vistaImagen && ev.archivo && /\.(?:jpe?g|png|webp)$/i.test(ev.archivo) && (
+            <a href={`${rutaDescarga}/${ev.id}?vista=1`} className={`gap-2 ${claseBotonSecundario}`} target="_blank" rel="noopener">
+              <Icono nombre="ojo" className="size-4 shrink-0" />
+              Ver imagen
+            </a>
+          )}
           {ev.archivo && (
             <a
               href={`${rutaDescarga}/${ev.id}`}
               className={`shrink-0 ${claseEnlace}`}
             >
-              Descargar
+              <span className="inline-flex items-center gap-1.5"><Icono nombre="descargar" className="size-4 shrink-0" />Descargar</span>
             </a>
           )}
           {corregir && (
             <details className="basis-full rounded-xl bg-muted/50 p-3 open:bg-card">
-              <summary className="w-fit cursor-pointer text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-ring">
+              <summary className={`w-fit cursor-pointer list-none [&::-webkit-details-marker]:hidden gap-2 ${claseBotonSecundario}`}>
+                <Icono nombre="editar" className="size-4 shrink-0" />
                 Corregir esta evidencia
               </summary>
               <div className="pt-3">

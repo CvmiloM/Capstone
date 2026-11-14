@@ -1,3 +1,4 @@
+import { claseAccionPrincipal, claseAccionSecundaria, EtiquetaAccion } from "./etiqueta-accion";
 import {
   BotonesRevisionBorrador,
   FormularioBorradorIA,
@@ -125,8 +126,8 @@ export function BorradoresIA({
                   <div className="mt-3 space-y-3">
                     {b.propio && (
                       <details>
-                        <summary className="cursor-pointer text-sm font-medium text-primary">
-                          Corregir el texto
+                        <summary className={claseAccionSecundaria}>
+                          <EtiquetaAccion icono="editar">Corregir el texto</EtiquetaAccion>
                         </summary>
                         <div className="mt-3">
                           <FormularioEdicionBorrador casoId={casoId} borrador={b} />
@@ -172,8 +173,8 @@ export function BorradoresIA({
         className="rounded-2xl border border-border p-4"
         open={vigentes.length === 0}
       >
-        <summary className="cursor-pointer text-sm font-semibold">
-          Preparar un borrador con IA
+        <summary className={claseAccionPrincipal}>
+          <EtiquetaAccion icono="documentos">Preparar un borrador con IA</EtiquetaAccion>
         </summary>
         <div className="mt-3">
           <FormularioBorradorIA

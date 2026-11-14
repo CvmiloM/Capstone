@@ -4,6 +4,7 @@ import { MarcaCompacta } from "@/app/components/marca";
 import { BotonCerrarSesion } from "@/app/components/boton-cerrar-sesion";
 import {
   EsqueletoUsuarioPortal,
+  FichaEscuelaPortal,
   UsuarioPortal,
 } from "@/app/components/usuario-portal";
 import { SaltarContenido } from "@/app/components/saltar-contenido";
@@ -44,6 +45,7 @@ export default function LayoutConvivencia({
             </Suspense>
           }
         >
+          <Suspense fallback={null}><FichaEscuelaPortal /></Suspense>
           {/* Con cacheComponents, usePathname necesita un Suspense cuando la ruta
               tiene partes dinámicas, como /convivencia/situaciones/[id]. */}
           <Suspense
