@@ -72,11 +72,12 @@ export function FormularioSituacion({
 
         <div>
           <label htmlFor="categoria_id" className="block text-sm font-medium">
-            Categoría (opcional)
+            Categoría
           </label>
           <select
             id="categoria_id"
             name="categoria_id"
+            required
             defaultValue={valores.categoria_id ?? ""}
             aria-invalid={errores.categoria_id ? true : undefined}
             aria-describedby={
@@ -84,7 +85,7 @@ export function FormularioSituacion({
             }
             className={`mt-1.5 ${claseControl} ${borde(errores.categoria_id)}`}
           >
-            <option value="">Sin categoría: la define Convivencia</option>
+            <option value="" disabled>Selecciona una categoría</option>
             {categorias.map((categoria) => (
               <option key={categoria.id} value={categoria.id}>
                 {categoria.nombre}

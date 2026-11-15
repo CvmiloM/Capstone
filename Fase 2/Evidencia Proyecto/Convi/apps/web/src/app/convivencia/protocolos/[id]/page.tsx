@@ -1,3 +1,4 @@
+import { casoDeOrigen, conCaso, volverAlCaso } from "../contexto-caso";
 import type { Metadata } from "next";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import { claseEnlace } from "@/app/components/formulario";
@@ -23,17 +24,23 @@ export default async function PaginaProtocolo({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ aviso?: string }>;
+  searchParams: Promise<{ aviso?: string; caso?: string }>;
 }) {
-  const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
+  const [{ id }, { aviso, caso }] = await Promise.all([params, searchParams]);
+  const casoId = casoDeOrigen(caso);
   const [respuesta, formatearFecha] = await Promise.all([obtenerProtocolo(id), obtenerFormatoFecha()]);
-  if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia/protocolos" />;
+  if (!respuesta.ok) return <AvisoNoDisponible volverA={casoId ? volverAlCaso(casoId) : "/convivencia/protocolos"} />;
   const protocolo = respuesta.datos;
   const textoAviso = aviso ? AVISOS[aviso] : undefined;
 
   return (
     <>
-      <Link href="/convivencia/protocolos" className={`text-sm ${claseEnlace}`}>
+      {casoId && (
+        <Link href={volverAlCaso(casoId)} className={"mr-4 text-sm " + claseEnlace}>
+          Volver al caso
+        </Link>
+      )}
+      <Link href={conCaso("/convivencia/protocolos", casoId)} className={`text-sm ${claseEnlace}`}>
         ← Protocolos
       </Link>
 
@@ -62,7 +69,7 @@ export default async function PaginaProtocolo({
               <div>
                 <p className="font-medium">
                   <Link
-                    href={`/convivencia/protocolos/versiones/${v.id}`}
+                    href={conCaso("/convivencia/protocolos/versiones/" + v.id, casoId)}
                     className={claseEnlace}
                   >
                     Versión {v.numero_version}
@@ -92,7 +99,7 @@ export default async function PaginaProtocolo({
               </div>
               {v.estado === "BORRADOR" && (
                 <Link
-                  href={`/convivencia/protocolos/versiones/${v.id}`}
+                  href={conCaso("/convivencia/protocolos/versiones/" + v.id, casoId)}
                   className={`text-sm ${claseEnlace}`}
                 >
                   Editar borrador
@@ -108,7 +115,7 @@ export default async function PaginaProtocolo({
               pasos de la última. La versión publicada sigue rigiendo hasta que
               publiques la nueva.
             </p>
-            <BotonNuevaVersion protocoloId={protocolo.id} />
+            <BotonNuevaVersion protocoloId={protocolo.id} casoId={casoId} />
           </div>
         )}
       </section>

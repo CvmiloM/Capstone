@@ -19,6 +19,7 @@ export type Categoria = {
   nombre: string;
   descripcion: string | null;
   estado: EstadoCategoria;
+  predeterminada: boolean;
 };
 
 export type Resultado =

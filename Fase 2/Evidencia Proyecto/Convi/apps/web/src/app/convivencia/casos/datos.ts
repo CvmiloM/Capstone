@@ -1,5 +1,5 @@
 import type { Evidencia } from "@/app/components/evidencias/opciones";
-import { enviar, pedir, type RevisionNormativa } from "../datos";
+import { enviar, pedir, type DetalleConvivencia, type RevisionNormativa } from "../datos";
 
 // PB-053 (HU-046): casos del portal de Convivencia. Mismas formas que devuelve
 // apps/api/src/modules/situaciones/casos.service.ts; las fechas llegan como
@@ -50,6 +50,8 @@ export type DetalleCaso = CasoLista & {
     /** HU-045 CA2: quién la vinculó y con qué fundamento. */
     vinculado_por: string;
     fundamento_vinculacion: string | null;
+    aclaraciones?: DetalleConvivencia["aclaraciones"];
+    revisiones_normativas?: RevisionNormativa[];
   }[];
   cerrado_en: string | null;
   /** HU-131 CA1: historial de estados, del más antiguo al más reciente. */

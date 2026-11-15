@@ -70,12 +70,13 @@ function propsControl(id: string, nombre: string, error?: string, ayuda?: boolea
 }
 
 // PB-081 (HU-070 CA1): protocolo nuevo, que nace con su versión 1 en Borrador.
-export function FormularioProtocolo() {
+export function FormularioProtocolo({ casoId }: { casoId?: string }) {
   const [estado, accion, pendiente] = useActionState(crearProtocolo, estadoInicial);
   const valores = estado.valores ?? {};
   const errores = estado.errores ?? {};
   return (
     <FormularioConCarga action={accion} noValidate className="space-y-4">
+      {casoId && <input type="hidden" name="caso" value={casoId} />}
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       <Campo id="nombre" etiqueta="Nombre" error={errores.nombre}>
         <input
@@ -98,10 +99,11 @@ export function FormularioProtocolo() {
 }
 
 // HU-070 CA5: versión nueva en Borrador, con los pasos de la última.
-export function BotonNuevaVersion({ protocoloId }: { protocoloId: string }) {
+export function BotonNuevaVersion({ protocoloId, casoId }: { protocoloId: string; casoId?: string }) {
   const [estado, accion, pendiente] = useActionState(crearVersion, estadoInicial);
   return (
     <FormularioConCarga action={accion} className="space-y-3">
+      {casoId && <input type="hidden" name="caso" value={casoId} />}
       <input type="hidden" name="protocolo_id" value={protocoloId} />
       {estado.mensaje && <AvisoError>{estado.mensaje}</AvisoError>}
       <button type="submit" disabled={pendiente} className={claseBotonSecundario}>
@@ -114,11 +116,13 @@ export function BotonNuevaVersion({ protocoloId }: { protocoloId: string }) {
 // HU-070 CA1: documento de origen y notas de la versión en Borrador. Los
 // documentos se cargan en PB-078; para publicar hace falta uno.
 export function FormularioDatosVersion({
+  casoId,
   versionId,
   documentoActual,
   notasActuales,
   documentos,
 }: {
+  casoId?: string;
   versionId: string;
   documentoActual: string | null;
   notasActuales: string | null;
@@ -132,6 +136,7 @@ export function FormularioDatosVersion({
   const errores = estado.errores ?? {};
   return (
     <FormularioConCarga action={accion} noValidate className="space-y-4">
+      {casoId && <input type="hidden" name="caso" value={casoId} />}
       <input type="hidden" name="version_id" value={versionId} />
       {estado.mensaje && !estado.errores && <AvisoError>{estado.mensaje}</AvisoError>}
       <Campo
@@ -180,10 +185,12 @@ export function FormularioDatosVersion({
 // siempre Convivencia; si otra persona realiza la acción, va en la descripción.
 // Cada formulario usa su propio prefijo de id, porque puede haber varios.
 export function FormularioPaso({
+  casoId,
   versionId,
   paso,
   ordenSugerido,
 }: {
+  casoId?: string;
   versionId: string;
   paso?: {
     id: string;
@@ -218,6 +225,7 @@ export function FormularioPaso({
 
   return (
     <FormularioConCarga action={accion} noValidate className="space-y-4">
+      {casoId && <input type="hidden" name="caso" value={casoId} />}
       <input type="hidden" name="version_id" value={versionId} />
       {paso && <input type="hidden" name="paso_id" value={paso.id} />}
       {estado.mensaje && !estado.errores && <AvisoError>{estado.mensaje}</AvisoError>}
@@ -308,9 +316,11 @@ export function FormularioPaso({
 // PB-083 (HU-072 CA1): publicar exige pasos y documento de origen; el revisor
 // y la fecha de publicación los registra el servidor.
 export function FormularioPublicacion({
+  casoId,
   versionId,
   hoy,
 }: {
+  casoId?: string;
   versionId: string;
   hoy: string;
 }) {
@@ -320,6 +330,7 @@ export function FormularioPublicacion({
   const faltan = [errores.pasos, errores.version_documento_origen_id].filter(Boolean);
   return (
     <FormularioConCarga action={accion} noValidate className="space-y-4">
+      {casoId && <input type="hidden" name="caso" value={casoId} />}
       <input type="hidden" name="version_id" value={versionId} />
       {estado.mensaje && (faltan.length > 0 || !estado.errores) && (
         <AvisoError>

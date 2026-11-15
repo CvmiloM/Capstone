@@ -1,4 +1,8 @@
 import {
+  aclaracionesDeSituaciones,
+  type AclaracionSituacion,
+} from './aclaraciones-situacion.js';
+import {
   leerBusquedaEstudiantes,
   buscarEstudiantesRegistro,
 } from './estudiantes-registro.js';
@@ -153,15 +157,7 @@ export type DetalleConvivencia = SituacionBandeja & {
     /** Curso y año de su matrícula activa hoy, aparte del anterior (HU-066 CA2). */
     curso_actual: string | null;
   }[];
-  aclaraciones: {
-    id: string;
-    pregunta: string;
-    solicitado_por: string;
-    solicitado_en: Date;
-    estado: string;
-    respuesta: string | null;
-    respondido_en: Date | null;
-  }[];
+  aclaraciones: AclaracionSituacion[];
   /** PB-046 (HU-039 CA1): cuentas de Convivencia activas que pueden revisar. */
   opciones_responsable: { id: string; nombre: string; propia: boolean }[];
   /** PB-155 (HU-134): lo que se registró del reglamento o protocolo. */
@@ -410,18 +406,8 @@ export class ConvivenciaService {
            ORDER BY p.apellidos, p.nombres`,
           [id],
         );
-        const aclaraciones = db.query<
-          DetalleConvivencia['aclaraciones'][number]
-        >(
-          `SELECT a.id, a.pregunta,
-                  ps.nombres || ' ' || ps.apellidos AS solicitado_por,
-                  a.solicitado_en, a.estado, a.respuesta, a.respondido_en
-           FROM convi.aclaraciones_situacion a
-           JOIN convi.membresias_establecimiento ms ON ms.id = a.solicitado_por
-           JOIN convi.personas ps ON ps.id = ms.persona_id
-           WHERE a.situacion_id = $1
-           ORDER BY a.solicitado_en`,
-          [id],
+        const aclaraciones = aclaracionesDeSituaciones(db, [id]).then((filas) =>
+          filas.map(({ situacion_id: _situacion, ...aclaracion }) => aclaracion),
         );
         // PB-144: el selector solo necesita la membresía y el nombre.
         const responsables = db.query<
@@ -437,7 +423,7 @@ export class ConvivenciaService {
         // Mismas lecturas, permisos y fotografía de datos, en menos viajes a la base.
         const datos = await todasLasLecturas({
           participantes: participantes.then((r) => r.rows),
-          aclaraciones: aclaraciones.then((r) => r.rows),
+          aclaraciones,
           opciones_responsable: responsables.then((r) => r.rows),
           revisiones_normativas: revisionesNormativas(db, id),
           opciones_normativa: opcionesNormativa(db),

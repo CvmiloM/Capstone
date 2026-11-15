@@ -42,18 +42,15 @@ export function BotonEnviarCorreo({
     estadoInicial,
   );
   const [aceptada, setAceptada] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const puedeEnviar = completo && (!advertencia || aceptada);
   const idAdvertencia = `advertencia-${correoId}`;
 
   return (
     <FormularioConCarga
       action={accion}
       onSubmit={(evento) => {
-        if (
-          !window.confirm(
-            "¿Enviar este correo? Después no se puede editar ni deshacer.",
-          )
-        )
-          evento.preventDefault();
+        if (!confirmando || !puedeEnviar) evento.preventDefault();
       }}
       className="space-y-3"
     >
@@ -99,18 +96,45 @@ export function BotonEnviarCorreo({
       )}
       {!completo && (
         <p className="text-sm text-muted-foreground">
-          Para enviarlo, completa la dirección del destinatario en el borrador.
+          Para enviarlo, completa la dirección, el asunto y el contenido del borrador.
         </p>
       )}
-      <button
-        type="submit"
-        disabled={pendiente || !completo || (advertencia && !aceptada)}
-        className={claseBotonPrimario}
-      >
-        <EtiquetaAccion icono="enviar">
-          {pendiente ? "Enviando…" : "Confirmar y enviar"}
-        </EtiquetaAccion>
-      </button>
+      {confirmando ? (
+        <div className="space-y-2 border-t border-border pt-3">
+          <p role="status" className="text-sm text-muted-foreground">
+            El correo se enviará a la dirección indicada en el borrador.
+            Después del envío puedes copiarlo como un borrador nuevo.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={pendiente || !puedeEnviar}
+              className={claseBotonPrimario}
+            >
+              <EtiquetaAccion icono="enviar">
+                {pendiente ? "Enviando…" : "Enviar ahora"}
+              </EtiquetaAccion>
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmando(false)}
+              disabled={pendiente}
+              className={claseBotonSecundario}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmando(true)}
+          disabled={!puedeEnviar}
+          className={claseBotonPrimario}
+        >
+          <EtiquetaAccion icono="enviar">Confirmar y enviar</EtiquetaAccion>
+        </button>
+      )}
     </FormularioConCarga>
   );
 }
