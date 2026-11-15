@@ -5,9 +5,9 @@ import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { enviar } from "../../datos";
 import type { EstadoAccion } from "./acciones";
 
-// PB-125 y PB-126 (HU-106 y HU-107): borradores de acta y de informe de caso con
-// IA. La API vuelve a validar todo, y ninguna de estas acciones firma un acta,
-// agrega una evidencia ni publica un informe.
+// PB-125 y PB-126 (HU-106 y HU-107): borradores de informe de caso con IA, el de
+// acta se dejó de pedir el 2026-11-15. La API vuelve a validar todo, y ninguna
+// de estas acciones firma un acta, agrega una evidencia ni publica un informe.
 const URL_API =
   process.env.API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
@@ -33,10 +33,7 @@ export async function pedirBorrador(
   formData: FormData,
 ): Promise<EstadoAccion> {
   const casoId = leerTexto(formData, "caso_id");
-  const valores = {
-    tipo: leerTexto(formData, "tipo"),
-    actuacion_id: leerTexto(formData, "actuacion_id"),
-  };
+  const valores = { tipo: "INFORME" };
   if (!UUID.test(casoId)) return { mensaje: NO_VALIDO, valores };
   const supabase = await crearClienteServidor();
   const { data } = await supabase.auth.getSession();
@@ -53,12 +50,7 @@ export async function pedirBorrador(
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          tipo: valores.tipo,
-          ...(valores.tipo === "ACTA" && valores.actuacion_id
-            ? { actuacion_id: valores.actuacion_id }
-            : {}),
-        }),
+        body: JSON.stringify({ tipo: valores.tipo }),
         cache: "no-store",
         // Incluye la espera en cola y la carga del modelo.
         signal: AbortSignal.timeout(235000),

@@ -6,8 +6,9 @@ import {
   type ActuacionElegible,
 } from "./formularios-borradores";
 
-// PB-125 y PB-126 (HU-106 y HU-107): borradores de acta y de informe de caso con
-// IA. Mismas formas que devuelve apps/api/src/modules/orientacion/borradores.service.ts.
+// PB-125 y PB-126 (HU-106 y HU-107): borradores con IA, desde el 2026-11-15 solo
+// se pide el informe del caso y los de acta que ya existen se siguen mostrando.
+// Mismas formas que devuelve apps/api/src/modules/orientacion/borradores.service.ts.
 export type BorradorCaso = {
   id: string;
   tipo: "ACTA" | "INFORME";
@@ -66,18 +67,12 @@ export function BorradoresIA({
     }
     return lista;
   };
-  const fechas = Object.fromEntries(
-    datos.actuaciones
-      .filter((a) => a.fecha)
-      .map((a) => [a.id, formatearFecha(a.fecha!)]),
-  );
-
   return (
     <div id="borradores" className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        Son textos de apoyo para revisar y corregir: un borrador nunca es un acta
-        firmada ni un informe publicado, y no se agrega como evidencia. El acta
-        firmada se adjunta en el encuentro, como siempre.
+        Son textos de apoyo para revisar y corregir: un borrador nunca es un
+        informe publicado ni se agrega como evidencia, y el acta firmada se
+        adjunta en el encuentro, como siempre.
       </p>
 
       {vigentes.length === 0 ? (
@@ -177,11 +172,7 @@ export function BorradoresIA({
           <EtiquetaAccion icono="documentos">Preparar un borrador con IA</EtiquetaAccion>
         </summary>
         <div className="mt-3">
-          <FormularioBorradorIA
-            casoId={casoId}
-            actuaciones={datos.actuaciones}
-            fechas={fechas}
-          />
+          <FormularioBorradorIA casoId={casoId} />
         </div>
       </details>
     </div>
