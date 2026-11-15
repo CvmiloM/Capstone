@@ -15,6 +15,7 @@ const base = {
   ocurrido_en: '2019-05-10T10:30',
   descripcion: 'Pelea en el recreo, según el libro de clases de 2019',
   urgencia: 'NORMAL',
+  categoria_id: '55555555-5555-4555-8555-555555555555',
   participantes: [{ estudiante_id: ESTUDIANTE, rol: 'AFECTADO' }],
   conclusion: '  Se conversó con las familias y no se repitió. ',
 };
@@ -72,10 +73,11 @@ describe('Registro histórico (PB-075, HU-065)', () => {
       camposConError({
         ...base,
         descripcion: '',
+        categoria_id: null,
         participantes: [],
         conclusion: '',
       }),
-    ).toEqual(['conclusion', 'descripcion', 'participantes']);
+    ).toEqual(['categoria_id', 'conclusion', 'descripcion', 'participantes']);
   });
 
   it('rechaza un cuerpo que no es un objeto', () => {

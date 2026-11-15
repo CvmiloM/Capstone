@@ -1134,6 +1134,7 @@ export function FormularioCaso({
           <select
             id="categoria_principal_id"
             name="categoria_principal_id"
+            required
             defaultValue={valores.categoria_principal_id ?? categoriaInicial}
             aria-invalid={errores.categoria_principal_id ? true : undefined}
             aria-describedby={
@@ -1143,7 +1144,7 @@ export function FormularioCaso({
             }
             className={`${claseControl} ${borde("categoria_principal_id")}`}
           >
-            <option value="">Sin categoría</option>
+            <option value="" disabled>Selecciona una categoría</option>
             {categorias.map((categoria) => (
               <option key={categoria.id} value={categoria.id}>
                 {categoria.nombre}

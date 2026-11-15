@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { casoDeOrigen, conCaso } from "./contexto-caso";
 import {
   enviarCambioPaso,
   enviarDatosVersion,
@@ -39,7 +40,7 @@ export async function crearProtocolo(
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  redirect(`/convivencia/protocolos/${resultado.id}?aviso=creado`);
+  redirect(conCaso(`/convivencia/protocolos/${resultado.id}?aviso=creado`, casoDeOrigen(formData.get("caso"))));
 }
 
 // HU-070 CA5: versión nueva en Borrador, con los pasos de la anterior.
@@ -51,7 +52,7 @@ export async function crearVersion(
   if (!UUID.test(protocoloId)) return { mensaje: NO_VALIDO };
   const resultado = await enviarNuevaVersion(protocoloId);
   if (!resultado.ok) return { mensaje: resultado.mensaje };
-  redirect(`/convivencia/protocolos/versiones/${resultado.id}?aviso=version`);
+  redirect(conCaso(`/convivencia/protocolos/versiones/${resultado.id}?aviso=version`, casoDeOrigen(formData.get("caso"))));
 }
 
 // HU-070 CA1: documento de origen y notas de la versión en Borrador.
@@ -69,7 +70,7 @@ export async function guardarDatosVersion(
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  redirect(`/convivencia/protocolos/versiones/${id}?aviso=datos`);
+  redirect(conCaso(`/convivencia/protocolos/versiones/${id}?aviso=datos`, casoDeOrigen(formData.get("caso"))));
 }
 
 // HU-070 CA2 y CA4: agrega un paso o, si trae paso_id, lo edita.
@@ -96,7 +97,7 @@ export async function guardarPaso(
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  redirect(`/convivencia/protocolos/versiones/${versionId}?aviso=paso`);
+  redirect(conCaso(`/convivencia/protocolos/versiones/${versionId}?aviso=paso`, casoDeOrigen(formData.get("caso"))));
 }
 
 // PB-083 (HU-072): publica la versión. La API exige pasos y documento de
@@ -112,5 +113,5 @@ export async function publicarVersion(
   if (!resultado.ok) {
     return { mensaje: resultado.mensaje, errores: resultado.errores, valores };
   }
-  redirect(`/convivencia/protocolos/versiones/${id}?aviso=publicada`);
+  redirect(conCaso(`/convivencia/protocolos/versiones/${id}?aviso=publicada`, casoDeOrigen(formData.get("caso"))));
 }

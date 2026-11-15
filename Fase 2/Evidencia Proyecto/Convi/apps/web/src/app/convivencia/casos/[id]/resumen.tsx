@@ -1,3 +1,4 @@
+import { AclaracionesGuardadas, RevisionesGuardadas } from "../../situaciones/[id]/antecedentes-revision";
 import { EtiquetaAccion } from "./etiqueta-accion";
 import { claseBotonSecundario } from "@/app/components/formulario";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
@@ -46,6 +47,27 @@ export function ResumenCaso({
             </details>
           )}
         </section>
+        {caso.situaciones_vinculadas.map((situacion) => (
+          <section key={situacion.id} className={panel}>
+            <h2 className="text-lg font-semibold">Información de la situación {situacion.codigo}</h2>
+            <Link
+              href={"/convivencia/situaciones/" + situacion.id + "?seccion=revision"}
+              className={claseEnlace}
+            >
+              Abrir revisión de la situación
+            </Link>
+            <div className="mt-4 space-y-4">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Aclaraciones pedidas</h3>
+                <AclaracionesGuardadas datos={situacion.aclaraciones ?? []} fecha={fecha} />
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Revisión normativa</h3>
+                <RevisionesGuardadas datos={situacion.revisiones_normativas ?? []} fecha={fecha} />
+              </div>
+            </div>
+          </section>
+        ))}
         <section className={panel}>
           <h2 className="text-lg font-semibold">Seguimiento pendiente</h2>
           {proximo ? (

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
-import { Encabezado } from "@/app/components/formulario";
+import { casoDeOrigen, conCaso, volverAlCaso } from "./contexto-caso";
+import { claseEnlace, Encabezado } from "@/app/components/formulario";
 import { AvisoNoDisponible } from "../aviso-no-disponible";
 import { formatearDia } from "../casos/datos";
 import { obtenerProtocolos, type ProtocoloLista } from "./datos";
@@ -11,15 +12,25 @@ export const metadata: Metadata = { title: "Protocolos" };
 // PB-081 y PB-083: protocolos de la escuela. Cada uno se prepara en
 // versiones: un Borrador con sus pasos que, revisado, se publica y desde ese
 // día se puede aplicar a los casos (PB-082).
-export default async function PaginaProtocolos() {
-  const respuesta = await obtenerProtocolos();
-  if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia" />;
+export default async function PaginaProtocolos({
+  searchParams,
+}: {
+  searchParams: Promise<{ caso?: string }>;
+}) {
+  const [respuesta, filtros] = await Promise.all([obtenerProtocolos(), searchParams]);
+  const casoId = casoDeOrigen(filtros.caso);
+  if (!respuesta.ok) return <AvisoNoDisponible volverA={casoId ? volverAlCaso(casoId) : "/convivencia"} />;
   // PB-124 (HU-105): las propuestas de la IA van aparte y marcadas como no oficiales.
   const protocolos = respuesta.datos.filter((p) => p.naturaleza !== "PROPUESTA_IA");
   const propuestas = respuesta.datos.filter((p) => p.naturaleza === "PROPUESTA_IA");
 
   return (
     <>
+      {casoId && (
+        <Link href={volverAlCaso(casoId)} className={"mr-4 text-sm " + claseEnlace}>
+          Volver al caso
+        </Link>
+      )}
       <Encabezado
         titulo="Protocolos"
         descripcion="Los protocolos de actuación de la escuela. Cada versión se prepara en borrador con sus pasos y, una vez revisada, se publica para aplicarla en los casos."
@@ -32,7 +43,7 @@ export default async function PaginaProtocolos() {
         <ul className="mb-6 space-y-3">
           {protocolos.map((protocolo) => (
             <li key={protocolo.id}>
-              <TarjetaProtocolo protocolo={protocolo} />
+              <TarjetaProtocolo protocolo={protocolo} casoId={casoId} />
             </li>
           ))}
         </ul>
@@ -50,25 +61,25 @@ export default async function PaginaProtocolos() {
           <ul className="space-y-3">
             {propuestas.map((protocolo) => (
               <li key={protocolo.id}>
-                <TarjetaProtocolo protocolo={protocolo} />
+                <TarjetaProtocolo protocolo={protocolo} casoId={casoId} />
               </li>
             ))}
           </ul>
         </section>
       )}
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-tarjeta">
+      <section id="nuevo-protocolo" className="scroll-mt-6 rounded-2xl border border-border bg-card p-5 shadow-tarjeta">
         <h2 className="mb-3 text-base font-semibold">Nuevo protocolo</h2>
-        <FormularioProtocolo />
+        <FormularioProtocolo casoId={casoId} />
       </section>
     </>
   );
 }
 
-function TarjetaProtocolo({ protocolo }: { protocolo: ProtocoloLista }) {
+function TarjetaProtocolo({ protocolo, casoId }: { protocolo: ProtocoloLista; casoId?: string }) {
   const propuesta = protocolo.naturaleza === "PROPUESTA_IA";
   return (
     <Link
-      href={`/convivencia/protocolos/${protocolo.id}`}
+      href={conCaso("/convivencia/protocolos/" + protocolo.id, casoId)}
       className={`flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-tarjeta transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-ring sm:flex-row sm:items-center ${propuesta ? "border-dashed border-amarillo" : "border-border"}`}
     >
       <div className="min-w-0 flex-1">

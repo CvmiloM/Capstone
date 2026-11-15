@@ -1,10 +1,11 @@
+import { conCaso } from "../../protocolos/contexto-caso";
 import { claseAccionPrincipal, claseAccionSecundaria, EtiquetaAccion } from "./etiqueta-accion";
 import type { Metadata } from "next";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import type { ReactNode } from "react";
 import { FormularioEvidencia } from "@/app/components/evidencias/formulario-evidencia";
 import { ListaEvidencias } from "@/app/components/evidencias/lista-evidencias";
-import { claseEnlace } from "@/app/components/formulario";
+import { claseBotonSecundario, claseEnlace } from "@/app/components/formulario";
 // Mismo formato de fecha y nombres de rol que el resto del portal.
 import { obtenerFormatoFecha } from "@/app/profesor/datos";
 import { NOMBRE_ROL_EN_SITUACION } from "@/app/profesor/situacion-opciones";
@@ -33,10 +34,6 @@ import { PropuestaProtocolo } from "./propuesta-protocolo";
 import { ResumenCaso } from "./resumen";
 import { PestanasCaso } from "./pestanas-caso";
 import { FormularioContinuidad } from "./formulario-continuidad";
-import {
-  claseBotonPrimario,
-  claseBotonSecundario,
-} from "@/app/components/formulario";
 import {
   ListaHistorial,
   type PaginaHistorial,
@@ -467,6 +464,16 @@ export default async function PaginaCaso({
           {/* PB-082 (HU-071): protocolo aplicado al caso, o por qué sigue sin uno. */}
           {seccion === "protocolo" && (
             <Seccion titulo="Protocolo" className="lg:col-span-3">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <Link href={conCaso("/convivencia/protocolos", caso.id)} className={claseBotonSecundario}>
+                  Ver protocolos existentes
+                </Link>
+                {caso.estado_actual !== "CERRADO" && (
+                  <Link href={conCaso("/convivencia/protocolos", caso.id) + "#nuevo-protocolo"} className={claseBotonSecundario}>
+                    Crear protocolo
+                  </Link>
+                )}
+              </div>
               {caso.estado_actual !== "CERRADO" && (
                 <div className="mb-4 grid gap-4 lg:grid-cols-2">
                   <Desplegable icono="protocolos" principal titulo="Aplicar un protocolo">
@@ -480,7 +487,7 @@ export default async function PaginaCaso({
                         No hay protocolos publicados y vigentes, se preparan y
                         publican en{" "}
                         <Link
-                          href="/convivencia/protocolos"
+                          href={conCaso("/convivencia/protocolos", caso.id)}
                           className={claseEnlace}
                         >
                           Protocolos

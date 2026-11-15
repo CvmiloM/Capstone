@@ -18,7 +18,7 @@ export type NuevoCaso = {
   resumen: string;
   /** AAAA-MM-DD, en la hora de la escuela. */
   fecha_inicio: string;
-  categoria_principal_id: string | null;
+  categoria_principal_id: string;
   responsable_id: string;
   /** Obligatoria si ya hay un caso activo con los mismos estudiantes (CA4). */
   justificacion_independiente: string | null;
@@ -72,7 +72,7 @@ export function validarNuevoCaso(cuerpo: unknown): NuevoCaso {
       'Elige a la persona de Convivencia responsable del caso.';
 
   const categoria = uuidOpcional(datos.categoria_principal_id);
-  if (categoria === 'invalido')
+  if (!categoria || categoria === 'invalido')
     errores.categoria_principal_id = 'Elige una categoría de la lista.';
 
   const justificacion = texto(datos.justificacion_independiente);
@@ -88,7 +88,7 @@ export function validarNuevoCaso(cuerpo: unknown): NuevoCaso {
     Object.keys(errores).length > 0 ||
     !responsable ||
     responsable === 'invalido' ||
-    categoria === 'invalido' ||
+    !categoria || categoria === 'invalido' ||
     anterior === 'invalido'
   ) {
     throw new BadRequestException({

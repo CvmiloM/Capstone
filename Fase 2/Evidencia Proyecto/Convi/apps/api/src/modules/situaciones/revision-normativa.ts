@@ -228,13 +228,23 @@ export async function opcionesNormativa(
   return { protocolos: protocolos.rows, documentos: documentos.rows };
 }
 
-/** Revisiones normativas de una situación, de la más antigua a la más reciente. */
 export async function revisionesNormativas(
   db: PoolClient,
   situacionId: string,
 ): Promise<RevisionNormativa[]> {
-  const revisiones = await db.query<Omit<RevisionNormativa, 'referencias'>>(
-    `SELECT r.id, r.revisado_en, p.nombres || ' ' || p.apellidos AS revisado_por,
+  return (await revisionesNormativasDeSituaciones(db, [situacionId])).map(
+    ({ situacion_id: _situacion, ...revision }) => revision,
+  );
+}
+
+/** Revisiones normativas de las situaciones indicadas, de la más antigua a la más reciente. */
+export async function revisionesNormativasDeSituaciones(
+  db: PoolClient,
+  situacionesIds: string[],
+): Promise<(RevisionNormativa & { situacion_id: string })[]> {
+  if (situacionesIds.length === 0) return [];
+  const revisiones = await db.query<Omit<RevisionNormativa, 'referencias'> & { situacion_id: string }>(
+    `SELECT r.id, r.situacion_id, r.revisado_en, p.nombres || ' ' || p.apellidos AS revisado_por,
             r.aplicabilidad, r.modo_revision, r.fundamento,
             pr.nombre || ' · versión ' || vp.numero_version AS protocolo
      FROM convi.revisiones_convivencia r
@@ -243,9 +253,9 @@ export async function revisionesNormativas(
      LEFT JOIN convi.versiones_protocolo vp
        ON vp.id = r.version_protocolo_seleccionada_id
      LEFT JOIN convi.protocolos pr ON pr.id = vp.protocolo_id
-     WHERE r.situacion_id = $1 AND r.tipo_revision = 'CONSULTA'
+     WHERE r.situacion_id = ANY($1::uuid[]) AND r.tipo_revision = 'CONSULTA'
      ORDER BY r.revisado_en, r.id`,
-    [situacionId],
+    [situacionesIds],
   );
   if (revisiones.rows.length === 0) return [];
   const referencias = await db.query<

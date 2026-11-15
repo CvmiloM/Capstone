@@ -79,16 +79,22 @@ export function PantallaCategorias({
                         </p>
                       )}
                     </div>
-                    <BotonEstado id={categoria.id} estado={categoria.estado} />
+                    {categoria.predeterminada ? (
+                      <span className="text-xs text-muted-foreground">Predeterminada</span>
+                    ) : (
+                      <BotonEstado id={categoria.id} estado={categoria.estado} />
+                    )}
                   </div>
-                  <details className="mt-3">
-                    <summary className="w-fit cursor-pointer rounded text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-ring">
-                      Editar
-                    </summary>
-                    <div className="mt-4 max-w-xl">
-                      <FormularioCategoria categoria={categoria} />
-                    </div>
-                  </details>
+                  {!categoria.predeterminada && (
+                    <details className="mt-3">
+                      <summary className="w-fit cursor-pointer rounded text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-ring">
+                        Editar
+                      </summary>
+                      <div className="mt-4 max-w-xl">
+                        <FormularioCategoria categoria={categoria} />
+                      </div>
+                    </details>
+                  )}
                 </li>
               );
             })}

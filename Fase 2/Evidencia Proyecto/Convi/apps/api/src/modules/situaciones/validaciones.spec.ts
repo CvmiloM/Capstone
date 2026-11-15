@@ -22,6 +22,7 @@ import { validarVinculacion } from './vinculacion-caso.js';
 // comprobar que se rechazan igual. Las reglas de la base están en
 // supabase/tests/situaciones_reglas.sql.
 
+const CATEGORIA = '55555555-5555-4555-8555-555555555555';
 const CURSO = '11111111-1111-4111-8111-111111111111';
 const ESTUDIANTE_1 = '22222222-2222-4222-8222-222222222222';
 const ESTUDIANTE_2 = '33333333-3333-4333-8333-333333333333';
@@ -44,6 +45,7 @@ describe('Registro del profesor (PB-042, HU-035)', () => {
   const base = {
     curso_id: CURSO,
     ocurrido_en: '2026-10-12T10:30',
+    categoria_id: CATEGORIA,
     descripcion: '  Discusión en el patio ',
     participantes: [{ estudiante_id: ESTUDIANTE_1, rol: 'AFECTADO' }],
   };
@@ -54,7 +56,7 @@ describe('Registro del profesor (PB-042, HU-035)', () => {
       ocurrido_en: '2026-10-12T10:30',
       lugar: null,
       urgencia: 'NORMAL',
-      categoria_id: null,
+      categoria_id: CATEGORIA,
       descripcion: 'Discusión en el patio',
       participantes: [{ estudiante_id: ESTUDIANTE_1, rol: 'AFECTADO' }],
     });
@@ -62,12 +64,14 @@ describe('Registro del profesor (PB-042, HU-035)', () => {
 
   it('indica todos los campos obligatorios que faltan (CA2 y CA5)', () => {
     expect(camposConError(() => validarNuevaSituacion({}))).toEqual([
+      'categoria_id',
       'curso_id',
       'descripcion',
       'ocurrido_en',
       'participantes',
     ]);
     expect(camposConError(() => validarNuevaSituacion('texto'))).toEqual([
+      'categoria_id',
       'curso_id',
       'descripcion',
       'ocurrido_en',
@@ -138,6 +142,7 @@ describe('Registro de Convivencia por otros canales (PB-043, HU-036)', () => {
   const base = {
     tipo_origen: 'APODERADO',
     ocurrido_en: '2026-10-12T10:30',
+    categoria_id: CATEGORIA,
     descripcion: 'Lo informó un apoderado por teléfono.',
     participantes: [{ estudiante_id: ESTUDIANTE_1, rol: 'AFECTADO' }],
   };
@@ -154,6 +159,7 @@ describe('Registro de Convivencia por otros canales (PB-043, HU-036)', () => {
 
   it('exige el origen y lo mismo que el registro del profesor (CA3)', () => {
     expect(camposConError(() => validarSituacionConvivencia({}))).toEqual([
+      'categoria_id',
       'descripcion',
       'ocurrido_en',
       'participantes',
@@ -468,22 +474,23 @@ describe('Creación de casos (PB-053, HU-046)', () => {
     titulo: ' Agresiones reiteradas en 1° A ',
     resumen: ' Tres hechos en dos semanas. ',
     fecha_inicio: '2026-10-20',
+    categoria_principal_id: CATEGORIA,
     responsable_id: RESPONSABLE,
     revision_anterior_id: null,
   };
 
-  it('exige título, resumen, fecha de inicio y responsable (CA1)', () => {
+  it('exige título, resumen, fecha de inicio, categoría y responsable (CA1)', () => {
     expect(
       camposConError(() => validarNuevoCaso({ revision_anterior_id: null })),
-    ).toEqual(['fecha_inicio', 'responsable_id', 'resumen', 'titulo']);
+    ).toEqual(['categoria_principal_id', 'fecha_inicio', 'responsable_id', 'resumen', 'titulo']);
   });
 
-  it('acepta un caso sin protocolo ni categoría y limpia los textos', () => {
+  it('acepta un caso categorizado sin protocolo y limpia los textos', () => {
     expect(validarNuevoCaso(caso)).toEqual({
       titulo: 'Agresiones reiteradas en 1° A',
       resumen: 'Tres hechos en dos semanas.',
       fecha_inicio: '2026-10-20',
-      categoria_principal_id: null,
+      categoria_principal_id: CATEGORIA,
       responsable_id: RESPONSABLE,
       justificacion_independiente: null,
       revision_anterior_id: null,

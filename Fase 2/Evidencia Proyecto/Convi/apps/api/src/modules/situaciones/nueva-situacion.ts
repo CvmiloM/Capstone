@@ -18,7 +18,7 @@ export type NuevaSituacion = {
   ocurrido_en: string;
   lugar: string | null;
   urgencia: (typeof URGENCIAS)[number];
-  categoria_id: string | null;
+  categoria_id: string;
   descripcion: string;
   participantes: {
     estudiante_id: string;
@@ -82,7 +82,7 @@ function validarComun(
   if (!urgencia) errores.urgencia = 'Elige Normal, Urgente o Inmediata.';
 
   const categoriaId = texto(datos.categoria_id).toLowerCase();
-  if (categoriaId && !UUID.test(categoriaId))
+  if (!UUID.test(categoriaId))
     errores.categoria_id = 'Elige una categoría de la lista.';
 
   const descripcion = texto(datos.descripcion);
@@ -125,7 +125,7 @@ function validarComun(
     ocurrido_en: ocurridoEn,
     lugar: lugar || null,
     urgencia,
-    categoria_id: categoriaId || null,
+    categoria_id: categoriaId,
     descripcion,
     participantes,
   };

@@ -27,13 +27,14 @@ export type Categoria = {
   descripcion: string | null;
   /** ACTIVO o INACTIVO. */
   estado: EstadoCategoria;
+  predeterminada: boolean;
 };
 
 // Para comparar nombres sin mayúsculas, tildes ni diéresis.
 const comparable = (sql: string) =>
   `lower(translate(${sql}, 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))`;
 
-const COLUMNAS = `id, nombre, descripcion, estado`;
+const COLUMNAS = `id, nombre, descripcion, estado, predeterminada`;
 
 @Injectable()
 export class CategoriasService {
@@ -122,12 +123,14 @@ export class CategoriasService {
 }
 
 async function bloquear(db: PoolClient, id: string) {
-  const actual = await db.query(
-    `SELECT id FROM convi.categorias_convivencia WHERE id = $1 FOR UPDATE`,
+  const actual = await db.query<{ predeterminada: boolean }>(
+    `SELECT predeterminada FROM convi.categorias_convivencia WHERE id = $1 FOR UPDATE`,
     [id],
   );
   if (actual.rows.length === 0)
     throw new NotFoundException('No encontramos esa categoría.');
+  if (actual.rows[0].predeterminada)
+    throw new ConflictException('Ninguna calza es una categoría predeterminada y debe permanecer disponible.');
 }
 
 // Decisión del PO: el nombre no se repite en la escuela, sin importar

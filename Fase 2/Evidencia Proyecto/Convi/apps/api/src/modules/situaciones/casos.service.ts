@@ -1,3 +1,7 @@
+import {
+  aclaracionesDeSituaciones,
+  type AclaracionSituacion,
+} from './aclaraciones-situacion.js';
 import { compromisosDelCaso, seguimientosDelCaso } from './seguimientos.js';
 import {
   BadRequestException,
@@ -69,6 +73,7 @@ import {
 import {
   comprobarNormativaVigente,
   opcionesNormativa,
+  revisionesNormativasDeSituaciones,
   validarRevisionNormativa,
   type OpcionesNormativa,
   type RevisionNormativa,
@@ -162,6 +167,8 @@ export type DetalleCaso = CasoLista & {
     /** HU-045 CA2: quién la vinculó y con qué fundamento. */
     vinculado_por: string;
     fundamento_vinculacion: string | null;
+    aclaraciones?: AclaracionSituacion[];
+    revisiones_normativas?: RevisionNormativa[];
   }[];
   cerrado_en: Date | null;
   /** HU-131 CA1: historial de estados, del más antiguo al más reciente. */
@@ -372,10 +379,9 @@ export class CasosService {
             .then((resultado) => resultado.rows),
           situaciones_vinculadas: cargar(
             'situaciones_vinculadas',
-            async () =>
-              (
-                await db.query<DetalleCaso['situaciones_vinculadas'][number]>(
-                  `SELECT s.id, s.codigo, cat.nombre AS categoria, s.ocurrido_en,
+            async () => {
+              const { rows } = await db.query<DetalleCaso['situaciones_vinculadas'][number]>(
+                `SELECT s.id, s.codigo, cat.nombre AS categoria, s.ocurrido_en,
                         s.vinculado_a_caso_en,
                         pv.nombres || ' ' || pv.apellidos AS vinculado_por,
                         (SELECT r.fundamento FROM convi.revisiones_convivencia r
@@ -389,8 +395,21 @@ export class CasosService {
                  WHERE s.caso_id = $1
                  ORDER BY s.ocurrido_en, s.codigo`,
                   [id],
-                )
-              ).rows,
+              );
+              if (seccion === 'situaciones') return rows;
+              const ids = rows.map((situacion) => situacion.id);
+              const antecedentes = await todasLasLecturas({
+                aclaraciones: aclaracionesDeSituaciones(db, ids),
+                revisiones: revisionesNormativasDeSituaciones(db, ids),
+              });
+              return rows.map((situacion) => ({
+                ...situacion,
+                aclaraciones: antecedentes.aclaraciones
+                  .filter((a) => a.situacion_id === situacion.id),
+                revisiones_normativas: antecedentes.revisiones
+                  .filter((r) => r.situacion_id === situacion.id),
+              }));
+            },
             [],
           ),
           // Necesita el estado actual: viaja después de la consulta base.

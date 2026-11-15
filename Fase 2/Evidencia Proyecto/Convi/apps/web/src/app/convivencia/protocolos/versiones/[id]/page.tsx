@@ -1,3 +1,4 @@
+import { casoDeOrigen, conCaso, volverAlCaso } from "../../contexto-caso";
 import type { Metadata } from "next";
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
 import type { ReactNode } from "react";
@@ -36,11 +37,12 @@ export default async function PaginaVersionProtocolo({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ aviso?: string }>;
+  searchParams: Promise<{ aviso?: string; caso?: string }>;
 }) {
-  const [{ id }, { aviso }] = await Promise.all([params, searchParams]);
+  const [{ id }, { aviso, caso }] = await Promise.all([params, searchParams]);
+  const casoId = casoDeOrigen(caso);
   const [respuesta, formatearFecha] = await Promise.all([obtenerVersion(id), obtenerFormatoFecha()]);
-  if (!respuesta.ok) return <AvisoNoDisponible volverA="/convivencia/protocolos" />;
+  if (!respuesta.ok) return <AvisoNoDisponible volverA={casoId ? volverAlCaso(casoId) : "/convivencia/protocolos"} />;
   const version = respuesta.datos;
   const borrador = version.estado === "BORRADOR";
   const textoAviso = aviso ? AVISOS[aviso] : undefined;
@@ -49,8 +51,13 @@ export default async function PaginaVersionProtocolo({
 
   return (
     <>
+      {casoId && (
+        <Link href={volverAlCaso(casoId)} className={"mr-4 text-sm " + claseEnlace}>
+          Volver al caso
+        </Link>
+      )}
       <Link
-        href={`/convivencia/protocolos/${version.protocolo_id}`}
+        href={conCaso("/convivencia/protocolos/" + version.protocolo_id, casoId)}
         className={`text-sm ${claseEnlace}`}
       >
         ← {version.protocolo_nombre}
@@ -129,7 +136,7 @@ export default async function PaginaVersionProtocolo({
                         Editar paso
                       </summary>
                       <div className="mt-3">
-                        <FormularioPaso versionId={version.id} paso={paso} />
+                        <FormularioPaso versionId={version.id} paso={paso} casoId={casoId} />
                       </div>
                     </details>
                   )}
@@ -140,7 +147,7 @@ export default async function PaginaVersionProtocolo({
           {borrador && (
             <div className="mt-4 border-t border-border pt-4">
               <h3 className="mb-3 text-sm font-semibold">Agregar un paso</h3>
-              <FormularioPaso versionId={version.id} ordenSugerido={siguienteOrden} />
+              <FormularioPaso versionId={version.id} ordenSugerido={siguienteOrden} casoId={casoId} />
             </div>
           )}
         </Seccion>
@@ -174,6 +181,7 @@ export default async function PaginaVersionProtocolo({
             </dl>
             {borrador && (
               <FormularioDatosVersion
+                casoId={casoId}
                 versionId={version.id}
                 documentoActual={version.version_documento_origen_id}
                 notasActuales={version.notas}
@@ -184,7 +192,7 @@ export default async function PaginaVersionProtocolo({
 
           {borrador && (
             <Seccion titulo="Publicar">
-              <FormularioPublicacion versionId={version.id} hoy={version.hoy} />
+              <FormularioPublicacion versionId={version.id} hoy={version.hoy} casoId={casoId} />
             </Seccion>
           )}
         </div>
