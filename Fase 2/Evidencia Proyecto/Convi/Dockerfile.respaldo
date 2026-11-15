@@ -1,0 +1,15 @@
+FROM public.ecr.aws/supabase/postgres:17.11.0.003
+
+RUN apk add --no-cache icu-libs krb5-libs libstdc++ libgcc zlib \
+    && mkdir -p /opt/powershell \
+    && curl -fsSL https://github.com/PowerShell/PowerShell/releases/download/v7.6.6/powershell-7.6.6-linux-musl-x64.tar.gz -o /tmp/pwsh.tgz \
+    && echo '9537c256a60c34f6bc2dd60c1c10b31a0c2ef26e96799d066be78325ab4947cc  /tmp/pwsh.tgz' | sha256sum -c - \
+    && tar -xzf /tmp/pwsh.tgz -C /opt/powershell \
+    && chmod +x /opt/powershell/pwsh \
+    && rm /tmp/pwsh.tgz
+
+ENV CONVI_IMAGEN_POSTGRES=public.ecr.aws/supabase/postgres:17.11.0.003
+COPY scripts/respaldar.ps1 scripts/respaldar-azure.ps1 scripts/respaldo-huella.sql /convi/
+COPY supabase/certs/prod-ca-2021.crt /certs/
+USER postgres
+ENTRYPOINT ["/opt/powershell/pwsh", "-NoProfile", "-File", "/convi/respaldar-azure.ps1"]

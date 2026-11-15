@@ -1,7 +1,8 @@
-﻿param(
+param(
     [ValidateSet('Local', 'Cloud')][string]$Entorno = 'Local',
     [string]$Destino = (Join-Path $env:USERPROFILE 'CONVI-respaldos'),
-    [ValidateRange(0, 365)][int]$Conservar = 14
+    [ValidateRange(0, 365)][int]$Conservar = 14,
+    [switch]$ClientePostgresLocal
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -43,16 +44,31 @@ function Primer-Valor($Tabla, [string[]]$Nombres) {
 }
 
 $raiz = Split-Path -Parent $PSScriptRoot
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Falta Docker Desktop o docker no esta en PATH.' }
-& docker info --format '{{.ServerVersion}}' 1>$null 2>$null
-if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop no tiene el motor iniciado, abrelo e intentalo de nuevo.' }
+if ($ClientePostgresLocal -and $Entorno -ne 'Cloud') { throw 'El cliente PostgreSQL directo requiere -Entorno Cloud.' }
+if (-not $ClientePostgresLocal) {
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Falta Docker Desktop o docker no esta en PATH.' }
+    & docker info --format '{{.ServerVersion}}' 1>$null 2>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop no tiene el motor iniciado, abrelo e intentalo de nuevo.' }
+}
 
 if ($Entorno -eq 'Cloud') {
-    $vars = Leer-Variables (Join-Path $raiz '.env.cloud')
+    if ($ClientePostgresLocal) {
+        $vars = @{
+            SUPABASE_DB_URL = $env:SUPABASE_DB_URL
+            SUPABASE_URL = $env:SUPABASE_URL
+            SUPABASE_SECRET_KEY = $env:SUPABASE_SECRET_KEY
+        }
+    } else {
+        $vars = Leer-Variables (Join-Path $raiz '.env.cloud')
+    }
     $urlBase = Primer-Valor $vars @('SUPABASE_DB_URL')
     $urlStorage = Primer-Valor $vars @('SUPABASE_URL')
     if (-not $urlBase -or -not $urlStorage) { throw 'Faltan SUPABASE_DB_URL o SUPABASE_URL en .env.cloud, sus valores no se muestran.' }
     if ($urlBase -notmatch '(?:[?&])sslmode=verify-full(?:&|$)') { throw 'La conexion cloud debe usar sslmode=verify-full, revisa SUPABASE-CLOUD.md.' }
+    # El contenedor de respaldo monta la CA en /certs, aunque .env.cloud use /workspace.
+    if ($urlBase -match '(?:[?&])sslrootcert=') {
+        $urlBase = $urlBase -replace '([?&])sslrootcert=[^&]*', '$1sslrootcert=%2Fcerts%2Fprod-ca-2021.crt'
+    }
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 } else {
     $vars = Leer-Variables (Join-Path $raiz '.env')
@@ -66,8 +82,13 @@ $clave = Primer-Valor $vars @('SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY'
 if (-not $clave) { throw 'Falta SUPABASE_SECRET_KEY para leer los archivos del bucket, su valor no se muestra.' }
 
 # Misma imagen de Postgres que Supabase local, para usar su pg_dump.
-$imagen = & docker inspect supabase_db_convi-local --format '{{.Config.Image}}' 2>$null
-if ($LASTEXITCODE -ne 0 -or -not $imagen) { $imagen = $ImagenPorDefecto }
+$imagen = $ImagenPorDefecto
+if ($ClientePostgresLocal) {
+    $imagen = $env:CONVI_IMAGEN_POSTGRES
+} else {
+    $imagenLocal = & docker inspect supabase_db_convi-local --format '{{.Config.Image}}' 2>$null
+    if ($LASTEXITCODE -eq 0 -and $imagenLocal) { $imagen = $imagenLocal }
+}
 
 $inicio = Get-Date
 $nombre = 'convi-' + $Entorno.ToLower() + '-' + $inicio.ToString('yyyyMMdd-HHmmss')
@@ -89,17 +110,23 @@ $comandos = @(
     'h -f /convi/respaldo-huella.sql -o /respaldo/huella-despues.txt',
     'h -c "\copy (SELECT id, bucket_id, clave_almacenamiento, sha256, tamano_bytes FROM convi.archivos ORDER BY subido_en, id) TO ''/respaldo/archivos.csv'' WITH (FORMAT csv, HEADER)"'
 ) -join "`n"
-[System.IO.File]::WriteAllText((Join-Path $carpeta 'respaldo.sh'), $comandos + "`n", [System.Text.UTF8Encoding]::new($false))
 $env:CONVI_DB_URL = $urlBase
 try {
-    $argumentos = @('run', '--rm', '-e', 'CONVI_DB_URL',
-        '-v', ($carpeta + ':/respaldo'),
-        '-v', ((Join-Path $raiz 'scripts') + ':/convi:ro'))
-    if ($Entorno -eq 'Cloud') {
-        $argumentos += @('-e', 'PGSSLROOTCERT=/certs/prod-ca-2021.crt', '-v', ((Join-Path $raiz 'supabase\certs') + ':/certs:ro'))
+    if ($ClientePostgresLocal) {
+        $env:PGSSLROOTCERT = '/certs/prod-ca-2021.crt'
+        $comandos = $comandos.Replace('/respaldo/', ($carpeta + '/'))
+        $comandos | & sh
+    } else {
+        [System.IO.File]::WriteAllText((Join-Path $carpeta 'respaldo.sh'), $comandos + "`n", [System.Text.UTF8Encoding]::new($false))
+        $argumentos = @('run', '--rm', '-e', 'CONVI_DB_URL',
+            '-v', ($carpeta + ':/respaldo'),
+            '-v', ((Join-Path $raiz 'scripts') + ':/convi:ro'))
+        if ($Entorno -eq 'Cloud') {
+            $argumentos += @('-e', 'PGSSLROOTCERT=/certs/prod-ca-2021.crt', '-v', ((Join-Path $raiz 'supabase\certs') + ':/certs:ro'))
+        }
+        $argumentos += @('--entrypoint', 'sh', $imagen, '/respaldo/respaldo.sh')
+        & docker @argumentos
     }
-    $argumentos += @('--entrypoint', 'sh', $imagen, '/respaldo/respaldo.sh')
-    & docker @argumentos
     if ($LASTEXITCODE -ne 0) { throw "Fallo el respaldo de la base, revisa base.log y roles.log en $carpeta." }
 } finally {
     Remove-Item Env:\CONVI_DB_URL -ErrorAction SilentlyContinue
@@ -119,7 +146,7 @@ foreach ($a in $lista) {
         $fallas.Add("$($a.id): clave no valida")
         continue
     }
-    $ruta = Join-Path (Join-Path (Join-Path $carpeta 'archivos') $a.bucket_id) ($a.clave_almacenamiento -replace '/', '\')
+    $ruta = Join-Path (Join-Path (Join-Path $carpeta 'archivos') $a.bucket_id) $a.clave_almacenamiento
     New-Item -ItemType Directory -Path (Split-Path -Parent $ruta) -Force | Out-Null
     $url = $urlStorage.TrimEnd('/') + '/storage/v1/object/authenticated/' + $a.bucket_id + '/' + (($a.clave_almacenamiento -split '/' | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/')
     $listo = $false
