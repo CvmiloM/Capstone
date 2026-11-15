@@ -122,6 +122,45 @@ Capstone/
             └── scripts/                 Iniciar, detener, comprobar, respaldar y restaurar en Windows
 ```
 
+## Cómo levantar CONVI
+
+CONVI se levanta en un equipo con Windows: la web, la API y Redis corren con **Docker Compose**, Supabase local corre con su CLI y todo se maneja desde la carpeta `Fase 2/Evidencia Proyecto/Convi`, donde están `compose.yaml` y los Dockerfile.
+
+**Requisitos:**
+
+- Windows 10 u 11 con **Docker Desktop** y su motor iniciado.
+- **Node.js 22.23.4**, la versión de `.node-version`, que trae `npx` para la CLI de Supabase 2.117.0.
+- Git y conexión a internet la primera vez, para descargar las imágenes y la CLI.
+- Solo para el asistente de IA: Ollama y uv, como explica `Convi/README-DOCKER.md`.
+
+**Primer inicio**, en PowerShell desde la raíz del repositorio:
+
+```powershell
+cd ".\Fase 2\Evidencia Proyecto\Convi"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\iniciar.ps1 -Build
+```
+
+El script inicia Supabase local con todas las migraciones del esquema, crea el archivo `.env` a partir de `.env.example` con las claves locales sin mostrarlas, y construye e inicia la web, la API y Redis.
+
+**Uso diario**, desde la misma carpeta:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\iniciar.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\comprobar.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\detener.ps1
+```
+
+| Servicio | Dirección |
+|---|---|
+| CONVI | http://localhost:3000 |
+| API | http://localhost:3001 |
+| Supabase Studio | http://localhost:54323 |
+| Correos de prueba (Mailpit) | http://localhost:54324 |
+
+Para entrar se puede crear una escuela propia desde http://localhost:3000/registro o cargar escuelas ficticias con el generador de datos sintéticos.
+
+Las variables de entorno están explicadas en `Convi/.env.example`, y el paso a paso completo, la conexión a Supabase en la nube, el servicio de IA, los datos de prueba y la solución de problemas están en `Convi/README-DOCKER.md`.
+
 ## Documentación técnica
 
 | Documento | Contenido |
