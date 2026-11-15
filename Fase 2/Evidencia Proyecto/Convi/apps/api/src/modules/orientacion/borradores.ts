@@ -14,6 +14,9 @@ import {
 // esquema exige una solicitud de IA completada del mismo autor y caso.
 // Decisión del PO (2026-11-04): por ahora solo informes de caso, el de período
 // espera los informes de PB-110.
+// Decisión del PO (2026-11-15): CONVI deja de preparar borradores de acta, solo
+// el informe del caso. Los borradores de acta que ya existen se siguen mostrando,
+// revisando y corrigiendo, por eso el tipo ACTA se conserva.
 
 /** El modelo escribió algo que el borrador no puede llevar: no se guarda nada. */
 export class BorradorRechazado extends Error {}
@@ -27,8 +30,6 @@ export const LARGO_MAXIMO_CONTENIDO = 8000;
 const MAXIMO_APARTADOS = 8;
 const LARGO_MAXIMO_APARTADO = 1500;
 
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 /** Huella de la fila que se veía (md5), para PB-139. */
 const VERSION = /^[0-9a-f]{32}$/;
 
@@ -45,32 +46,27 @@ const texto = (valor: unknown) =>
 // Validaciones de lo que envía la pantalla
 // ---------------------------------------------------------------------------
 
-/** Acta del caso o de una de sus actuaciones, o informe del caso. */
+/** Tipos que se pueden pedir hoy: solo el informe del caso (decisión del 2026-11-15). */
+export const TIPOS_SOLICITABLES = ['INFORME'] as const;
+
+/** Informe del caso completo, sin actuación. */
 export function validarSolicitudBorrador(cuerpo: unknown): {
   tipo: TipoBorrador;
   actuacion_id: string | null;
 } {
   const datos = datosDe(cuerpo);
   const errores: Record<string, string> = {};
-  const tipo = TIPOS_BORRADOR.find((t) => t === datos.tipo);
-  if (!tipo) errores.tipo = 'Elige si quieres un borrador de acta o de informe';
+  const tipo = TIPOS_SOLICITABLES.find((t) => t === datos.tipo);
+  if (!tipo) errores.tipo = 'CONVI solo prepara borradores de informe del caso';
   const valor = datos.actuacion_id;
-  const actuacion =
-    valor === undefined || valor === null || valor === '' ? null : valor;
-  if (
-    actuacion !== null &&
-    (typeof actuacion !== 'string' || !UUID.test(actuacion))
-  )
-    errores.actuacion_id = 'Elige una actuación del caso';
-  else if (actuacion !== null && tipo === 'INFORME')
-    errores.actuacion_id =
-      'El informe es del caso completo, la actuación solo se elige para un acta';
+  if (valor !== undefined && valor !== null && valor !== '')
+    errores.actuacion_id = 'El informe es del caso completo, sin elegir una actuación';
   if (!tipo || Object.keys(errores).length > 0)
     throw new BadRequestException({
       mensaje: 'Revisa los datos marcados, no se pidió el borrador',
       errores,
     });
-  return { tipo, actuacion_id: actuacion as string | null };
+  return { tipo, actuacion_id: null };
 }
 
 /** HU-106 CA2 y HU-107 CA2: editar crea otra edición con el texto corregido. */

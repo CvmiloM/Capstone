@@ -140,16 +140,10 @@ const respuesta = (titulo: string, ...apartados: [string, string][]) =>
   });
 
 describe('Pedir un borrador (PB-125 y PB-126)', () => {
-  it('acepta acta del caso, acta de una actuación e informe del caso', () => {
-    expect(validarSolicitudBorrador({ tipo: 'ACTA' })).toEqual({
-      tipo: 'ACTA',
+  it('acepta solo el informe del caso completo', () => {
+    expect(validarSolicitudBorrador({ tipo: 'INFORME' })).toEqual({
+      tipo: 'INFORME',
       actuacion_id: null,
-    });
-    expect(
-      validarSolicitudBorrador({ tipo: 'ACTA', actuacion_id: ACTUACION }),
-    ).toEqual({
-      tipo: 'ACTA',
-      actuacion_id: ACTUACION,
     });
     expect(
       validarSolicitudBorrador({ tipo: 'INFORME', actuacion_id: '' }),
@@ -159,12 +153,14 @@ describe('Pedir un borrador (PB-125 y PB-126)', () => {
     });
   });
 
-  it('rechaza otros tipos, actuaciones inválidas e informes de una actuación', () => {
+  it('rechaza pedir actas desde el 2026-11-15, otros tipos e informes de una actuación', () => {
     for (const cuerpo of [
       {},
+      { tipo: 'ACTA' },
+      { tipo: 'ACTA', actuacion_id: ACTUACION },
       { tipo: 'ACTA_FIRMADA' },
-      { tipo: 'ACTA', actuacion_id: 'x' },
       { tipo: 'INFORME', actuacion_id: ACTUACION },
+      { tipo: 'INFORME', actuacion_id: 'x' },
     ])
       expect(() => validarSolicitudBorrador(cuerpo)).toThrow(
         BadRequestException,

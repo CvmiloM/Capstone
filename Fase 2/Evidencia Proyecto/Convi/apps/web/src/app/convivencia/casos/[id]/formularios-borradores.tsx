@@ -21,13 +21,14 @@ import {
 } from "./acciones-borradores";
 import { Campo, propsControl } from "./formularios";
 
-// PB-125 y PB-126 (HU-106 y HU-107): pedir, corregir y revisar borradores de
-// acta y de informe de caso con IA.
+// PB-125 y PB-126 (HU-106 y HU-107): pedir, corregir y revisar borradores con
+// IA. Decisión del PO (2026-11-15): solo se pide el informe del caso, los
+// borradores de acta que ya existen se siguen revisando y corrigiendo.
 const estadoInicial: EstadoAccion = {};
 const FASES_ESPERA: FaseMascota[] = ["buscando", "pensando", "escribiendo"];
 const MENSAJES: MensajesMascota = {
   reposo:
-    "Puedo redactar un borrador de acta o de informe con lo que está registrado en el caso",
+    "Puedo redactar un borrador de informe con lo que está registrado en el caso",
   buscando: "Leyendo el expediente con seudónimos…",
   pensando: "Ordenando los antecedentes…",
   escribiendo: "Redactando el borrador…",
@@ -42,30 +43,12 @@ export type ActuacionElegible = {
   objetivo: string;
 };
 
-const NOMBRE_TIPO: Record<string, string> = {
-  INTERVENCION: "Intervención",
-  ENTREVISTA: "Entrevista",
-  REUNION: "Reunión",
-  MEDIACION: "Mediación",
-  SEGUIMIENTO: "Seguimiento",
-  ACOMPANAMIENTO: "Acompañamiento",
-};
-
-export function FormularioBorradorIA({
-  casoId,
-  actuaciones,
-  fechas,
-}: {
-  casoId: string;
-  actuaciones: ActuacionElegible[];
-  fechas: Record<string, string>;
-}) {
+export function FormularioBorradorIA({ casoId }: { casoId: string }) {
   const [estado, accion, pendiente] = useActionState(
     pedirBorrador,
     estadoInicial,
   );
   const [paso, setPaso] = useState(0);
-  const [tipo, setTipo] = useState(estado.valores?.tipo ?? "ACTA");
   const errores = estado.errores ?? {};
 
   useEffect(() => {
@@ -94,73 +77,24 @@ export function FormularioBorradorIA({
         className="space-y-4"
       >
         <input type="hidden" name="caso_id" value={casoId} />
+        <input type="hidden" name="tipo" value="INFORME" />
         {estado.mensaje && !estado.errores && (
           <AvisoError>{estado.mensaje}</AvisoError>
         )}
-        <fieldset disabled={pendiente} className="space-y-4">
-          <div role="radiogroup" aria-label="Tipo de borrador" className="grid gap-2 sm:grid-cols-2">
-            {(
-              [
-                ["ACTA", "Acta", "De una entrevista, reunión u otra actuación, o del caso"],
-                ["INFORME", "Informe del caso", "Antecedentes, actuaciones y cifras del caso"],
-              ] as const
-            ).map(([valor, titulo, detalle]) => (
-              <label
-                key={valor}
-                className={`flex min-h-11 cursor-pointer flex-col rounded-xl border px-4 py-3 text-sm transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring ${
-                  tipo === valor
-                    ? "border-primary bg-accent"
-                    : "border-border hover:bg-muted"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="tipo"
-                  value={valor}
-                  checked={tipo === valor}
-                  onChange={() => setTipo(valor)}
-                  className="sr-only"
-                />
-                <span className="font-medium">{titulo}</span>
-                <span className="text-xs text-muted-foreground">{detalle}</span>
-              </label>
-            ))}
-          </div>
-          {errores.tipo && (
-            <p className="text-sm text-destructive">{errores.tipo}</p>
-          )}
-          {tipo === "ACTA" && (
-            <Campo
-              id="borrador_actuacion"
-              etiqueta="¿De qué actuación es el acta? (opcional)"
-              error={errores.actuacion_id}
-              ayuda="Si no eliges una, el acta resume el caso completo"
-            >
-              <select
-                {...propsControl(
-                  "borrador_actuacion",
-                  errores.actuacion_id,
-                  true,
-                  "actuacion_id",
-                )}
-                defaultValue={estado.valores?.actuacion_id ?? ""}
-              >
-                <option value="">Del caso completo</option>
-                {actuaciones.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {NOMBRE_TIPO[a.tipo] ?? a.tipo}
-                    {a.fecha ? ` del ${fechas[a.id]}` : ""}: {a.objetivo}
-                  </option>
-                ))}
-              </select>
-            </Campo>
-          )}
-        </fieldset>
+        {(errores.tipo || errores.actuacion_id) && (
+          <AvisoError>{errores.tipo ?? errores.actuacion_id}</AvisoError>
+        )}
+        <div className="rounded-xl border border-primary bg-accent px-4 py-3 text-sm">
+          <p className="font-medium">Informe del caso</p>
+          <p className="text-xs text-muted-foreground">
+            Antecedentes, actuaciones y cifras del caso
+          </p>
+        </div>
         <p className="text-sm text-muted-foreground">
           La IA recibe el expediente con seudónimos, sin nombres, RUT ni datos de
           contacto, y CONVI pone después los nombres reales: el borrador queda
-          marcado como generado con IA y pendiente de revisión, nunca como acta
-          firmada ni informe publicado.
+          marcado como generado con IA y pendiente de revisión, nunca como
+          informe publicado.
         </p>
         <button
           type="submit"
