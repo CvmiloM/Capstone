@@ -1,0 +1,15 @@
+﻿ID ZAP,Alerta,Riesgo,Confianzas observadas
+10020,Missing Anti-clickjacking Header,2,2
+10038,Content Security Policy (CSP) Header Not Set,2,3
+10202,Absence of Anti-CSRF Tokens,2,1
+10010,Cookie Sin Flag HttpOnly,1,2
+10021,X-Content-Type-Options Header Missing,1,2
+10037,"Server Leaks Information via ""X-Powered-By"" HTTP Response Header Field(s)",1,2
+10096,Divulgación de Marcas de Tiempo - Unix,1,1
+10019,Cabecera Content-Type Perdida,0,2
+10027,Information Disclosure - Suspicious Comments,0,1
+10031,User Controllable HTML Element Attribute (Potential XSS),0,1
+10104,User Agent Fuzzer,0,2
+10109,Modern Web Application,0,2
+10112,Respuesta de Gestión de Sesión Identificada,0,2
+10113,Petición de Verificación Identificada,0,1

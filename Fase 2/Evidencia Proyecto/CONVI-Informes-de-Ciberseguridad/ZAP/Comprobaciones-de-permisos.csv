@@ -1,0 +1,21 @@
+﻿Caso,Perfil,Ruta,HTTP esperado,HTTP observado,Cumple
+1,SIN_SESION,/profesor/cursos,401,401,Si
+2,SIN_SESION,/apoderado,401,401,Si
+3,SIN_SESION,/admin/resumen,401,401,Si
+4,SIN_SESION,/convivencia/situaciones,401,401,Si
+5,PROFESOR,/profesor/cursos,200,200,Si
+6,PROFESOR,/apoderado,403,403,Si
+7,PROFESOR,/admin/resumen,403,403,Si
+8,PROFESOR,/convivencia/situaciones,403,403,Si
+9,APODERADO,/profesor/cursos,403,403,Si
+10,APODERADO,/apoderado,200,200,Si
+11,APODERADO,/admin/resumen,403,403,Si
+12,APODERADO,/convivencia/situaciones,403,403,Si
+13,ADMIN,/profesor/cursos,403,403,Si
+14,ADMIN,/apoderado,403,403,Si
+15,ADMIN,/admin/resumen,200,200,Si
+16,ADMIN,/convivencia/situaciones,403,403,Si
+17,CONVIVENCIA,/profesor/cursos,403,403,Si
+18,CONVIVENCIA,/apoderado,403,403,Si
+19,CONVIVENCIA,/admin/resumen,403,403,Si
+20,CONVIVENCIA,/convivencia/situaciones,200,200,Si

@@ -1,0 +1,21 @@
+﻿Entrada,Origen,Bytes,SHA-256
+Cloudflare/FINDINGS-DETAIL.md,convi-cloudflare-audit-20261109/FINDINGS-DETAIL.md,569,05d940d2a7e1fe27edf4c849e4a77474359af90444d97e84aa62edf8fc1b8bb6
+Cloudflare/NEEDS-VALIDATION.md,convi-cloudflare-audit-20261109/NEEDS-VALIDATION.md,3621,3cca2e146c7f7feb80cf29d309e1053d5456759b4c11f2e9b98323c8a9e453a2
+Cloudflare/REPORT.md,convi-cloudflare-audit-20261109/REPORT.md,9177,172281347e74d999d5d13c3fbc45075f4484cc3c490060bb6e14697ca964a2ca
+Cloudflare/architecture.md,convi-cloudflare-audit-20261109/architecture.md,4351,154808b46e298a6f02fe71e26cf8ac0976a81db714e75771426884bb31cd726e
+Correcciones/Dependencias-04-11.txt,seguridad-20261104/resultado.txt,3761,6a395a6ffd7f57f8fc14835354ac7499c679d03770cce5f7fbeb955e0c9b6bd6
+Correcciones/Priorizacion-12-11.md,revision-refinamientos-20261111/prioridad-seguridad-rendimiento-refinamientos-20261112.md,13627,6290ee8f469a9d06fa21f0c89a7f6bd8991d76c663b9415d8f864f2231d0f276
+Correcciones/RESULTADOS-AD-001.md,seguridad-integridad-20261112/RESULTADOS.md,19495,ef0b482039eb3be45dfb51c04857d8c9f568d7115b5ace5c819573f7cd53cd50
+Evidencia-academica/CONVI_Plan_de_Pruebas.docx,"Propuestas corregidas/Plan de pruebas + evidencias.docx, versión 1.1 del 15-11-2026",49500,9c935d38a248a984dadc5e505a8d0c42fbdbe05313b5eb63d2ca711e86571a35
+Evidencia-academica/CONVI_Requisitos_No_Funcionales.docx,"Propuestas corregidas/Requisitos no funcionales.docx, versión 1.1 del 15-11-2026",48455,5b6cee52abae0b70e02c38de23291fd2fe0d9fd10bb6ae16bd93c08641eac457
+LEEME.md,Resumen redactado para el paquete,6507,ccb671e5b3f8aaf64d3c0c4baa1b6237adbee0eecc73a6af3634e74ef5ae9980
+ZAP/01-Preparacion-revision-local.md,convi-seguridad-local-20261108/revision-inicial.md,11042,ca7997120b0ba9d0439e98b4420fd542266a5f50045af3d46d20704a7b85e049
+ZAP/02-Profesor-AJAX-Spider.md,convi-seguridad-local-20261108/profesor-spider-01.md,3344,fcfb15efdfefc6c71c664b29f751b8ea88b519673a3375f7a020c121fce80cba
+ZAP/03-Analisis-primer-informe.md,convi-seguridad-local-20261108/analisis-zap-01.md,7412,9e01a947fc2de8bee7318134da29923b0d7024ce325445b47a48d34ab87dbb40
+ZAP/04-Profesor-Revision-escaneo-activo.md,profesor-activo-privado/RESUMEN-REVISION-ANTES-APAGADO.md,5466,fb0c13cb9f644803061bf7d4611d711fe681929c84fcfae24890c28107f04ad0
+ZAP/ANALISIS-CONSOLIDADO-ALERTAS-CONVI.md,convi-zap-completo-20261108-2341/ANALISIS-CONSOLIDADO-ALERTAS-CONVI.md,13718,128e23597da9c81e3a6b76e58be9129bfbaff418b96437924fe2646bb5a1f8bb
+ZAP/Alcance-operativo.txt,convi-zap-completo-20261108-2341/LEEME-alcance-operativo.txt,1449,b509ae5e440530d0acd99f1bc6d292f7b53bdcbdea5068f8bbdf3c21be7e82c6
+ZAP/Comprobaciones-de-permisos.csv,"matriz-permisos-api.json, sin evidencia de trafico",880,d8be489ce56e21567241e6817b8fa21b408b9cb339b839a1371dbfa3269a0c2a
+ZAP/Familias-locales-consolidadas.csv,inventario-alertas-consolidado-redactado.json,747,66bd389c0be9f6cd8990ba8940b9d6263c5c0d1684ede45594378bb221ce0313
+ZAP/Incidencias-herramienta.txt,convi-zap-completo-20261108-2341/incidencias-herramienta.txt,221,f1d36243b53b457357dc4c1e0765d19c2a4b41067f803ba6ee9bc2bb5d66783d
+ZAP/Inventario-por-informe.csv,Derivado de ocho exportaciones ZAP,4560,69312f9e0029eb9e84cb83482e20aca14523cb9845f78f00200fe303ca2dec69

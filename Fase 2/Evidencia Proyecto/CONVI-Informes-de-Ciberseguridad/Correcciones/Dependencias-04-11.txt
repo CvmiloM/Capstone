@@ -1,0 +1,29 @@
+CONVI — mantenimiento de seguridad — 04-11-2026
+Rama informada por el usuario: sebastian/seguridad-dependencias; base main 239f33d.
+Estado: probado localmente, sin commit, push ni publicación realizados por el agente.
+
+Versiones: Node Windows y ambos servicios Docker 22.23.4. NestJS 12.3.2, Next 16.4.5, React/React DOM 19.3.1, Vitest 4.1.12. Body-parser 2.4.0, Multer 2.5.0, qs 6.17.1, Undici 6.29.1, tmp 0.2.7, fast-uri 3.1.9, zod 4.6.7 en el lockfile.
+Se mantienen las versiones principales de los frameworks. Los overrides de Mau/editor se explican en pnpm-workspace.yaml y README-DOCKER.md.
+Docker y CI fijan la versión de Node. Reconstrucciones con --pull. GitHub comprueba pnpm audit --prod --audit-level high antes de compilar/publicar.
+
+Auditoría Node completa: antes 11 altos, 19 moderados, 7 bajos; después 0 altos, 4 moderados, 0 bajos; sin críticos en ambas muestras.
+Auditoría producción: antes 2 altos y 4 moderados; después 0 altos y 3 moderados; sin críticos en ambas muestras.
+Son conteos de la herramienta, no cantidades de ataques comprobados. Persisten avisos de uuid y minimatch en ExcelJS y CLI. Uso identificado: ExcelJS llama v4, mientras el aviso UUID afecta v3/v5/v6 con buffer. No se ofrecen patrones glob de usuario en el código de CONVI. No se fuerza minimatch 11 sobre consumidores con otra API. Revisión/actualización de esos consumidores pendiente; no equivale a seguridad total.
+
+Verificación:
+- Instalador Windows oficial: SHA256 contra SHASUMS256.txt y firma válida de OpenJS Foundation. MSI elevado terminó en 0; node --version = v22.23.4.
+- Imagen Docker construida con pnpm install --frozen-lockfile, sin resolver versiones nuevas; Node 22.23.4.
+- 53 archivos y 786 pruebas de API correctos.
+- API y web: lint sin errores; una advertencia previa de tipo redundante en caso-nuevo.ts.
+- API y web: compilación correcta; Next generó 76 páginas estáticas/parciales según sus rutas.
+- Sintaxis de scripts PowerShell y alineación de versión Node/CI/Docker comprobadas.
+- tmp del editor: crear, escribir, leer y eliminar su archivo temporal, correcto.
+- Regresión HTTP real con Supabase local y cuentas ficticias: seis filtros de situaciones, nueve secciones de casos, tres rechazos por autenticación/perfil, otra escuela rechazada con 404, descarga PDF con hash correcto, consulta de profesor.
+- Dos peticiones HTTP comprimidas y dos multipart: validación y rechazo de datos malformados correctos; API sigue respondiendo; sin nuevos archivos por cargas inválidas.
+- Plantilla XLSX generada por API y reabierta con ExcelJS con hoja Datos presente.
+
+Eficiencia de construcción: contexto anterior superó 131 MB/97 s antes de cancelarlo. Tras excluir .pnpm-store, contexto de 8,47 MB transferido en 3,6 s. No es una medición de velocidad de la web ni demuestra ahorro equivalente de RAM.
+Datos: no se modificaron tablas, funciones, permisos, migraciones ni configuración cloud. Se conservaron volúmenes, datos y colas. Las pruebas usaron cuentas ficticias existentes y generaron los registros normales de sus consultas.
+Equipo: después del pull, instalar Node 22.23.4 y ejecutar scripts/iniciar.ps1 -Build; los pasos completos están en README-DOCKER.md. La publicación Azure utiliza el flujo habitual de PR y merge.
+Pendiente: commit/PR/publicación del usuario; validar versión efectiva en Azure después del despliegue. No se auditaron exhaustivamente Python, imágenes/SO ni servicios administrados; no se ejecutó pentesting.
+Fuentes: https://nodejs.org/en/blog/release/v22.23.4 ; https://github.com/advisories/GHSA-27r3-jxmh-p828 ; https://github.com/advisories/GHSA-q7qp-rjg7-q26m ; https://github.com/advisories/GHSA-w5hq-g745-h8pq ; https://github.com/advisories/GHSA-g3hv-75wg-m249

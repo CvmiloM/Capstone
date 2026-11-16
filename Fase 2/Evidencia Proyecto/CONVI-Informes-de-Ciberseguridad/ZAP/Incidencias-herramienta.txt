@@ -1,0 +1,1 @@
+2026-11-09: ZAP agotó heap de 1536 MB durante spider. API sin respuesta durante más de 120 s; proceso de ZAP detenido para recuperar la sesión. Ejecución interrumpida antes de escaneo activo; no se atribuye a Convi.

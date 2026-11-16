@@ -1,0 +1,54 @@
+﻿Informe,Alcance,ID ZAP,Alerta,Riesgo segun ZAP,Confianza ZAP 0-4,Registros en el informe
+convi-admin-api,local,10037,Consultar el analisis consolidado por ID,Baja,2,3
+convi-admin-api,local,10021,X-Content-Type-Options Header Missing,Baja,2,3
+convi-admin-api,local,10104,User Agent Fuzzer,Informativa,2,3
+convi-admin-web,local,10202,Absence of Anti-CSRF Tokens,Media,1,3
+convi-admin-web,local,10038,Content Security Policy (CSP) Header Not Set,Media,3,3
+convi-admin-web,local,10020,Missing Anti-clickjacking Header,Media,2,3
+convi-admin-web,local,10037,Consultar el analisis consolidado por ID,Baja,2,3
+convi-admin-web,local,10021,X-Content-Type-Options Header Missing,Baja,2,3
+convi-admin-web,local,10027,Information Disclosure - Suspicious Comments,Informativa,1,11
+convi-admin-web,local,10104,User Agent Fuzzer,Informativa,2,3
+convi-apoderado-api,local,10037,Consultar el analisis consolidado por ID,Baja,2,5
+convi-apoderado-api,local,10021,X-Content-Type-Options Header Missing,Baja,2,5
+convi-apoderado-web,local,10202,Absence of Anti-CSRF Tokens,Media,1,3
+convi-apoderado-web,local,10038,Content Security Policy (CSP) Header Not Set,Media,3,3
+convi-apoderado-web,local,10020,Missing Anti-clickjacking Header,Media,2,3
+convi-apoderado-web,local,10037,Consultar el analisis consolidado por ID,Baja,2,3
+convi-apoderado-web,local,10021,X-Content-Type-Options Header Missing,Baja,2,5
+convi-apoderado-web,local,10027,Information Disclosure - Suspicious Comments,Informativa,1,6
+convi-apoderado-web,local,10104,User Agent Fuzzer,Informativa,2,3
+convi-convivencia-api,local,10037,Consultar el analisis consolidado por ID,Baja,2,3
+convi-convivencia-api,local,10021,X-Content-Type-Options Header Missing,Baja,2,3
+convi-convivencia-web,local,10202,Absence of Anti-CSRF Tokens,Media,1,3
+convi-convivencia-web,local,10038,Content Security Policy (CSP) Header Not Set,Media,3,3
+convi-convivencia-web,local,10020,Missing Anti-clickjacking Header,Media,2,3
+convi-convivencia-web,local,10037,Consultar el analisis consolidado por ID,Baja,2,3
+convi-convivencia-web,local,10021,X-Content-Type-Options Header Missing,Baja,2,3
+convi-convivencia-web,local,10027,Information Disclosure - Suspicious Comments,Informativa,1,16
+convi-convivencia-web,local,10109,Modern Web Application,Informativa,2,3
+convi-convivencia-web,local,10104,User Agent Fuzzer,Informativa,2,3
+convi-convivencia-web,local,10031,User Controllable HTML Element Attribute (Potential XSS),Informativa,1,32
+convi-web,local,10202,Ausencia de Tokens Anti-CSRF,Media,1,3
+convi-web,local,10038,Cabecera Content Security Policy (CSP) no configurada,Media,3,3
+convi-web,local,10020,Falta de cabecera Anti-Clickjacking,Media,2,3
+convi-web,local,10010,Cookie Sin Flag HttpOnly,Baja,2,1
+convi-web,local,10096,Divulgación de Marcas de Tiempo - Unix,Baja,1,1
+convi-web,local,10037,El servidor divulga información mediante un campo(s) de encabezado de respuesta HTTP ''''X-Powered-By'''',Baja,2,3
+convi-web,local,10021,Falta encabezado X-Content-Type-Options,Baja,2,3
+convi-web,local,10109,Aplicación Web Moderna,Informativa,2,1
+convi-web,local,10019,Cabecera Content-Type Perdida,Informativa,2,1
+convi-web,local,10027,Divulgación de información - Comentarios sospechosos,Informativa,1,20
+convi-web,local,10112,Respuesta de Gestión de Sesión Identificada,Informativa,2,2
+convi-web,local,10104,User Agent Fuzzer,Informativa,2,3
+profesor-revision-20261108-042352,local,10202,Ausencia de Tokens Anti-CSRF,Media,1,3
+profesor-revision-20261108-042352,local,10038,Cabecera Content Security Policy (CSP) no configurada,Media,3,3
+profesor-revision-20261108-042352,local,10020,Falta de cabecera Anti-Clickjacking,Media,2,3
+profesor-revision-20261108-042352,local,10010,Cookie Sin Flag HttpOnly,Baja,2,1
+profesor-revision-20261108-042352,local,10096,Divulgación de Marcas de Tiempo - Unix,Baja,1,1
+profesor-revision-20261108-042352,local,10037,El servidor divulga información mediante un campo(s) de encabezado de respuesta HTTP ''''X-Powered-By'''',Baja,2,3
+profesor-revision-20261108-042352,local,10021,Falta encabezado X-Content-Type-Options,Baja,2,3
+profesor-revision-20261108-042352,local,10109,Aplicación Web Moderna,Informativa,2,3
+profesor-revision-20261108-042352,local,10027,Divulgación de información - Comentarios sospechosos,Informativa,1,13
+profesor-revision-20261108-042352,local,10113,Petición de Verificación Identificada,Informativa,1,2
+profesor-revision-20261108-042352,local,10112,Respuesta de Gestión de Sesión Identificada,Informativa,2,2

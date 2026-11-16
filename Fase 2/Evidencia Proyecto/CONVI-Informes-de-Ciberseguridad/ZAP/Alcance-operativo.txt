@@ -1,0 +1,11 @@
+Alcance operativo de esta ronda local de ZAP
+
+Se conservan las ejecuciones anteriores de Profesor y Apoderado. Profesor tuvo reglas limitadas por tiempo, ya registradas en estado-supervisor.json.
+
+Admin y Convivencia se ejecutan con las 16 reglas seleccionadas, separadas por destino web/API y con reinicios de ZAP para liberar memoria. estado-reglas-pendientes.json conserva las reglas completas y el punto de continuación.
+
+DOM XSS de Convivencia web agotó la memoria incluso aislado. Ahora se prueba por pantalla, con un proceso renovado entre objetivos y un solo trabajador. Se seleccionaron 42 URLs correspondientes a 32 plantillas, con hasta tres instancias de cada plantilla dinámica. Las 231 URLs observadas se conservan en objetivos-dom-convivencia-privado.json; la selección y su límite constan en dom-convivencia-alcance.json. No se afirma una prueba individual de cada registro.
+
+El apagado solo se solicita después de completar los 64 trabajos previstos y validar los HTML y JSON de Apoderado, Admin y Convivencia. Los límites de Profesor se mantienen documentados; 64 trabajos terminados no significa cobertura de toda vulnerabilidad posible. El análisis de hallazgos queda pendiente.
+
+Los ficheros de sesión e informes son privados y pueden contener datos de autenticación. No compartirlos sin redactar secretos. No se han modificado archivos, configuración ni bases de datos del proyecto para resolver los fallos de ZAP.
