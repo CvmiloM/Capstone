@@ -25,6 +25,8 @@ ALTER TABLE convi.suscripciones_calendario ADD FOREIGN KEY (establecimiento_id) 
 ALTER TABLE convi.suscripciones_calendario ADD FOREIGN KEY (establecimiento_id, membresia_id) REFERENCES convi.membresias_establecimiento (establecimiento_id, id) ON DELETE RESTRICT;
 CREATE INDEX ON convi.suscripciones_calendario (establecimiento_id);
 -- Un solo enlace activo por cuenta: crear otro revoca el anterior.
+-- REGLA DE NEGOCIO
+-- Cada cuenta de Convivencia puede tener un solo enlace activo de calendario.
 CREATE UNIQUE INDEX suscripcion_calendario_activa ON convi.suscripciones_calendario (membresia_id) WHERE revocada_en IS NULL;
 
 ALTER TABLE convi.suscripciones_calendario ENABLE ROW LEVEL SECURITY;
@@ -67,6 +69,8 @@ CREATE TRIGGER proteger BEFORE INSERT OR UPDATE ON convi.suscripciones_calendari
 -- en el calendario (Convivencia ve toda su escuela). Devuelve null si el
 -- enlace no sirve. Corre con los permisos de su dueño, que debe ser el
 -- propietario de instalación, como sesion_valida, y solo la ejecuta la API.
+-- REGLA DE NEGOCIO
+-- El enlace del calendario muestra eventos mínimos de la escuela mientras la suscripción, la escuela y la cuenta de Convivencia estén vigentes.
 CREATE FUNCTION convi.calendario_suscrito(p_huella bytea) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = convi, pg_temp AS $$
 DECLARE

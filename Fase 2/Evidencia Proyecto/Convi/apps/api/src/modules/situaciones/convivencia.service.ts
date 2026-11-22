@@ -647,6 +647,8 @@ export class ConvivenciaService {
   // durante la revisión, antes de decidir. Es una consulta: el estado de la
   // situación no cambia (CA4). Si otra persona cambió la situación al mismo
   // tiempo se reintenta una vez con el estado nuevo.
+  // REGLA DE NEGOCIO
+  // La revisión normativa guarda su fundamento y las fuentes que usó el equipo de Convivencia.
   async registrarRevisionNormativa(
     sesion: Sesion,
     id: string,
@@ -796,6 +798,8 @@ export class ConvivenciaService {
   // profesor autor y que quien pide sea Convivencia activa (CA2), y que la
   // solicitud no se modifique después (CA3). Si otra persona cambió la
   // situación al mismo tiempo se reintenta una vez con el estado nuevo.
+  // REGLA DE NEGOCIO
+  // Cuando termina la revisión de una situación, ya no se pueden pedir aclaraciones.
   async pedirAclaracion(
     sesion: Sesion,
     id: string,

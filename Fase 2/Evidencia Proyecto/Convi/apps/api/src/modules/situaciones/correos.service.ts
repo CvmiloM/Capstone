@@ -179,6 +179,8 @@ export class CorreosService {
    * auditoría. READ COMMITTED: una repetición simultánea espera el bloqueo y
    * ve el envío de la primera.
    */
+  // REGLA DE NEGOCIO
+  // El equipo de Convivencia confirma el contenido y el destinatario antes de enviar un correo.
   async enviar(
     sesion: Sesion,
     correoId: string,
@@ -316,6 +318,8 @@ export class CorreosService {
    * contenido, y la consulta va fuera de la transacción para no bloquear el
    * correo mientras el servicio responde. Entregado y Fallido son finales.
    */
+  // REGLA DE NEGOCIO
+  // Solo la confirmación del proveedor de correo marca un mensaje como entregado.
   async revisarEntrega(
     sesion: Sesion,
     correoId: string,
@@ -386,6 +390,8 @@ export class CorreosService {
     });
   }
 
+  // REGLA DE NEGOCIO
+  // Para corregir un correo confirmado o enviado se crea un borrador nuevo con una copia.
   // HU-076 CA2: lo confirmado o enviado no cambia; para corregirlo se copia
   // en un borrador nuevo, que conserva la marca de IA si la tenía.
   copiar(sesion: Sesion, correoId: string): Promise<{ id: string }> {

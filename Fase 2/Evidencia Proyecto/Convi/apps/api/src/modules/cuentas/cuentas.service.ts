@@ -130,6 +130,8 @@ export class CuentasService {
   }
 
   // PB-007: solo cambia la membresía, conserva Auth y los registros históricos.
+  // REGLA DE NEGOCIO
+  // Suspender una cuenta conserva los registros que esa persona creó.
   suspender(sesion: Sesion, id: string) {
     return this.cambiarEstado(sesion, id, 'SUSPENDIDO');
   }
@@ -155,6 +157,8 @@ export class CuentasService {
       sesion,
       { tipo: 'establecimiento', perfiles: PERFILES },
       async (db) => {
+        // REGLA DE NEGOCIO
+        // Una persona no puede suspender su propia cuenta.
         if (
           destino === 'SUSPENDIDO' &&
           id.toLowerCase() === sesion.membresia_id.toLowerCase()
@@ -374,6 +378,8 @@ export class CuentasService {
   }
 
   // PB-115 completa la invitación de PB-010 desde una persona ya vinculada.
+  // REGLA DE NEGOCIO
+  // Para invitar a un apoderado, su ficha y su vínculo con el estudiante deben seguir activos.
   async invitarApoderado(sesion: Sesion, vinculoId: string) {
     const invitacion = await this.cuentas.operar(
       sesion,
@@ -417,6 +423,8 @@ export class CuentasService {
     return invitacion;
   }
 
+  // REGLA DE NEGOCIO
+  // Un correo puede estar registrado como máximo en una cuenta de Convi.
   private async enviarInvitacionAuth(invitacion: InvitacionEnviada) {
     const { error } = await this.supabase.auth.admin.inviteUserByEmail(
       invitacion.correo,

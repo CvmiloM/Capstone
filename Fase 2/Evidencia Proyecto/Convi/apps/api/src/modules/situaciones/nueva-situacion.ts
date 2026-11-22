@@ -81,6 +81,8 @@ function validarComun(
   const urgencia = esUno(URGENCIAS, valorUrgencia) ? valorUrgencia : null;
   if (!urgencia) errores.urgencia = 'Elige Normal, Urgente o Inmediata.';
 
+  // REGLA DE NEGOCIO
+  // El profesor o el equipo de Convivencia debe elegir una categoría al registrar una situación.
   const categoriaId = texto(datos.categoria_id).toLowerCase();
   if (!UUID.test(categoriaId))
     errores.categoria_id = 'Elige una categoría de la lista.';

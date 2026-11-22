@@ -1,5 +1,6 @@
 "use client";
 
+import { AvisoRespuestaIA } from "@/app/components/normativa/aviso-respuesta-ia";
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { EnlaceConCarga as Link } from "@/app/components/actividad";
@@ -97,6 +98,7 @@ export function ConsultaReglamento() {
 
   return (
     <div className="space-y-6">
+      <AvisoRespuestaIA activo={Boolean(resultado && !resultado.sin_disposicion)} />
       <MascotaIA fase={fase} />
       <FormularioConCarga
         action={accion}
@@ -214,6 +216,8 @@ export function ConsultaReglamento() {
                       </blockquote>
                       <Link
                         href={enlace(cita)}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className={`mt-2 inline-block ${claseEnlace}`}
                       >
                         {cita.pagina_desde === null

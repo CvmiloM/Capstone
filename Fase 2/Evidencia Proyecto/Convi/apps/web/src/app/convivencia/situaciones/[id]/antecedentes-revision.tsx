@@ -86,6 +86,8 @@ export function RevisionesGuardadas({ datos, fecha }: {
                       <Link
                         className={claseEnlace}
                         href={`/convivencia/documentos/versiones/${ref.version_documento_id}?pagina=${ref.pagina_desde ?? 1}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
                         {ref.documento} ({ref.version})
                       </Link>

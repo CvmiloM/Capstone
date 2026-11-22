@@ -3,6 +3,8 @@
 -- índice lo asegura en la base, aunque dos administradores activen años a la vez.
 -- Si una base local ya tiene dos años Activos en la misma escuela, cerrar uno
 -- antes de aplicar esta migración.
+-- REGLA DE NEGOCIO
+-- Un establecimiento puede tener como máximo un año académico activo a la vez.
 CREATE UNIQUE INDEX anios_academicos_un_activo
   ON convi.anios_academicos (establecimiento_id)
   WHERE estado = 'ACTIVO';

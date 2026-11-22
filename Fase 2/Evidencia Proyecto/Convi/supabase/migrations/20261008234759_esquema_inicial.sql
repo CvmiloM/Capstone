@@ -85,6 +85,8 @@ CREATE TABLE convi.personas (
   rut varchar(12),
   direccion text,
   UNIQUE (establecimiento_id, id),
+  -- REGLA DE NEGOCIO
+  -- Si se registra un RUT, debe ser válido.
   CONSTRAINT persona_rut_valido CHECK (rut IS NULL OR convi.rut_valido(rut))
 );
 
@@ -114,8 +116,12 @@ CREATE TABLE convi.membresias_establecimiento (
   UNIQUE (establecimiento_id, persona_id),
   UNIQUE (establecimiento_id, id),
   -- HU-003 y HU-002 una cuenta activa o suspendida tiene identidad verificada y fecha de activación
+  -- REGLA DE NEGOCIO
+  -- Una cuenta activa o suspendida debe tener identidad y fecha de activación.
   CONSTRAINT membresia_activada_completa CHECK (estado NOT IN ('ACTIVO','SUSPENDIDO') OR (auth_usuario_id IS NOT NULL AND activado_en IS NOT NULL)),
   -- HU-009 una invitación pendiente guarda quién invitó y cuándo
+  -- REGLA DE NEGOCIO
+  -- Una invitación pendiente guarda quién la envió y cuándo.
   CONSTRAINT membresia_invitacion_completa CHECK (estado<>'PENDIENTE' OR (invitado_por IS NOT NULL AND invitado_en IS NOT NULL))
 );
 
@@ -156,7 +162,11 @@ CREATE TABLE convi.matriculas (
   CHECK (finalizado_en IS NULL OR finalizado_en >= matriculado_en),
   UNIQUE (establecimiento_id, id),
   -- HU-014 la matrícula indica su fecha de inicio, HU-017 y HU-024 una matrícula terminada tiene fecha de término y estado Completado, Trasladado o Retirado
+  -- REGLA DE NEGOCIO
+  -- Toda matrícula debe tener una fecha de inicio.
   CONSTRAINT matricula_fecha_inicio CHECK (matriculado_en IS NOT NULL),
+  -- REGLA DE NEGOCIO
+  -- Una matrícula activa sigue abierta y una matrícula terminada tiene fecha de término.
   CONSTRAINT matricula_estado_termino CHECK ((estado='ACTIVO')=(finalizado_en IS NULL))
 );
 
@@ -171,6 +181,8 @@ CREATE TABLE convi.apoderados_estudiante (
   activo_desde date,
   activo_hasta date,
   CHECK ( activo_desde IS NULL OR activo_hasta IS NULL OR activo_hasta >= activo_desde ),
+  -- REGLA DE NEGOCIO
+  -- Una persona solo puede tener un vínculo de apoderado con el mismo estudiante.
   UNIQUE (estudiante_id, persona_apoderado_id),
   UNIQUE (establecimiento_id, id)
 );
@@ -189,6 +201,8 @@ CREATE TABLE convi.accesos_apoderado (
   CHECK ( (estado <> 'REVOCADO') OR revocado_en IS NOT NULL ),
   UNIQUE (establecimiento_id, id),
   -- HU-099 un acceso revocado guarda quién y cuándo
+  -- REGLA DE NEGOCIO
+  -- Al revocar el acceso de un apoderado se registra quién lo revocó y cuándo.
   CONSTRAINT acceso_revocado_completo CHECK (estado<>'REVOCADO' OR (revocado_por IS NOT NULL AND revocado_en IS NOT NULL))
 );
 
@@ -221,6 +235,8 @@ CREATE TABLE convi.casos (
   justificacion_independiente text,
   plazo_cierre_dias_aplicado integer CHECK (plazo_cierre_dias_aplicado > 0),
   fecha_limite_cierre date CHECK (fecha_limite_cierre >= fecha_inicio),
+  -- REGLA DE NEGOCIO
+  -- El plazo de cierre y la fecha límite del caso se registran juntos.
   CHECK (num_nonnulls(plazo_cierre_dias_aplicado,fecha_limite_cierre) IN (0,2))
 );
 
@@ -243,6 +259,8 @@ CREATE TABLE convi.situaciones (
   vinculado_a_caso_por uuid,
   asignado_a_membresia_id uuid,
   UNIQUE (establecimiento_id, codigo),
+  -- REGLA DE NEGOCIO
+  -- Vincular una situación exige guardar el caso, la fecha y la cuenta que hizo el vínculo.
   CHECK ((estado = 'VINCULADA_CASO' AND caso_id IS NOT NULL AND vinculado_a_caso_en IS NOT NULL AND vinculado_a_caso_por IS NOT NULL) OR (estado <> 'VINCULADA_CASO' AND caso_id IS NULL AND vinculado_a_caso_en IS NULL AND vinculado_a_caso_por IS NULL)),
   UNIQUE (establecimiento_id, id),
   urgencia varchar(20) NOT NULL DEFAULT 'NORMAL' CHECK (urgencia IN ('NORMAL','URGENTE','INMEDIATA')),
@@ -261,7 +279,11 @@ CREATE TABLE convi.participaciones (
   activo_desde timestamptz NOT NULL DEFAULT now(),
   activo_hasta timestamptz,
   notas text,
+  -- REGLA DE NEGOCIO
+  -- Cada participación pertenece a una sola situación, caso o actuación.
   CHECK (num_nonnulls(situacion_id, caso_id, actuacion_id) = 1),
+  -- REGLA DE NEGOCIO
+  -- La asistencia solo se registra para una actuación.
   CHECK (estado_asistencia IS NULL OR actuacion_id IS NOT NULL),
   CHECK (activo_hasta IS NULL OR activo_hasta >= activo_desde),
   UNIQUE (establecimiento_id, id),
@@ -283,12 +305,16 @@ CREATE TABLE convi.revisiones_convivencia (
   revisado_por uuid NOT NULL,
   revisado_en timestamptz NOT NULL DEFAULT now(),
   CHECK (num_nonnulls(situacion_id, caso_id) = 1),
+  -- REGLA DE NEGOCIO
+  -- Una decisión se toma sobre una situación y debe tener un resultado.
   CHECK (tipo_revision <> 'DECISION' OR (situacion_id IS NOT NULL AND resultado IS NOT NULL)),
   CHECK ((resultado = 'VINCULADA_CASO' AND caso_destino_id IS NOT NULL) OR (resultado IS DISTINCT FROM 'VINCULADA_CASO' AND caso_destino_id IS NULL)),
   UNIQUE (establecimiento_id, id),
   situacion_duplicada_id uuid,
   revision_anterior_id uuid,
   -- HU-134 y HU-071 una revisión de consulta indica la aplicabilidad del reglamento o protocolo
+  -- REGLA DE NEGOCIO
+  -- La consulta normativa debe indicar si la norma aplica.
   CONSTRAINT consulta_con_aplicabilidad CHECK (tipo_revision<>'CONSULTA' OR aplicabilidad IS NOT NULL)
 );
 
@@ -347,9 +373,13 @@ CREATE TABLE convi.versiones_documento (
   detalle_error_procesamiento text,
   intentos_procesamiento integer NOT NULL DEFAULT 0 CHECK (intentos_procesamiento >= 0),
   CHECK ( vigente_desde IS NULL OR vigente_hasta IS NULL OR vigente_hasta >= vigente_desde ),
+  -- REGLA DE NEGOCIO
+  -- La etiqueta de una versión no se repite dentro del mismo documento.
   UNIQUE (documento_id, etiqueta_version),
   UNIQUE (establecimiento_id, id),
   -- HU-069 y HU-028 una versión publicada tiene fecha de publicación y fecha de inicio de vigencia
+  -- REGLA DE NEGOCIO
+  -- Una versión publicada registra su fecha de publicación y el inicio de su vigencia.
   CONSTRAINT version_publicada_vigente CHECK (estado<>'PUBLICADO' OR (publicado_en IS NOT NULL AND vigente_desde IS NOT NULL))
 );
 
@@ -395,7 +425,11 @@ CREATE TABLE convi.versiones_protocolo (
   publicado_en timestamptz,
   notas text,
   CHECK ( vigente_desde IS NULL OR vigente_hasta IS NULL OR vigente_hasta >= vigente_desde ),
+  -- REGLA DE NEGOCIO
+  -- Una versión de protocolo que deja de ser borrador conserva una fuente o una explicación de su procedencia.
   CHECK ( estado = 'BORRADOR' OR version_documento_origen_id IS NOT NULL OR COALESCE(length(trim(notas)), 0) > 0 ),
+  -- REGLA DE NEGOCIO
+  -- El número de versión es único dentro de cada protocolo.
   UNIQUE (protocolo_id, numero_version),
   UNIQUE (establecimiento_id, id),
   generado_por_ia boolean NOT NULL DEFAULT false,
@@ -415,10 +449,14 @@ CREATE TABLE convi.pasos_protocolo (
   unidad_plazo varchar(20) CHECK (unidad_plazo IS NULL OR unidad_plazo IN ('MINUTOS','HORAS','DIAS_HABILES','DIAS')),
   requiere_evidencia boolean NOT NULL DEFAULT false,
   es_obligatorio boolean NOT NULL DEFAULT true,
+  -- REGLA DE NEGOCIO
+  -- Cada paso ocupa una posición distinta en su versión del protocolo.
   UNIQUE (version_protocolo_id, orden_paso),
   UNIQUE (establecimiento_id, id),
   -- El paso del protocolo solo prevé a Convivencia como responsable, igual que estados_pasos_protocolo_caso.responsable_id
   -- Si en la práctica lo realiza otra persona, se indica en la descripción del paso
+  -- REGLA DE NEGOCIO
+  -- Si un paso tiene perfil responsable, debe ser Convivencia.
   CONSTRAINT paso_responsable_convivencia CHECK (codigo_rol_responsable IS NULL OR codigo_rol_responsable='CONVIVENCIA')
 );
 
@@ -435,8 +473,12 @@ CREATE TABLE convi.protocolos_caso (
   UNIQUE (establecimiento_id, id),
   -- Protocolo aplicado y plan de intervención se completan o cancelan manualmente, sin condiciones sobre pasos o acciones
   -- Completar, cancelar o reabrir exige motivo y queda auditado, la fecha de término la registra el sistema
+  -- REGLA DE NEGOCIO
+  -- Un protocolo aplicado tiene fecha de término cuando se marca como completado.
   CONSTRAINT protocolo_caso_fecha_termino CHECK ((estado='COMPLETADO')=(completado_en IS NOT NULL)),
   -- HU-071 al aplicar un protocolo se guarda el fundamento
+  -- REGLA DE NEGOCIO
+  -- Aplicar un protocolo a un caso requiere explicar el motivo.
   CONSTRAINT protocolo_caso_fundamento CHECK (nullif(trim(fundamento),'') IS NOT NULL)
 );
 
@@ -451,6 +493,8 @@ CREATE TABLE convi.estados_pasos_protocolo_caso (
   completado_por uuid,
   notas text,
   actualizado_en timestamptz NOT NULL DEFAULT now(),
+  -- REGLA DE NEGOCIO
+  -- Cada paso de un protocolo aplicado tiene un único registro de avance.
   UNIQUE (protocolo_caso_id, paso_protocolo_id),
   UNIQUE (establecimiento_id, id),
   responsable_id uuid
@@ -479,6 +523,8 @@ CREATE TABLE convi.planes_intervencion (
   creado_en timestamptz NOT NULL DEFAULT now(),
   completado_en timestamptz,
   UNIQUE (establecimiento_id, id),
+  -- REGLA DE NEGOCIO
+  -- Un plan de intervención tiene fecha de término cuando se completa.
   CONSTRAINT plan_intervencion_fecha_termino CHECK ((estado='COMPLETADO')=(completado_en IS NOT NULL))
 );
 
@@ -495,6 +541,8 @@ CREATE TABLE convi.acciones_plan_intervencion (
   creado_en timestamptz NOT NULL DEFAULT now(),
   UNIQUE (establecimiento_id, id),
   -- HU-054 una acción de intervención completada tiene fecha de cumplimiento
+  -- REGLA DE NEGOCIO
+  -- Completar una acción del plan de intervención requiere registrar la fecha.
   CONSTRAINT accion_intervencion_completada CHECK (estado<>'COMPLETADO' OR completado_en IS NOT NULL)
 );
 
@@ -517,8 +565,14 @@ CREATE TABLE convi.actuaciones (
   proxima_accion text,
   proximo_seguimiento_en timestamptz,
   creado_en timestamptz NOT NULL DEFAULT now(),
+  -- REGLA DE NEGOCIO
+  -- Una actuación realizada guarda la fecha real y el resultado.
   CHECK (estado <> 'REALIZADA' OR (realizado_en IS NOT NULL AND resultado IS NOT NULL)),
+  -- REGLA DE NEGOCIO
+  -- El término programado de una actuación debe ser igual o posterior al inicio.
   CHECK (fin_programado_en IS NULL OR (programado_en IS NOT NULL AND fin_programado_en >= programado_en)),
+  -- REGLA DE NEGOCIO
+  -- El término real de una actuación debe ser igual o posterior al inicio real.
   CHECK (fin_real_en IS NULL OR (realizado_en IS NOT NULL AND fin_real_en >= realizado_en)),
   UNIQUE (establecimiento_id, id),
   creado_por uuid NOT NULL,
@@ -526,6 +580,8 @@ CREATE TABLE convi.actuaciones (
   -- HU-061 y HU-084 fecha de la última modificación para rechazar una edición hecha sobre datos desactualizados
   actualizado_en timestamptz NOT NULL DEFAULT now(),
   -- HU-060 un seguimiento realizado guarda la próxima acción y un seguimiento tiene un solo seguimiento siguiente
+  -- REGLA DE NEGOCIO
+  -- Al completar un seguimiento se registra la próxima acción.
   CONSTRAINT seguimiento_realizado_proxima_accion CHECK (tipo_actuacion<>'SEGUIMIENTO' OR estado<>'REALIZADA' OR nullif(trim(proxima_accion),'') IS NOT NULL)
 );
 
@@ -554,6 +610,8 @@ CREATE TABLE convi.revisiones_compromisos (
   observacion text,
   registrado_en timestamptz NOT NULL DEFAULT now(),
   actuacion_id uuid NOT NULL,
+  -- REGLA DE NEGOCIO
+  -- Un seguimiento solo puede tener una revisión por cada compromiso.
   UNIQUE (actuacion_id, compromiso_id),
   UNIQUE (establecimiento_id, id),
   creado_por uuid NOT NULL
@@ -575,7 +633,11 @@ CREATE TABLE convi.comunicaciones (
   generado_por_ia boolean NOT NULL DEFAULT false,
   referencia_externa varchar(220),
   archivo_respaldo_id uuid,
+  -- REGLA DE NEGOCIO
+  -- Para dejar de ser borrador, un correo debe tener destinatario, asunto y cuerpo.
   CHECK ( tipo_comunicacion <> 'CORREO' OR estado_entrega = 'BORRADOR' OR (direccion_destinatario IS NOT NULL AND asunto IS NOT NULL AND cuerpo_enviado IS NOT NULL) ),
+  -- REGLA DE NEGOCIO
+  -- Un correo enviado, entregado o rebotado conserva su fecha de envío.
   CHECK ( tipo_comunicacion <> 'CORREO' OR estado_entrega NOT IN ('ENVIADO','ENTREGADO','REBOTADO') OR enviado_en IS NOT NULL ),
   UNIQUE (establecimiento_id, id),
   ocurrido_en timestamptz,
@@ -585,6 +647,8 @@ CREATE TABLE convi.comunicaciones (
   clave_envio uuid UNIQUE,
   detalle_error text,
   -- HU-058 una llamada, conversación o comunicación institucional guarda la fecha en que ocurrió
+  -- REGLA DE NEGOCIO
+  -- En una comunicación distinta de correo se registra cuándo ocurrió el contacto.
   CONSTRAINT comunicacion_fecha_ocurrida CHECK (tipo_comunicacion='CORREO' OR ocurrido_en IS NOT NULL)
 );
 
@@ -611,7 +675,11 @@ CREATE TABLE convi.reglas (
   UNIQUE (establecimiento_id, codigo_regla, numero_version),
   UNIQUE (establecimiento_id, id),
   -- Valores permitidos de cada código de la regla, el motor de reglas solo calcula estos valores
+  -- REGLA DE NEGOCIO
+  -- Una regla se evalúa por estudiante, curso, caso o establecimiento.
   CONSTRAINT reglas_ambito_valido CHECK (codigo_ambito IN ('ESTUDIANTE','CURSO','CASO','ESTABLECIMIENTO')),
+  -- REGLA DE NEGOCIO
+  -- Una regla puede guardar una alerta y opcionalmente avisar al equipo.
   CONSTRAINT reglas_accion_valida CHECK (codigo_accion IN ('ALERTA','ALERTA_Y_NOTIFICACION')),
   CONSTRAINT reglas_prioridad_valida CHECK (codigo_prioridad IN ('BAJA','MEDIA','ALTA')),
   CONSTRAINT reglas_metrica_valida CHECK (codigo_metrica IS NULL OR codigo_metrica IN ('CONTEO_SITUACIONES','VARIACION_PORCENTUAL','CONTEO_VENCIDOS')),
@@ -619,6 +687,8 @@ CREATE TABLE convi.reglas (
   -- Cada tipo de regla exige la métrica, el ámbito y los datos que el motor necesita para calcularla
   -- coalesce(...,false) evita que un campo vacío deje la condición en estado desconocido, una CHECK desconocida se aceptaría
   -- OTRO no tiene cálculo automático definido, puede guardarse como borrador o archivarse pero no activarse
+  -- REGLA DE NEGOCIO
+  -- Cada tipo de regla admite una métrica, un ámbito y condiciones acordes con lo que evalúa.
   CONSTRAINT reglas_coherencia_tipo CHECK (coalesce(CASE tipo_regla
    WHEN 'RECURRENCIA' THEN codigo_metrica='CONTEO_SITUACIONES' AND codigo_ambito IN ('ESTUDIANTE','CURSO','ESTABLECIMIENTO')
     AND codigo_operador IS NOT NULL AND valor_umbral IS NOT NULL AND valor_umbral > 0 AND valor_umbral=trunc(valor_umbral)
@@ -670,7 +740,11 @@ CREATE TABLE convi.planes_gestion (
   UNIQUE (establecimiento_id, id),
   -- Plan de Gestión: aprobación por Convivencia, estados, acciones, indicador y responsables
   aprobado_por uuid,
+  -- REGLA DE NEGOCIO
+  -- La aprobación de un Plan de Gestión guarda autor y fecha juntos.
   CONSTRAINT plan_aprobacion_completa CHECK ((aprobado_en IS NULL)=(aprobado_por IS NULL)),
+  -- REGLA DE NEGOCIO
+  -- El Plan de Gestión debe estar aprobado para quedar activo o completado.
   CONSTRAINT plan_activo_aprobado CHECK (estado NOT IN ('ACTIVO','COMPLETADO') OR aprobado_en IS NOT NULL)
 );
 
@@ -703,7 +777,11 @@ CREATE TABLE convi.acciones_plan_gestion (
   unidad_indicador varchar(40),
   UNIQUE (establecimiento_id, id),
   actualizado_en timestamptz NOT NULL DEFAULT now(),
+  -- REGLA DE NEGOCIO
+  -- Para registrar una meta o su valor alcanzado, el indicador necesita nombre y unidad.
   CONSTRAINT accion_indicador_completo CHECK ((meta_indicador IS NULL AND valor_indicador IS NULL) OR (nombre_indicador IS NOT NULL AND unidad_indicador IS NOT NULL)),
+  -- REGLA DE NEGOCIO
+  -- Completar una acción del Plan de Gestión exige fecha y resumen del resultado.
   CONSTRAINT accion_completada_con_resultado CHECK (estado<>'COMPLETADO' OR (completado_en IS NOT NULL AND nullif(trim(resumen_resultado),'') IS NOT NULL))
 );
 
@@ -726,7 +804,11 @@ CREATE TABLE convi.actividades_plan_gestion (
   -- Actividades: inicio y término reales, que no pueden ser futuros
   inicio_real timestamptz,
   fin_real timestamptz,
+  -- REGLA DE NEGOCIO
+  -- El término real de una actividad exige un inicio real igual o anterior.
   CONSTRAINT actividad_fechas_reales CHECK (fin_real IS NULL OR (inicio_real IS NOT NULL AND fin_real>=inicio_real)),
+  -- REGLA DE NEGOCIO
+  -- Completar una actividad del Plan de Gestión exige fechas reales, fecha de cumplimiento y resultado.
   CONSTRAINT actividad_completada_con_resultado CHECK (estado<>'COMPLETADO' OR (inicio_real IS NOT NULL AND fin_real IS NOT NULL AND completado_en IS NOT NULL AND nullif(trim(resumen_resultado),'') IS NOT NULL))
 );
 
@@ -755,7 +837,11 @@ CREATE TABLE convi.evidencias (
   aclaracion_id uuid,
   -- HU-057 tipo de evidencia de un catálogo, HU-062 el acta lleva archivo y fecha del documento, HU-063 una evidencia no se corrige a sí misma
   CONSTRAINT evidencia_tipo_valido CHECK (tipo_evidencia IN ('DOCUMENTO','IMAGEN','CORREO','ACTA','OTRO')),
+  -- REGLA DE NEGOCIO
+  -- Un acta adjunta debe indicar la fecha del documento.
   CONSTRAINT evidencia_acta_fechada CHECK (tipo_evidencia<>'ACTA' OR fecha_documento IS NOT NULL),
+  -- REGLA DE NEGOCIO
+  -- Una evidencia puede rectificar otra evidencia.
   CONSTRAINT evidencia_rectifica_otra CHECK (rectifica_evidencia_id IS NULL OR rectifica_evidencia_id<>id)
 );
 
@@ -796,6 +882,8 @@ CREATE TABLE convi.procesos_importacion (
   mapeo_columnas jsonb NOT NULL DEFAULT '{}'::jsonb,
   opciones_importacion jsonb NOT NULL DEFAULT '{}'::jsonb,
   -- HU-020 el proceso confirmado tiene fecha y cada fila confirmada guarda lo que creó o reutilizó
+  -- REGLA DE NEGOCIO
+  -- Una importación confirmada conserva la fecha de confirmación.
   CONSTRAINT importacion_confirmada_fecha CHECK ((estado='CONFIRMADO')=(confirmado_en IS NOT NULL))
 );
 
@@ -812,6 +900,8 @@ CREATE TABLE convi.filas_importacion (
   UNIQUE (proceso_importacion_id, numero_fila),
   UNIQUE (establecimiento_id, id),
   entidades_confirmadas jsonb NOT NULL DEFAULT '{}'::jsonb,
+  -- REGLA DE NEGOCIO
+  -- Una fila de importación confirmada registra qué entidades se crearon o reutilizaron.
   CONSTRAINT fila_confirmada_entidades CHECK (estado<>'CONFIRMADO' OR entidades_confirmadas<>'{}'::jsonb)
 );
 
@@ -849,7 +939,11 @@ CREATE TABLE convi.registros_solicitudes_ia (
   contexto_explicacion jsonb,
   CONSTRAINT solicitud_ia_proposito_valido CHECK (codigo_proposito IN (
    'CONSULTA_REGLAMENTO','SINTESIS_CASO','PREPARAR_ENCUENTRO','BORRADOR_CORREO','PROPUESTA_PROTOCOLO','EXPLICACION_ALERTA','COMPARACION_PERIODOS','BORRADOR_ACTA','BORRADOR_INFORME')),
+  -- REGLA DE NEGOCIO
+  -- Para explicar una alerta con IA debe indicarse qué alerta se consulta.
   CONSTRAINT solicitud_ia_alerta CHECK (codigo_proposito<>'EXPLICACION_ALERTA' OR alerta_id IS NOT NULL),
+  -- REGLA DE NEGOCIO
+  -- Las explicaciones de alertas y de comparaciones necesitan los datos del cálculo.
   CONSTRAINT solicitud_ia_contexto CHECK (codigo_proposito NOT IN ('EXPLICACION_ALERTA','COMPARACION_PERIODOS') OR (contexto_explicacion IS NOT NULL AND contexto_explicacion<>'{}'::jsonb))
 );
 
@@ -1404,18 +1498,32 @@ ALTER TABLE convi.registros_solicitudes_ia ADD FOREIGN KEY (establecimiento_id, 
 
 CREATE INDEX ON convi.registros_solicitudes_ia (caso_id);
 
+-- REGLA DE NEGOCIO
+-- En un establecimiento, el mismo RUT corresponde como máximo a una ficha de persona.
 CREATE UNIQUE INDEX ON convi.personas (establecimiento_id, rut) WHERE rut IS NOT NULL;
 
+-- REGLA DE NEGOCIO
+-- El correo de invitación es único en cada escuela y se compara sin distinguir mayúsculas.
 CREATE UNIQUE INDEX ON convi.membresias_establecimiento (establecimiento_id, lower(correo_invitacion));
 
+-- REGLA DE NEGOCIO
+-- Un estudiante puede tener una sola matrícula abierta por año académico.
 CREATE UNIQUE INDEX ON convi.matriculas (establecimiento_id, estudiante_id, anio_academico_id) WHERE finalizado_en IS NULL;
 
+-- REGLA DE NEGOCIO
+-- Un profesor puede tener una sola asignación abierta del mismo tipo en el mismo curso.
 CREATE UNIQUE INDEX ON convi.asignaciones_docentes (curso_id, membresia_id, rol_asignacion) WHERE fecha_fin IS NULL;
 
+-- REGLA DE NEGOCIO
+-- Una persona puede participar una sola vez en una situación con el mismo rol vigente.
 CREATE UNIQUE INDEX ON convi.participaciones (situacion_id, persona_id, rol_contextual) WHERE situacion_id IS NOT NULL AND activo_hasta IS NULL;
 
+-- REGLA DE NEGOCIO
+-- Una persona puede participar una sola vez en un caso con el mismo rol vigente.
 CREATE UNIQUE INDEX ON convi.participaciones (caso_id, persona_id, rol_contextual) WHERE caso_id IS NOT NULL AND activo_hasta IS NULL;
 
+-- REGLA DE NEGOCIO
+-- Una persona puede participar una sola vez en una actuación con el mismo rol vigente.
 CREATE UNIQUE INDEX ON convi.participaciones (actuacion_id, persona_id, rol_contextual) WHERE actuacion_id IS NOT NULL AND activo_hasta IS NULL;
 
 ALTER TABLE convi.establecimientos ENABLE ROW LEVEL SECURITY;
@@ -1725,7 +1833,11 @@ ALTER TABLE convi.informes ADD FOREIGN KEY (establecimiento_id) REFERENCES convi
 ALTER TABLE convi.informes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE convi.informes FORCE ROW LEVEL SECURITY;
 ALTER TABLE convi.evidencias ADD FOREIGN KEY (establecimiento_id,aclaracion_id) REFERENCES convi.aclaraciones_situacion (establecimiento_id,id) ON DELETE RESTRICT;
+-- REGLA DE NEGOCIO
+-- El mismo evento de una regla genera una sola alerta por escuela.
 CREATE UNIQUE INDEX alerta_unica ON convi.alertas (establecimiento_id,clave_evento);
+-- REGLA DE NEGOCIO
+-- Cada cuenta recibe un solo aviso por evento.
 CREATE UNIQUE INDEX notificacion_unica ON convi.notificaciones (membresia_destinatario_id,clave_evento) WHERE clave_evento IS NOT NULL;
 CREATE TABLE convi.borradores_documentales_ia (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1782,77 +1894,155 @@ CREATE INDEX ON convi.planes_gestion (aprobado_por);
 CREATE INDEX ON convi.registros_solicitudes_ia (alerta_id);
 -- Cuentas: una identidad de Supabase Auth es una sola cuenta de CONVI (otro perfil u otra escuela usan otro correo)
 -- HU-004 entra al portal de su único perfil, HU-002 reintentar no crea otra escuela, HU-003 una cuenta activada no se vincula a otra identidad
+-- REGLA DE NEGOCIO
+-- Una identidad de inicio de sesión solo puede tener una cuenta registrada en Convi.
 CREATE UNIQUE INDEX membresia_identidad_unica ON convi.membresias_establecimiento (auth_usuario_id) WHERE auth_usuario_id IS NOT NULL;
+-- REGLA DE NEGOCIO
+-- Cada seguimiento puede tener un solo seguimiento siguiente.
 CREATE UNIQUE INDEX seguimiento_siguiente_unico ON convi.actuaciones (seguimiento_anterior_id) WHERE seguimiento_anterior_id IS NOT NULL;
 
 -- ===== 2. Integridad e historia =====
 
 CREATE FUNCTION convi.solo_insertar() RETURNS trigger LANGUAGE plpgsql AS $$
+-- REGLA DE NEGOCIO
+-- Las entradas históricas se corrigen agregando una nueva entrada.
 BEGIN RAISE EXCEPTION 'Registro histórico inmutable, incorporar una nueva entrada'; END $$;
 CREATE FUNCTION convi.validar_relaciones() RETURNS trigger LANGUAGE plpgsql SET search_path=convi,pg_temp AS $$
 DECLARE a record; b record; c record;
 BEGIN
  IF TG_OP='UPDATE' AND to_jsonb(NEW)->>'establecimiento_id' IS DISTINCT FROM to_jsonb(OLD)->>'establecimiento_id' THEN
+ -- REGLA DE NEGOCIO
+ -- Un registro se mantiene en el establecimiento donde fue creado.
  RAISE EXCEPTION 'No se permite trasladar un registro entre establecimientos'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Las actuaciones y relaciones históricas permanecen en su caso original.
  IF TG_OP='UPDATE' AND TG_TABLE_NAME IN ('actuaciones','compromisos','planes_intervencion','protocolos_caso','comunicaciones') AND to_jsonb(NEW)->>'caso_id' IS DISTINCT FROM to_jsonb(OLD)->>'caso_id' THEN RAISE EXCEPTION 'No trasladar una actuación o relación histórica a otro caso'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Una cuenta activada conserva la persona y la identidad con que fue vinculada.
  IF TG_OP='UPDATE' AND TG_TABLE_NAME='membresias_establecimiento' AND ((to_jsonb(NEW)->>'persona_id',to_jsonb(NEW)->>'auth_usuario_id') IS DISTINCT FROM (to_jsonb(OLD)->>'persona_id',to_jsonb(OLD)->>'auth_usuario_id')) AND to_jsonb(OLD)->>'auth_usuario_id' IS NOT NULL THEN RAISE EXCEPTION 'Una membresía activada no cambia de persona o identidad'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Para cambiar al estudiante o al apoderado se crea un vínculo nuevo.
  IF TG_OP='UPDATE' AND TG_TABLE_NAME='apoderados_estudiante' AND (to_jsonb(NEW)->>'persona_apoderado_id',to_jsonb(NEW)->>'estudiante_id') IS DISTINCT FROM (to_jsonb(OLD)->>'persona_apoderado_id',to_jsonb(OLD)->>'estudiante_id') THEN RAISE EXCEPTION 'Crear otra relación de apoderado'; END IF;
  IF TG_TABLE_NAME='matriculas' THEN
  SELECT * INTO a FROM cursos WHERE id=NEW.curso_id;
+ -- REGLA DE NEGOCIO
+ -- El curso de la matrícula pertenece al mismo año académico de la matrícula.
  IF a.anio_academico_id<>NEW.anio_academico_id THEN RAISE EXCEPTION 'El curso no pertenece al año'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Los períodos en que un estudiante está matriculado no pueden superponerse.
  IF EXISTS(SELECT 1 FROM matriculas m WHERE m.estudiante_id=NEW.estudiante_id AND m.id<>NEW.id AND daterange(m.matriculado_en, m.finalizado_en,'[]') && daterange(NEW.matriculado_en,NEW.finalizado_en,'[]')) THEN RAISE EXCEPTION 'Matrículas con períodos superpuestos'; END IF;
  ELSIF TG_TABLE_NAME='accesos_apoderado' THEN
  SELECT * INTO a FROM apoderados_estudiante WHERE id=NEW.apoderado_estudiante_id;
  SELECT * INTO b FROM membresias_establecimiento WHERE id=NEW.membresia_apoderado_id;
+ -- REGLA DE NEGOCIO
+ -- El permiso del portal debe corresponder a la misma persona del vínculo y al perfil Apoderado.
  IF a.persona_apoderado_id<>b.persona_id OR b.codigo_perfil<>'APODERADO' THEN RAISE EXCEPTION 'Permiso asignado a otra persona o perfil'; END IF;
+ -- REGLA DE NEGOCIO
+ -- El acceso activo de un apoderado debe vencer en una fecha posterior a su otorgamiento.
  IF NEW.estado='ACTIVO' AND (NEW.expira_en IS NULL OR NEW.expira_en<=NEW.otorgado_en) THEN RAISE EXCEPTION 'El permiso activo requiere vencimiento posterior al otorgamiento'; END IF;
  ELSIF TG_TABLE_NAME='asignaciones_docentes' THEN
+ -- REGLA DE NEGOCIO
+ -- Las asignaciones docentes corresponden a cuentas de Profesor.
  IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.membresia_id AND codigo_perfil='PROFESOR') THEN RAISE EXCEPTION 'La asignación requiere un profesor'; END IF;
  ELSIF TG_TABLE_NAME='casos' THEN
+ -- REGLA DE NEGOCIO
+ -- Los cambios de estado de un caso pasan por su historial.
  IF TG_OP='UPDATE' AND (NEW.estado_actual,NEW.cerrado_en) IS DISTINCT FROM (OLD.estado_actual,OLD.cerrado_en) AND pg_trigger_depth()<2 THEN RAISE EXCEPTION 'Cambiar estado mediante historial_estados_caso'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Un caso nuevo comienza en análisis.
  IF TG_OP='INSERT' AND NEW.estado_actual<>'EN_ANALISIS' THEN RAISE EXCEPTION 'Un caso nuevo inicia en análisis'; END IF;
  ELSIF TG_TABLE_NAME='situaciones' THEN
+ -- REGLA DE NEGOCIO
+ -- Una situación recién registrada comienza como nueva.
  IF TG_OP='INSERT' AND NEW.estado<>'NUEVA' THEN RAISE EXCEPTION 'Una situación nueva inicia NUEVA'; END IF;
+ -- REGLA DE NEGOCIO
+ -- La decisión de Convivencia determina el nuevo estado o el vínculo de una situación.
  IF TG_OP='UPDATE' AND (NEW.estado,NEW.caso_id) IS DISTINCT FROM (OLD.estado,OLD.caso_id) AND pg_trigger_depth()<2 AND (NEW.estado<>'EN_REVISION' OR NEW.caso_id IS DISTINCT FROM OLD.caso_id) THEN RAISE EXCEPTION 'Registrar el cambio mediante revisiones_convivencia'; END IF;
  SELECT * INTO a FROM membresias_establecimiento WHERE id=NEW.reportado_por_membresia_id;
+ -- REGLA DE NEGOCIO
+ -- Profesor y Convivencia pueden registrar situaciones. El profesor solo puede hacerlo en cursos asignados.
  IF a.codigo_perfil NOT IN ('PROFESOR','CONVIVENCIA') THEN RAISE EXCEPTION 'Perfil no autorizado para reportar'; END IF;
  IF a.codigo_perfil='PROFESOR' AND NOT EXISTS (SELECT 1 FROM asignaciones_docentes x WHERE x.membresia_id=a.id AND x.curso_id=NEW.curso_contexto_id AND (x.fecha_inicio IS NULL OR x.fecha_inicio<=NEW.reportado_en::date) AND (x.fecha_fin IS NULL OR x.fecha_fin>=NEW.reportado_en::date)) THEN RAISE EXCEPTION 'Curso no asignado al profesor'; END IF;
+ -- REGLA DE NEGOCIO
+ -- La revisión de una situación se asigna a una cuenta de Convivencia.
  IF NEW.asignado_a_membresia_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.asignado_a_membresia_id AND codigo_perfil='CONVIVENCIA') THEN RAISE EXCEPTION 'La revisión requiere responsable de Convivencia'; END IF;
+ -- REGLA DE NEGOCIO
+ -- El contenido original de un reporte se conserva. Las aclaraciones se registran aparte.
  IF TG_OP='UPDATE' AND (NEW.descripcion,NEW.ocurrido_en,NEW.reportado_en,NEW.reportado_por_membresia_id,NEW.curso_contexto_id) IS DISTINCT FROM (OLD.descripcion,OLD.ocurrido_en,OLD.reportado_en,OLD.reportado_por_membresia_id,OLD.curso_contexto_id) THEN RAISE EXCEPTION 'El reporte original se conserva, registrar aclaración o nueva revisión'; END IF;
  ELSIF TG_TABLE_NAME='planes_intervencion' THEN
+ -- REGLA DE NEGOCIO
+ -- El protocolo asociado al plan de intervención debe pertenecer al mismo caso.
  IF NEW.protocolo_caso_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM protocolos_caso WHERE id=NEW.protocolo_caso_id AND caso_id=NEW.caso_id) THEN RAISE EXCEPTION 'Protocolo de otro caso'; END IF;
  ELSIF TG_TABLE_NAME='actuaciones' THEN
+ -- REGLA DE NEGOCIO
+ -- La acción asociada a una actuación debe pertenecer al mismo caso.
  IF NEW.accion_plan_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM acciones_plan_intervencion x JOIN planes_intervencion p ON p.id=x.plan_intervencion_id WHERE x.id=NEW.accion_plan_id AND p.caso_id=NEW.caso_id) THEN RAISE EXCEPTION 'Acción de otro caso'; END IF;
+ -- REGLA DE NEGOCIO
+ -- La responsabilidad de una actuación corresponde a Convivencia.
  IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.membresia_responsable_id AND codigo_perfil='CONVIVENCIA') THEN RAISE EXCEPTION 'Responsable de actuación debe ser Convivencia'; END IF;
  ELSIF TG_TABLE_NAME='compromisos' THEN
+ -- REGLA DE NEGOCIO
+ -- La actuación que origina un compromiso debe ser del mismo caso.
  IF NEW.actuacion_origen_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM actuaciones WHERE id=NEW.actuacion_origen_id AND caso_id=NEW.caso_id) THEN RAISE EXCEPTION 'Actuación de otro caso'; END IF;
  ELSIF TG_TABLE_NAME='revisiones_compromisos' THEN
+ -- REGLA DE NEGOCIO
+ -- El avance de un compromiso se registra mediante un seguimiento realizado del mismo caso.
  IF NOT EXISTS(SELECT 1 FROM actuaciones WHERE id=NEW.actuacion_id AND caso_id=NEW.caso_id AND tipo_actuacion='SEGUIMIENTO' AND estado='REALIZADA') OR NOT EXISTS(SELECT 1 FROM compromisos WHERE id=NEW.compromiso_id AND caso_id=NEW.caso_id) THEN RAISE EXCEPTION 'Seguimiento realizado y compromiso deben pertenecer al mismo caso'; END IF;
  ELSIF TG_TABLE_NAME='estados_pasos_protocolo_caso' THEN
  SELECT * INTO a FROM protocolos_caso WHERE id=NEW.protocolo_caso_id;
+ -- REGLA DE NEGOCIO
+ -- El paso debe pertenecer a la misma versión del protocolo que se aplicó al caso.
  IF NOT EXISTS(SELECT 1 FROM pasos_protocolo WHERE id=NEW.paso_protocolo_id AND version_protocolo_id=a.version_protocolo_id) THEN RAISE EXCEPTION 'Paso de otra versión de protocolo'; END IF;
  ELSIF TG_TABLE_NAME='protocolos_caso' THEN
+ -- REGLA DE NEGOCIO
+ -- Para aplicar un protocolo, su versión debe estar publicada.
  IF NOT EXISTS(SELECT 1 FROM versiones_protocolo WHERE id=NEW.version_protocolo_id AND estado='PUBLICADO') THEN RAISE EXCEPTION 'Se aplica una versión publicada'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Un protocolo aplicado conserva su versión, caso, autor y fecha originales.
  IF TG_OP='UPDATE' AND (NEW.caso_id,NEW.version_protocolo_id,NEW.aplicado_por,NEW.aplicado_en) IS DISTINCT FROM (OLD.caso_id,OLD.version_protocolo_id,OLD.aplicado_por,OLD.aplicado_en) THEN RAISE EXCEPTION 'La versión aplicada no se reemplaza'; END IF;
  ELSIF TG_TABLE_NAME='versiones_protocolo' THEN
+ -- REGLA DE NEGOCIO
+ -- Publicar una versión de un protocolo requiere revisor y una fuente o explicación de procedencia.
  IF NEW.estado='PUBLICADO' AND (NEW.revisado_por IS NULL OR (NEW.version_documento_origen_id IS NULL AND nullif(trim(NEW.notas),'') IS NULL)) THEN RAISE EXCEPTION 'Publicación requiere revisor y fuente o procedencia'; END IF;
  ELSIF TG_TABLE_NAME='revisiones_convivencia' THEN
+ -- REGLA DE NEGOCIO
+ -- La revisión de Convivencia debe explicar sus fundamentos.
  IF nullif(trim(NEW.fundamento),'') IS NULL THEN RAISE EXCEPTION 'Indicar fundamento'; END IF;
  IF NEW.situacion_id IS NOT NULL THEN
  PERFORM 1 FROM situaciones WHERE id=NEW.situacion_id FOR UPDATE;
+ -- REGLA DE NEGOCIO
+ -- Una decisión debe partir desde la última revisión registrada.
  IF NEW.revision_anterior_id IS DISTINCT FROM (SELECT id FROM revisiones_convivencia WHERE situacion_id=NEW.situacion_id ORDER BY revisado_en DESC,id DESC LIMIT 1) THEN RAISE EXCEPTION 'La revisión cambió, recargar antes de decidir'; END IF; END IF;
+ -- REGLA DE NEGOCIO
+ -- Las revisiones y decisiones corresponden a Convivencia activa.
  IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.revisado_por AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN RAISE EXCEPTION 'La decisión corresponde a Convivencia activa'; END IF;
  ELSIF TG_TABLE_NAME='historial_estados_caso' THEN
  SELECT * INTO a FROM casos WHERE id=NEW.caso_id FOR UPDATE;
+ -- REGLA DE NEGOCIO
+ -- Cambiar el estado de un caso requiere indicar el motivo.
  IF length(trim(NEW.motivo))=0 THEN RAISE EXCEPTION 'Indicar motivo del cambio'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Antes de cerrar un caso hay que resolver o justificar sus pendientes.
  IF NEW.estado_nuevo='CERRADO' AND (EXISTS(SELECT 1 FROM actuaciones WHERE caso_id=NEW.caso_id AND estado IN ('PLANIFICADA','POSPUESTA')) OR EXISTS(SELECT 1 FROM compromisos WHERE caso_id=NEW.caso_id AND estado NOT IN ('COMPLETADO','CANCELADO')) OR EXISTS(SELECT 1 FROM acciones_plan_intervencion x JOIN planes_intervencion p ON p.id=x.plan_intervencion_id WHERE p.caso_id=NEW.caso_id AND x.estado NOT IN ('COMPLETADO','CANCELADO')) OR EXISTS(SELECT 1 FROM estados_pasos_protocolo_caso x JOIN protocolos_caso p ON p.id=x.protocolo_caso_id WHERE p.caso_id=NEW.caso_id AND x.estado NOT IN ('COMPLETADO','OMITIDO'))) AND nullif(trim(NEW.justificacion_pendientes),'') IS NULL THEN RAISE EXCEPTION 'Resolver o justificar pendientes antes de cerrar'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Un cambio de estado usa el estado vigente del caso.
  IF NEW.estado_anterior IS DISTINCT FROM a.estado_actual THEN RAISE EXCEPTION 'El caso cambió, recargar antes de decidir'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Si se adjunta evidencia de cierre, debe ser un acta del mismo caso.
  IF NEW.evidencia_cierre_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM evidencias e LEFT JOIN actuaciones x ON x.id=e.actuacion_id LEFT JOIN situaciones z ON z.id=e.situacion_id LEFT JOIN compromisos k ON k.id=e.compromiso_id WHERE e.id=NEW.evidencia_cierre_id AND coalesce(e.caso_id,x.caso_id,z.caso_id,k.caso_id)=NEW.caso_id AND e.tipo_evidencia='ACTA') THEN RAISE EXCEPTION 'Acta de cierre debe corresponder al mismo caso'; END IF;
+ -- REGLA DE NEGOCIO
+ -- El cierre de un caso exige un resumen.
  IF NEW.estado_nuevo='CERRADO' AND nullif(trim(NEW.resumen_cierre),'') IS NULL THEN RAISE EXCEPTION 'El cierre requiere resumen'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Un caso cerrado solo cambia de estado al reabrirlo. Para reabrir un caso, debe estar cerrado.
  IF a.estado_actual='CERRADO' AND NEW.estado_nuevo<>'REABIERTO' THEN RAISE EXCEPTION 'Un caso cerrado primero se reabre'; END IF;
  IF a.estado_actual<>'CERRADO' AND NEW.estado_nuevo='REABIERTO' THEN RAISE EXCEPTION 'Solo se reabre un caso cerrado'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Los cambios de estado requieren una cuenta activa de Convivencia.
  IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.cambiado_por AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN RAISE EXCEPTION 'Cambio requiere Convivencia activa'; END IF;
  ELSIF TG_TABLE_NAME='comunicaciones' THEN
+ -- REGLA DE NEGOCIO
+ -- El contenido y el destinatario de un correo enviado se conservan.
  IF TG_OP='UPDATE' AND OLD.enviado_en IS NOT NULL AND (NEW.cuerpo_enviado,NEW.direccion_destinatario,NEW.persona_destinataria_id,NEW.asunto,NEW.enviado_en) IS DISTINCT FROM (OLD.cuerpo_enviado,OLD.direccion_destinatario,OLD.persona_destinataria_id,OLD.asunto,OLD.enviado_en) THEN RAISE EXCEPTION 'Conservar contenido del correo enviado'; END IF;
  END IF;
  RETURN NEW;
@@ -1944,11 +2134,15 @@ CREATE TRIGGER auditar AFTER UPDATE ON convi.estados_pasos_protocolo_caso FOR EA
 CREATE FUNCTION convi.proteger_version() RETURNS trigger LANGUAGE plpgsql SET search_path=convi,pg_temp AS $$
 BEGIN
  IF TG_TABLE_NAME='pasos_protocolo' THEN
+ -- REGLA DE NEGOCIO
+ -- Un paso de protocolo conserva su versión. Solo se alteran los pasos de un borrador.
  IF TG_OP='UPDATE' AND NEW.version_protocolo_id IS DISTINCT FROM OLD.version_protocolo_id THEN RAISE EXCEPTION 'Un paso no cambia de versión'; END IF;
  IF TG_OP='INSERT' THEN
  IF EXISTS(SELECT 1 FROM versiones_protocolo WHERE id=NEW.version_protocolo_id AND estado<>'BORRADOR') THEN RAISE EXCEPTION 'No agregar pasos a versión publicada'; END IF;
  RETURN NEW; END IF;
  IF EXISTS(SELECT 1 FROM versiones_protocolo WHERE id=OLD.version_protocolo_id AND estado<>'BORRADOR') THEN RAISE EXCEPTION 'Pasos publicados inmutables'; END IF;
+ -- REGLA DE NEGOCIO
+ -- El contenido publicado se conserva. Los cambios de contenido requieren otra versión.
  ELSIF OLD.estado<>'BORRADOR' AND NEW.estado='BORRADOR' THEN RAISE EXCEPTION 'Una versión publicada no vuelve a borrador';
  ELSIF OLD.estado<>'BORRADOR' AND (to_jsonb(NEW)-'estado'-'vigente_hasta'-'estado_procesamiento'-'procesado_en'-'detalle_error_procesamiento'-'intentos_procesamiento') IS DISTINCT FROM (to_jsonb(OLD)-'estado'-'vigente_hasta'-'estado_procesamiento'-'procesado_en'-'detalle_error_procesamiento'-'intentos_procesamiento') THEN RAISE EXCEPTION 'Contenido publicado inmutable';
  END IF;
@@ -2062,6 +2256,8 @@ CREATE FUNCTION convi.buscar_fragmentos_normativa(p_vector extensions.vector,p_l
  BEGIN
   IF p_vector IS NULL OR extensions.vector_dims(p_vector)<>1024 THEN RAISE EXCEPTION 'La consulta requiere 1024 dimensiones'; END IF;
   IF p_limite IS NULL OR p_limite<1 OR p_limite>20 THEN RAISE EXCEPTION 'La consulta admite entre 1 y 20 fragmentos'; END IF;
+  -- REGLA DE NEGOCIO
+  -- La consulta normativa con IA se autoriza solo para Convivencia.
   IF NOT convi.sesion_valida() OR NOT EXISTS(SELECT 1 FROM convi.membresias_establecimiento WHERE id=convi.membresia_actual() AND codigo_perfil='CONVIVENCIA') THEN RAISE EXCEPTION 'Consulta normativa de IA autorizada solo para Convivencia'; END IF;
   RETURN QUERY
   SELECT f.id,f.version_documento_id,v.documento_id,f.pagina_desde,f.pagina_hasta,f.contenido,f.embedding OPERATOR(extensions.<=>) p_vector
@@ -2125,83 +2321,145 @@ BEGIN
  actor:=nullif(current_setting('app.membresia_id',true),'')::uuid;
  motivo:=nullif(trim(current_setting('app.motivo_cambio',true)),'');
  IF TG_OP='UPDATE' AND to_jsonb(NEW)->>'establecimiento_id' IS DISTINCT FROM to_jsonb(OLD)->>'establecimiento_id' THEN RAISE EXCEPTION 'No trasladar registros entre establecimientos'; END IF;
+ -- REGLA DE NEGOCIO
+ -- Los registros con autor guardan la cuenta que los creó y conservan esa autoría.
  IF TG_OP='INSERT' AND to_jsonb(NEW) ? 'creado_por' AND actor IS NOT NULL AND (to_jsonb(NEW)->>'creado_por')::uuid IS DISTINCT FROM actor THEN RAISE EXCEPTION 'El autor debe ser la cuenta que registra'; END IF;
  IF TG_OP='UPDATE' AND to_jsonb(NEW) ? 'creado_por' AND to_jsonb(NEW)->>'creado_por' IS DISTINCT FROM to_jsonb(OLD)->>'creado_por' THEN RAISE EXCEPTION 'Conservar autor original'; END IF;
  IF TG_TABLE_NAME='casos' THEN
+  -- REGLA DE NEGOCIO
+  -- El responsable del caso debe tener una cuenta activa de Convivencia.
   IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.asignado_a_membresia_id AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN RAISE EXCEPTION 'Responsable debe ser Convivencia activa'; END IF;
   IF TG_OP='INSERT' THEN NEW.registrado_en:=clock_timestamp(); NEW.abierto_en:=NEW.registrado_en;
   ELSIF NEW.registrado_en IS DISTINCT FROM OLD.registrado_en OR NEW.abierto_en IS DISTINCT FROM OLD.abierto_en OR NEW.abierto_por IS DISTINCT FROM OLD.abierto_por THEN RAISE EXCEPTION 'Conservar fecha y autor de registro'; END IF;
+  -- REGLA DE NEGOCIO
+  -- Cambiar al responsable de un caso requiere explicar el motivo.
   IF TG_OP='UPDATE' AND NEW.asignado_a_membresia_id IS DISTINCT FROM OLD.asignado_a_membresia_id AND motivo IS NULL THEN RAISE EXCEPTION 'Indicar motivo del cambio de responsable'; END IF;
  ELSIF TG_TABLE_NAME='situaciones' THEN
+  -- REGLA DE NEGOCIO
+  -- Una situación debe incluir una descripción.
   IF nullif(trim(NEW.descripcion),'') IS NULL THEN RAISE EXCEPTION 'Indicar descripción'; END IF;
   IF TG_OP='INSERT' THEN NEW.reportado_en:=clock_timestamp(); END IF;
+  -- REGLA DE NEGOCIO
+  -- Solo Convivencia registra situaciones históricas.
   IF NEW.registro_historico AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.reportado_por_membresia_id AND codigo_perfil='CONVIVENCIA') THEN RAISE EXCEPTION 'El registro histórico corresponde a Convivencia'; END IF;
+  -- REGLA DE NEGOCIO
+  -- Cambiar la urgencia o el responsable de una situación exige motivo.
   IF TG_OP='UPDATE' AND (NEW.urgencia,NEW.asignado_a_membresia_id) IS DISTINCT FROM (OLD.urgencia,OLD.asignado_a_membresia_id) AND motivo IS NULL THEN RAISE EXCEPTION 'Indicar motivo de la actualización'; END IF;
  ELSIF TG_TABLE_NAME='revisiones_convivencia' THEN
+  -- REGLA DE NEGOCIO
+  -- Una situación solo puede señalarse como duplicado de otra situación.
   IF NEW.situacion_duplicada_id=NEW.situacion_id THEN RAISE EXCEPTION 'No señalar la misma situación como duplicado'; END IF;
  ELSIF TG_TABLE_NAME='participaciones' THEN
+  -- REGLA DE NEGOCIO
+  -- La matrícula del participante debe corresponder al mismo estudiante y se conserva como antecedente histórico.
   IF NEW.matricula_contexto_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM matriculas m JOIN estudiantes e ON e.id=m.estudiante_id WHERE m.id=NEW.matricula_contexto_id AND e.persona_id=NEW.persona_id) THEN RAISE EXCEPTION 'Matrícula de otra persona'; END IF;
   IF TG_OP='UPDATE' AND (NEW.persona_id,NEW.situacion_id,NEW.caso_id,NEW.actuacion_id,NEW.matricula_contexto_id) IS DISTINCT FROM (OLD.persona_id,OLD.situacion_id,OLD.caso_id,OLD.actuacion_id,OLD.matricula_contexto_id) THEN RAISE EXCEPTION 'Conservar contexto histórico, registrar corrección sin sustituir la participación'; END IF;
  ELSIF TG_TABLE_NAME='actuaciones' THEN
+  -- REGLA DE NEGOCIO
+  -- Una actuación realizada debe registrar el resultado.
   IF NEW.estado='REALIZADA' AND nullif(trim(NEW.resultado),'') IS NULL THEN RAISE EXCEPTION 'Indicar resultado de la actuación'; END IF;
+  -- REGLA DE NEGOCIO
+  -- Una actuación planificada o pospuesta debe conservar la fecha programada.
   IF NEW.estado IN ('PLANIFICADA','POSPUESTA') AND NEW.programado_en IS NULL THEN RAISE EXCEPTION 'Indicar fecha programada'; END IF;
+  -- REGLA DE NEGOCIO
+  -- El seguimiento anterior debe pertenecer al mismo caso.
   IF NEW.seguimiento_anterior_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM actuaciones WHERE id=NEW.seguimiento_anterior_id AND caso_id=NEW.caso_id AND tipo_actuacion='SEGUIMIENTO') THEN RAISE EXCEPTION 'El seguimiento anterior debe corresponder al mismo caso'; END IF;
+  -- REGLA DE NEGOCIO
+  -- Reprogramar una actuación requiere dejar el motivo.
   IF TG_OP='UPDATE' AND (NEW.programado_en,NEW.fin_programado_en) IS DISTINCT FROM (OLD.programado_en,OLD.fin_programado_en) AND motivo IS NULL THEN RAISE EXCEPTION 'Indicar motivo de reprogramación'; END IF;
  ELSIF TG_TABLE_NAME='compromisos' THEN
+  -- REGLA DE NEGOCIO
+  -- El compromiso comienza pendiente y su cumplimiento se cambia mediante una revisión que explica el resultado observado.
   IF TG_OP='INSERT' AND NEW.estado<>'PENDIENTE' THEN RAISE EXCEPTION 'Registrar primero el compromiso y luego su revisión'; END IF;
   IF TG_OP='UPDATE' AND (NEW.estado,NEW.nota_cumplimiento,NEW.completado_en) IS DISTINCT FROM (OLD.estado,OLD.nota_cumplimiento,OLD.completado_en) AND pg_trigger_depth()<2 THEN RAISE EXCEPTION 'Cambiar cumplimiento mediante una revisión'; END IF;
  ELSIF TG_TABLE_NAME='revisiones_compromisos' THEN
   IF nullif(trim(NEW.observacion),'') IS NULL THEN RAISE EXCEPTION 'Explicar el resultado observado'; END IF;
  ELSIF TG_TABLE_NAME='aclaraciones_situacion' THEN
   SELECT * INTO x FROM situaciones WHERE id=NEW.situacion_id;
+  -- REGLA DE NEGOCIO
+  -- Convivencia solicita la aclaración al profesor que registró la situación.
   IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.solicitado_por AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') OR NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.profesor_destinatario_id AND codigo_perfil='PROFESOR') OR NEW.profesor_destinatario_id IS DISTINCT FROM x.reportado_por_membresia_id THEN RAISE EXCEPTION 'Solicitar al profesor autor del reporte'; END IF;
   IF TG_OP='INSERT' AND (NEW.estado<>'PENDIENTE' OR (actor IS NOT NULL AND actor<>NEW.solicitado_por)) THEN RAISE EXCEPTION 'Solo Convivencia crea la solicitud pendiente'; END IF;
   IF TG_OP='UPDATE' THEN
+   -- REGLA DE NEGOCIO
+   -- La solicitud original y su respuesta se conservan. Solo responde el profesor destinatario.
    IF OLD.estado='RESPONDIDA' THEN RAISE EXCEPTION 'La respuesta enviada se conserva, incorporar otra solicitud'; END IF;
    IF (NEW.situacion_id,NEW.solicitado_por,NEW.profesor_destinatario_id,NEW.pregunta,NEW.solicitado_en) IS DISTINCT FROM (OLD.situacion_id,OLD.solicitado_por,OLD.profesor_destinatario_id,OLD.pregunta,OLD.solicitado_en) THEN RAISE EXCEPTION 'Conservar solicitud original'; END IF;
    IF NEW.respondido_por IS DISTINCT FROM NEW.profesor_destinatario_id OR (actor IS NOT NULL AND actor<>NEW.respondido_por) THEN RAISE EXCEPTION 'Solo el profesor destinatario responde'; END IF;
    NEW.respondido_en:=clock_timestamp();
   END IF;
  ELSIF TG_TABLE_NAME='protocolos' THEN
+  -- REGLA DE NEGOCIO
+  -- Una propuesta de protocolo de la IA conserva su carácter de propuesta después de publicarse.
   IF TG_OP='UPDATE' AND NEW.naturaleza<>OLD.naturaleza THEN RAISE EXCEPTION 'Una propuesta de IA no se convierte en protocolo oficial'; END IF;
  ELSIF TG_TABLE_NAME='versiones_protocolo' THEN
   IF NEW.estado='PUBLICADO' THEN
    IF NEW.version_documento_origen_id IS NULL OR NEW.publicado_en IS NULL THEN RAISE EXCEPTION 'Conservar documento de origen y fecha de revisión'; END IF;
+   -- REGLA DE NEGOCIO
+   -- La revisión institucional exige una cuenta activa de Administración o Convivencia.
    IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.revisado_por AND codigo_perfil IN ('ADMIN','CONVIVENCIA') AND estado='ACTIVO') THEN RAISE EXCEPTION 'Revisor institucional autorizado'; END IF;
   END IF;
  ELSIF TG_TABLE_NAME='estados_pasos_protocolo_caso' THEN
+  -- REGLA DE NEGOCIO
+  -- Un paso del protocolo solo se asigna a una cuenta activa de Convivencia.
   IF NEW.responsable_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.responsable_id AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN RAISE EXCEPTION 'Asignar paso a Convivencia activa'; END IF;
   IF NEW.estado='COMPLETADO' THEN
+   -- REGLA DE NEGOCIO
+   -- Completar un paso conserva quién lo hizo y cuándo. Si pide evidencia, debe adjuntarse antes.
    IF NEW.completado_en IS NULL OR NEW.completado_por IS NULL THEN RAISE EXCEPTION 'Conservar fecha y autor del cumplimiento'; END IF;
    IF EXISTS(SELECT 1 FROM pasos_protocolo WHERE id=NEW.paso_protocolo_id AND requiere_evidencia) AND NOT EXISTS(SELECT 1 FROM evidencias WHERE paso_caso_id=NEW.id AND archivo_id IS NOT NULL) THEN RAISE EXCEPTION 'Adjuntar respaldo antes de completar el paso'; END IF;
   END IF;
+  -- REGLA DE NEGOCIO
+  -- Omitir un paso requiere registrar el motivo.
   IF NEW.estado='OMITIDO' AND nullif(trim(NEW.notas),'') IS NULL THEN RAISE EXCEPTION 'Justificar omisión de paso'; END IF;
  ELSIF TG_TABLE_NAME='comunicaciones' THEN
+  -- REGLA DE NEGOCIO
+  -- Convivencia debe confirmar contenido y destinatario antes de enviar un correo.
   IF NEW.tipo_comunicacion='CORREO' AND NEW.estado_entrega IN ('PENDIENTE','ENVIADO','ENTREGADO','REBOTADO') AND (NEW.confirmado_por IS NULL OR NEW.confirmado_en IS NULL OR NEW.clave_envio IS NULL) THEN RAISE EXCEPTION 'Confirmar contenido y destinatario antes de enviar'; END IF;
   IF NEW.confirmado_por IS NOT NULL AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.confirmado_por AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN RAISE EXCEPTION 'Confirmación requiere Convivencia'; END IF;
+  -- REGLA DE NEGOCIO
+  -- Si cambia el contenido o destinatario de un correo ya confirmado, se crea otro borrador.
   IF TG_OP='UPDATE' AND OLD.confirmado_en IS NOT NULL AND OLD.enviado_en IS NULL AND (NEW.cuerpo_enviado,NEW.asunto,NEW.direccion_destinatario) IS DISTINCT FROM (OLD.cuerpo_enviado,OLD.asunto,OLD.direccion_destinatario) THEN RAISE EXCEPTION 'Crear un nuevo borrador si cambia el contenido confirmado'; END IF;
  ELSIF TG_TABLE_NAME='reglas' THEN
+  -- REGLA DE NEGOCIO
+  -- La variación porcentual compara dos períodos de igual duración.
   IF NEW.tipo_regla='VARIACION_PERIODO' AND (NEW.ventana_dias IS NULL OR NEW.ventana_dias<=0 OR NEW.ventana_comparacion_dias IS DISTINCT FROM NEW.ventana_dias OR NEW.codigo_metrica IS DISTINCT FROM 'VARIACION_PORCENTUAL' OR NEW.codigo_operador NOT IN ('GT','GE','LT','LE') OR NEW.codigo_operador IS NULL OR NEW.valor_umbral IS NULL) THEN RAISE EXCEPTION 'Definir ventanas iguales, métrica, operador y umbral de variación'; END IF;
+  -- REGLA DE NEGOCIO
+  -- Cambiar las condiciones de una regla que ya salió de borrador requiere una nueva versión.
   IF TG_OP='UPDATE' AND OLD.estado<>'BORRADOR' AND (to_jsonb(NEW)-'estado'-'vigente_hasta') IS DISTINCT FROM (to_jsonb(OLD)-'estado'-'vigente_hasta') THEN RAISE EXCEPTION 'Crear otra versión de regla'; END IF;
   IF TG_OP='UPDATE' AND OLD.estado<>'BORRADOR' AND NEW.estado='BORRADOR' THEN RAISE EXCEPTION 'Una regla utilizada no vuelve a borrador'; END IF;
  ELSIF TG_TABLE_NAME='filas_importacion' THEN
+  -- REGLA DE NEGOCIO
+  -- Las filas de importación conservan los datos originales del archivo.
   IF TG_OP='UPDATE' AND (NEW.datos_originales,NEW.proceso_importacion_id,NEW.numero_fila) IS DISTINCT FROM (OLD.datos_originales,OLD.proceso_importacion_id,OLD.numero_fila) THEN RAISE EXCEPTION 'Conservar fila original'; END IF;
  ELSIF TG_TABLE_NAME='procesos_importacion' THEN
+  -- REGLA DE NEGOCIO
+  -- La importación masiva se reserva para datos académicos y administrativos.
   IF NEW.tipo_importacion NOT IN ('ESTUDIANTES','CURSOS','PROFESORES','APODERADOS','MATRICULAS','ASIGNACIONES') THEN RAISE EXCEPTION 'Importación reservada a datos administrativos'; END IF;
  ELSIF TG_TABLE_NAME='evidencias' THEN
+  -- REGLA DE NEGOCIO
+  -- Rectificar evidencia requiere un motivo. La evidencia de un paso debe ser del mismo caso.
   IF NEW.rectifica_evidencia_id IS NOT NULL AND nullif(trim(NEW.motivo_rectificacion),'') IS NULL THEN RAISE EXCEPTION 'Explicar la rectificación'; END IF;
   IF NEW.paso_caso_id IS NOT NULL THEN
    SELECT p.caso_id INTO contexto FROM estados_pasos_protocolo_caso ep JOIN protocolos_caso p ON p.id=ep.protocolo_caso_id WHERE ep.id=NEW.paso_caso_id;
    IF contexto IS DISTINCT FROM coalesce(NEW.caso_id,(SELECT caso_id FROM actuaciones WHERE id=NEW.actuacion_id),(SELECT caso_id FROM situaciones WHERE id=NEW.situacion_id),(SELECT caso_id FROM compromisos WHERE id=NEW.compromiso_id)) THEN RAISE EXCEPTION 'Respaldo de paso debe pertenecer al mismo caso'; END IF;
   END IF;
  ELSIF TG_TABLE_NAME='cursos_actividad' THEN
+  -- REGLA DE NEGOCIO
+  -- Los cursos asociados a una actividad deben ser del mismo año que el Plan de Gestión.
   IF NOT EXISTS(SELECT 1 FROM actividades_plan_gestion a JOIN acciones_plan_gestion ac ON ac.id=a.accion_plan_id JOIN objetivos_plan_gestion o ON o.id=ac.objetivo_id JOIN planes_gestion p ON p.id=o.plan_gestion_id JOIN cursos c ON c.anio_academico_id=p.anio_academico_id WHERE a.id=NEW.actividad_id AND c.id=NEW.curso_id) THEN RAISE EXCEPTION 'Curso debe corresponder al año del Plan'; END IF;
  ELSIF TG_TABLE_NAME='profesionales_actividad' THEN
+  -- REGLA DE NEGOCIO
+  -- La actividad se asigna a profesionales activos de Convivencia o a profesores activos.
   IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.membresia_id AND codigo_perfil IN ('CONVIVENCIA','PROFESOR') AND estado='ACTIVO') THEN RAISE EXCEPTION 'Profesional institucional activo requerido'; END IF;
  ELSIF TG_TABLE_NAME='informes' THEN
+  -- REGLA DE NEGOCIO
+  -- Un informe publicado se modifica creando una nueva edición.
   IF TG_OP='UPDATE' AND OLD.estado='PUBLICADO' THEN RAISE EXCEPTION 'El informe publicado se conserva, crear nueva edición'; END IF;
   IF NEW.informe_anterior_id=NEW.id THEN RAISE EXCEPTION 'Informe no puede ser su propia edición anterior'; END IF;
  ELSIF TG_TABLE_NAME='fragmentos_rag' THEN
+  -- REGLA DE NEGOCIO
+  -- El texto y las páginas de una versión publicada se mantienen como referencia histórica.
   IF TG_OP='UPDATE' AND (NEW.contenido,NEW.version_documento_id,NEW.pagina_desde,NEW.pagina_hasta) IS DISTINCT FROM (OLD.contenido,OLD.version_documento_id,OLD.pagina_desde,OLD.pagina_hasta) AND EXISTS(SELECT 1 FROM versiones_documento WHERE id=OLD.version_documento_id AND estado<>'BORRADOR') THEN RAISE EXCEPTION 'Conservar texto y páginas del documento publicado'; END IF;
  END IF;
  RETURN NEW;
@@ -2229,6 +2487,8 @@ CREATE FUNCTION convi.exigir_estudiante_situacion() RETURNS trigger LANGUAGE plp
 DECLARE sid uuid;
 BEGIN
  IF TG_TABLE_NAME='situaciones' THEN sid:=NEW.id; ELSE sid:=CASE WHEN TG_OP='DELETE' THEN OLD.situacion_id ELSE NEW.situacion_id END; END IF;
+ -- REGLA DE NEGOCIO
+ -- Cada situación debe incluir al menos un estudiante.
  IF sid IS NOT NULL AND EXISTS(SELECT 1 FROM situaciones WHERE id=sid) AND NOT EXISTS(SELECT 1 FROM participaciones p JOIN estudiantes e ON e.persona_id=p.persona_id WHERE p.situacion_id=sid) THEN RAISE EXCEPTION 'La situación debe incluir al menos un estudiante'; END IF;
  RETURN NULL;
 END $$;
@@ -2245,27 +2505,41 @@ DECLARE doc_tipo text; solicitud registros_solicitudes_ia%ROWTYPE; previo borrad
 BEGIN
  IF TG_TABLE_NAME='versiones_documento' THEN
   SELECT tipo_documento INTO doc_tipo FROM documentos_institucionales WHERE id=NEW.documento_id;
+  -- REGLA DE NEGOCIO
+  -- Una plantilla se usa para preparar documentos y queda fuera de la búsqueda normativa con IA.
   IF doc_tipo='PLANTILLA' AND NEW.incluir_en_busqueda_ia THEN RAISE EXCEPTION 'La plantilla no es fuente normativa de IA'; END IF;
   IF NOT NEW.incluir_en_busqueda_ia AND NEW.estado_procesamiento NOT IN ('PENDIENTE','NO_APLICA') THEN RAISE EXCEPTION 'El procesamiento exige una versión habilitada para búsqueda'; END IF;
   IF NEW.estado_procesamiento='FALLIDO' AND nullif(trim(NEW.detalle_error_procesamiento),'') IS NULL THEN RAISE EXCEPTION 'Explicar el error de procesamiento'; END IF;
   IF NEW.estado_procesamiento<>'FALLIDO' AND NEW.detalle_error_procesamiento IS NOT NULL THEN RAISE EXCEPTION 'El error corresponde solamente al intento fallido vigente'; END IF;
   IF TG_OP='UPDATE' AND NEW.intentos_procesamiento<OLD.intentos_procesamiento THEN RAISE EXCEPTION 'No reducir los intentos registrados'; END IF;
  ELSIF TG_TABLE_NAME='fragmentos_rag' THEN
+  -- REGLA DE NEGOCIO
+  -- Solo las versiones habilitadas para búsqueda pueden aportar fragmentos a la IA.
   IF NOT EXISTS(SELECT 1 FROM versiones_documento WHERE id=NEW.version_documento_id AND incluir_en_busqueda_ia) THEN RAISE EXCEPTION 'Habilitar la versión antes de crear fragmentos'; END IF;
  ELSIF TG_TABLE_NAME='borradores_documentales_ia' THEN
   SELECT * INTO solicitud FROM registros_solicitudes_ia WHERE id=NEW.solicitud_ia_id;
+  -- REGLA DE NEGOCIO
+  -- El borrador requiere una solicitud de IA completada para el mismo autor, tipo y caso.
   IF solicitud.estado<>'COMPLETADO' OR solicitud.codigo_proposito IS DISTINCT FROM ('BORRADOR_'||NEW.tipo_borrador) OR solicitud.caso_id IS DISTINCT FROM NEW.caso_id OR solicitud.membresia_id<>NEW.creado_por THEN RAISE EXCEPTION 'El borrador requiere solicitud IA completada del mismo autor y contexto'; END IF;
+  -- REGLA DE NEGOCIO
+  -- Solo Convivencia activa puede crear y revisar borradores documentales.
   IF NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.creado_por AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN RAISE EXCEPTION 'Solo Convivencia crea borradores documentales'; END IF;
   IF NEW.actuacion_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM actuaciones WHERE id=NEW.actuacion_id AND caso_id=NEW.caso_id) THEN RAISE EXCEPTION 'La actuación debe pertenecer al caso del borrador'; END IF;
   IF NEW.revisado_por IS NOT NULL AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.revisado_por AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN RAISE EXCEPTION 'Revisor de Convivencia activo requerido'; END IF;
   IF TG_OP='INSERT' THEN
+   -- REGLA DE NEGOCIO
+   -- Un borrador recién creado queda pendiente de revisión.
    IF NEW.estado<>'BORRADOR' THEN RAISE EXCEPTION 'Un borrador nuevo inicia pendiente de revisión'; END IF;
    NEW.creado_en:=clock_timestamp();
    IF NEW.borrador_anterior_id IS NOT NULL THEN
     SELECT * INTO previo FROM borradores_documentales_ia WHERE id=NEW.borrador_anterior_id;
+    -- REGLA DE NEGOCIO
+    -- La nueva edición de un borrador mantiene el mismo contexto que la anterior.
     IF previo.tipo_borrador<>NEW.tipo_borrador OR previo.caso_id IS DISTINCT FROM NEW.caso_id OR previo.informe_id IS DISTINCT FROM NEW.informe_id OR previo.actuacion_id IS DISTINCT FROM NEW.actuacion_id THEN RAISE EXCEPTION 'La edición anterior debe conservar el mismo contexto'; END IF;
    END IF;
   ELSE
+   -- REGLA DE NEGOCIO
+   -- Cambiar el texto de un borrador genera otra edición y conserva las anteriores.
    IF (to_jsonb(NEW)-'estado'-'revisado_por'-'revisado_en') IS DISTINCT FROM (to_jsonb(OLD)-'estado'-'revisado_por'-'revisado_en') THEN RAISE EXCEPTION 'Conservar el texto generado, crear otro borrador para modificarlo'; END IF;
    IF OLD.estado<>'BORRADOR' THEN RAISE EXCEPTION 'La revisión documental se conserva'; END IF;
    IF NEW.estado<>'BORRADOR' THEN NEW.revisado_en:=clock_timestamp(); END IF;
@@ -2275,6 +2549,8 @@ BEGIN
    SELECT plazo_cierre_dias INTO NEW.plazo_cierre_dias_aplicado FROM establecimientos WHERE id=NEW.establecimiento_id;
    IF NEW.plazo_cierre_dias_aplicado IS NOT NULL THEN NEW.fecha_limite_cierre:=NEW.fecha_inicio+NEW.plazo_cierre_dias_aplicado; END IF;
   END IF;
+  -- REGLA DE NEGOCIO
+  -- Modificar el plazo de cierre del caso requiere motivo.
   IF TG_OP='UPDATE' AND (NEW.plazo_cierre_dias_aplicado,NEW.fecha_limite_cierre) IS DISTINCT FROM (OLD.plazo_cierre_dias_aplicado,OLD.fecha_limite_cierre) AND nullif(trim(current_setting('app.motivo_cambio',true)),'') IS NULL THEN RAISE EXCEPTION 'Justificar el ajuste del plazo de cierre'; END IF;
  END IF;
  RETURN NEW;
@@ -2306,18 +2582,26 @@ BEGIN
  IF TG_TABLE_NAME='reglas' THEN
   IF NEW.categoria_id IS NOT NULL AND (TG_OP='INSERT' OR NEW.categoria_id IS DISTINCT FROM OLD.categoria_id)
    AND NOT EXISTS(SELECT 1 FROM categorias_convivencia WHERE id=NEW.categoria_id AND estado='ACTIVO') THEN
+   -- REGLA DE NEGOCIO
+   -- Si una regla usa una categoría, debe estar activa al definirla.
    RAISE EXCEPTION 'La regla requiere una categoría activa'; END IF;
  ELSIF TG_TABLE_NAME='alertas' THEN
   IF TG_OP='INSERT' THEN
    SELECT * INTO r FROM reglas WHERE id=NEW.regla_id;
+   -- REGLA DE NEGOCIO
+   -- Solo una regla activa puede generar alertas.
    IF r.estado<>'ACTIVO' THEN RAISE EXCEPTION 'Solo una regla activa genera alertas'; END IF;
    IF (r.codigo_ambito='ESTUDIANTE' AND (NEW.estudiante_id IS NULL OR NEW.curso_id IS NOT NULL OR NEW.caso_id IS NOT NULL))
     OR (r.codigo_ambito='CURSO' AND (NEW.curso_id IS NULL OR NEW.estudiante_id IS NOT NULL OR NEW.caso_id IS NOT NULL))
     OR (r.codigo_ambito='CASO' AND (NEW.caso_id IS NULL OR NEW.estudiante_id IS NOT NULL OR NEW.curso_id IS NOT NULL))
     OR (r.codigo_ambito='ESTABLECIMIENTO' AND num_nonnulls(NEW.estudiante_id,NEW.curso_id,NEW.caso_id)>0) THEN
+    -- REGLA DE NEGOCIO
+    -- La alerta debe apuntar al tipo de registro indicado por la regla.
     RAISE EXCEPTION 'La alerta debe referirse al registro que indica el ámbito de su regla'; END IF;
   ELSE
    IF (to_jsonb(NEW)-'estado'-'revisado_por'-'revisado_en'-'observacion_revision') IS DISTINCT FROM (to_jsonb(OLD)-'estado'-'revisado_por'-'revisado_en'-'observacion_revision') THEN
+    -- REGLA DE NEGOCIO
+    -- El cálculo de una alerta se conserva. Convivencia activa registra la atención con fecha y observación.
     RAISE EXCEPTION 'Conservar la alerta y su explicación, solo se registra su revisión'; END IF;
    IF OLD.estado<>'NUEVA' AND NEW.observacion_revision IS DISTINCT FROM OLD.observacion_revision THEN
     RAISE EXCEPTION 'La observación de una alerta revisada se conserva'; END IF;
@@ -2357,6 +2641,8 @@ DECLARE actor uuid:=nullif(current_setting('app.membresia_id',true),'')::uuid;
 BEGIN
  IF NEW.estado IS DISTINCT FROM OLD.estado THEN
   IF (NEW.estado IN ('COMPLETADO','CANCELADO') OR OLD.estado IN ('COMPLETADO','CANCELADO')) AND nullif(trim(current_setting('app.motivo_cambio',true)),'') IS NULL THEN
+   -- REGLA DE NEGOCIO
+   -- Completar, cancelar o reabrir un protocolo aplicado o un plan de intervención requiere motivo.
    RAISE EXCEPTION 'Indicar motivo para completar, cancelar o reabrir'; END IF;
   IF actor IS NOT NULL AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=actor AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN
    RAISE EXCEPTION 'El término corresponde a Convivencia activa'; END IF;
@@ -2439,6 +2725,8 @@ CREATE FUNCTION convi.validar_notificacion() RETURNS trigger LANGUAGE plpgsql SE
 DECLARE actor uuid:=nullif(current_setting('app.membresia_id',true),'')::uuid;
 BEGIN
  IF TG_OP='INSERT' AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.membresia_destinatario_id AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN
+  -- REGLA DE NEGOCIO
+  -- El motor envía avisos de alerta a las cuentas activas de Convivencia.
   RAISE EXCEPTION 'Los avisos solo se envían a cuentas activas de Convivencia'; END IF;
  IF TG_OP='UPDATE' THEN
   IF (to_jsonb(NEW)-'leido_en') IS DISTINCT FROM (to_jsonb(OLD)-'leido_en') THEN
@@ -2446,6 +2734,8 @@ BEGIN
   IF OLD.leido_en IS NOT NULL AND NEW.leido_en IS DISTINCT FROM OLD.leido_en THEN
    RAISE EXCEPTION 'La fecha de lectura se conserva'; END IF;
   IF actor IS NOT NULL AND actor<>NEW.membresia_destinatario_id THEN
+   -- REGLA DE NEGOCIO
+   -- Cada destinatario marca su propio aviso como leído.
    RAISE EXCEPTION 'Solo la persona destinataria marca el aviso como leído'; END IF;
  END IF;
  RETURN NEW;
@@ -2458,6 +2748,8 @@ BEGIN
  IF TG_TABLE_NAME='planes_gestion' THEN
   IF NEW.aprobado_por IS NOT NULL AND (TG_OP='INSERT' OR NEW.aprobado_por IS DISTINCT FROM OLD.aprobado_por)
    AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.aprobado_por AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN
+   -- REGLA DE NEGOCIO
+   -- El Plan de Gestión lo aprueba una cuenta activa de Convivencia.
    RAISE EXCEPTION 'La aprobación del plan corresponde a un profesional de Convivencia activo'; END IF;
   IF NEW.aprobado_en > ahora THEN RAISE EXCEPTION 'La fecha de aprobación no puede ser futura'; END IF;
   IF TG_OP='UPDATE' THEN
@@ -2466,6 +2758,8 @@ BEGIN
    IF OLD.aprobado_en IS NOT NULL AND (NEW.aprobado_en,NEW.aprobado_por) IS DISTINCT FROM (OLD.aprobado_en,OLD.aprobado_por) THEN
     RAISE EXCEPTION 'La aprobación registrada se conserva'; END IF;
    IF OLD.estado<>'BORRADOR' AND (NEW.nombre,NEW.anio_academico_id) IS DISTINCT FROM (OLD.nombre,OLD.anio_academico_id) THEN
+    -- REGLA DE NEGOCIO
+    -- Un plan aprobado conserva su nombre y año.
     RAISE EXCEPTION 'Un plan aprobado conserva su nombre y año'; END IF;
   END IF;
   RETURN NEW;
@@ -2478,6 +2772,8 @@ BEGIN
  ELSE
   SELECT p.* INTO pl FROM planes_gestion p JOIN objetivos_plan_gestion o ON o.plan_gestion_id=p.id JOIN acciones_plan_gestion a ON a.objetivo_id=o.id WHERE a.id=NEW.accion_plan_id;
  END IF;
+ -- REGLA DE NEGOCIO
+ -- Los planes completados o archivados conservan su contenido.
  IF pl.estado IN ('COMPLETADO','ARCHIVADO') THEN RAISE EXCEPTION 'El plan % no admite cambios',lower(pl.estado); END IF;
  -- Cada bloque lee solo campos que existen en su tabla
  IF TG_TABLE_NAME IN ('acciones_plan_gestion','actividades_plan_gestion') THEN
@@ -2491,10 +2787,14 @@ BEGIN
  IF TG_TABLE_NAME='acciones_plan_gestion' THEN
   IF NEW.estado='COMPLETADO' AND (TG_OP='INSERT' OR OLD.estado<>'COMPLETADO') THEN
    IF EXISTS(SELECT 1 FROM actividades_plan_gestion WHERE accion_plan_id=NEW.id AND estado IN ('PLANIFICADO','EN_PROGRESO')) THEN
+    -- REGLA DE NEGOCIO
+    -- Para completar una acción hay que completar o cancelar sus actividades pendientes.
     RAISE EXCEPTION 'Completar o cancelar las actividades pendientes antes de completar la acción'; END IF;
   END IF;
  END IF;
  IF TG_TABLE_NAME='actividades_plan_gestion' THEN
+  -- REGLA DE NEGOCIO
+  -- Las fechas reales de una actividad no pueden estar en el futuro.
   IF NEW.inicio_real > ahora OR NEW.fin_real > ahora THEN RAISE EXCEPTION 'Las fechas reales de la actividad no pueden ser futuras'; END IF;
  END IF;
  RETURN NEW;
@@ -2508,6 +2808,8 @@ CREATE FUNCTION convi.conservar_contexto_ia() RETURNS trigger LANGUAGE plpgsql S
 BEGIN
  IF (NEW.membresia_id,NEW.caso_id,NEW.codigo_proposito,NEW.alerta_id,NEW.contexto_explicacion,NEW.iniciado_en)
   IS DISTINCT FROM (OLD.membresia_id,OLD.caso_id,OLD.codigo_proposito,OLD.alerta_id,OLD.contexto_explicacion,OLD.iniciado_en) THEN
+  -- REGLA DE NEGOCIO
+  -- Una solicitud de IA conserva el contexto que recibió y registra su resultado.
   RAISE EXCEPTION 'Se conserva el contexto que recibió la IA, solo se registra el resultado de la solicitud'; END IF;
  RETURN NEW;
 END $$;
@@ -2522,13 +2824,19 @@ BEGIN
  -- HU-009 solo un administrador activo de la escuela invita
  IF NEW.invitado_por IS NOT NULL AND (TG_OP='INSERT' OR NEW.invitado_por IS DISTINCT FROM OLD.invitado_por)
   AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.invitado_por AND codigo_perfil='ADMIN' AND estado='ACTIVO') THEN
+  -- REGLA DE NEGOCIO
+  -- Solo un administrador activo puede invitar cuentas.
   RAISE EXCEPTION 'Solo un administrador activo invita cuentas'; END IF;
  IF TG_OP='UPDATE' THEN
   -- HU-009 y HU-003 el perfil asignado no cambia, otro perfil requiere otra cuenta con otro correo
   IF NEW.codigo_perfil IS DISTINCT FROM OLD.codigo_perfil THEN
+   -- REGLA DE NEGOCIO
+   -- El perfil de una cuenta se conserva. Para usar otro perfil se necesita otra cuenta con otro correo.
    RAISE EXCEPTION 'El perfil de una cuenta no cambia, otro perfil requiere otra cuenta con otro correo'; END IF;
   -- HU-132 reactivar una cuenta suspendida exige motivo, la auditoría guarda el estado anterior
   IF OLD.estado='SUSPENDIDO' AND NEW.estado='ACTIVO' AND nullif(trim(current_setting('app.motivo_cambio',true)),'') IS NULL THEN
+   -- REGLA DE NEGOCIO
+   -- Reactivar una cuenta requiere un motivo.
    RAISE EXCEPTION 'Indicar motivo para reactivar la cuenta'; END IF;
  END IF;
  RETURN NEW;
@@ -2550,11 +2858,15 @@ RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=convi,pg_temp AS 
 DECLARE correo text; verificado timestamptz; m record; escuela uuid; persona uuid; zona text:=coalesce(nullif(trim(p_zona_horaria),''),'America/Santiago');
 BEGIN
  SELECT u.email,u.email_confirmed_at INTO correo,verificado FROM auth.users u WHERE u.id=p_auth_usuario_id;
+ -- REGLA DE NEGOCIO
+ -- Para crear una escuela, el correo de quien se registra debe estar verificado.
  IF correo IS NULL OR verificado IS NULL THEN RAISE EXCEPTION 'Verificar el correo antes de crear la escuela'; END IF;
  PERFORM pg_advisory_xact_lock(hashtext('registro:'||p_auth_usuario_id::text));
  SELECT * INTO m FROM membresias_establecimiento WHERE auth_usuario_id=p_auth_usuario_id;
  IF FOUND THEN
   IF m.codigo_perfil='ADMIN' AND m.invitado_por IS NULL THEN RETURN m.establecimiento_id; END IF;
+  -- REGLA DE NEGOCIO
+  -- Una identidad verificada solo puede registrar una cuenta en Convi.
   RAISE EXCEPTION 'Esta identidad ya tiene una cuenta en CONVI, usar otro correo';
  END IF;
  IF nullif(trim(p_nombre_escuela),'') IS NULL OR nullif(trim(p_nombres),'') IS NULL OR nullif(trim(p_apellidos),'') IS NULL THEN
@@ -2577,10 +2889,14 @@ CREATE FUNCTION convi.activar_invitacion(p_membresia_id uuid,p_auth_usuario_id u
 DECLARE correo text; verificado timestamptz; m record;
 BEGIN
  SELECT u.email,u.email_confirmed_at INTO correo,verificado FROM auth.users u WHERE u.id=p_auth_usuario_id;
+ -- REGLA DE NEGOCIO
+ -- Activar una invitación requiere un correo verificado que coincida con la dirección invitada.
  IF correo IS NULL OR verificado IS NULL THEN RAISE EXCEPTION 'La identidad debe tener el correo verificado'; END IF;
  SELECT * INTO m FROM membresias_establecimiento WHERE id=p_membresia_id FOR UPDATE;
  IF NOT FOUND OR lower(m.correo_invitacion)<>lower(correo) THEN RAISE EXCEPTION 'La invitación no corresponde a este correo'; END IF;
  IF m.estado='ACTIVO' AND m.auth_usuario_id=p_auth_usuario_id THEN RETURN m.establecimiento_id; END IF;
+ -- REGLA DE NEGOCIO
+ -- Una invitación solo se activa una vez y para una escuela activa.
  IF m.estado<>'PENDIENTE' OR m.auth_usuario_id IS NOT NULL THEN RAISE EXCEPTION 'La invitación ya fue usada o no está vigente'; END IF;
  IF EXISTS(SELECT 1 FROM membresias_establecimiento WHERE auth_usuario_id=p_auth_usuario_id) THEN RAISE EXCEPTION 'Esta identidad ya tiene una cuenta en CONVI, usar otro correo'; END IF;
  IF NOT EXISTS(SELECT 1 FROM establecimientos WHERE id=m.establecimiento_id AND estado='ACTIVO') THEN RAISE EXCEPTION 'La escuela no está activa'; END IF;
@@ -2596,6 +2912,8 @@ BEGIN
  IF TG_OP='UPDATE' THEN
   IF NEW.id<>OLD.id OR NEW.creado_en IS DISTINCT FROM OLD.creado_en THEN RAISE EXCEPTION 'Conservar identificador y fecha de incorporación de la escuela'; END IF;
   IF OLD.onboarding_completado_en IS NOT NULL AND NEW.onboarding_completado_en IS DISTINCT FROM OLD.onboarding_completado_en THEN
+   -- REGLA DE NEGOCIO
+   -- La guía inicial conserva la fecha en que se completó.
    RAISE EXCEPTION 'La fecha en que terminó la guía inicial se conserva'; END IF;
   IF (to_jsonb(NEW)-'actualizado_en') IS DISTINCT FROM (to_jsonb(OLD)-'actualizado_en') THEN NEW.actualizado_en:=clock_timestamp(); END IF;
  END IF;
@@ -2617,12 +2935,16 @@ DECLARE motivo text:=nullif(trim(current_setting('app.motivo_cambio',true)),'');
 BEGIN
  IF TG_TABLE_NAME='estudiantes' THEN
   -- HU-016 la ficha del estudiante no pasa a otra persona
+  -- REGLA DE NEGOCIO
+  -- La ficha de un estudiante sigue asociada a la misma persona.
   IF TG_OP='UPDATE' AND NEW.persona_id IS DISTINCT FROM OLD.persona_id THEN RAISE EXCEPTION 'La ficha del estudiante no se asigna a otra persona'; END IF;
 
  ELSIF TG_TABLE_NAME IN ('cursos','asignaciones_docentes') THEN
   -- HU-012 un nivel desactivado no se ofrece para cursos nuevos
   IF TG_TABLE_NAME='cursos' THEN
    IF NEW.nivel_id IS NOT NULL AND (TG_OP='INSERT' OR NEW.nivel_id IS DISTINCT FROM OLD.nivel_id) AND NOT EXISTS(SELECT 1 FROM niveles_educativos WHERE id=NEW.nivel_id AND activo) THEN
+    -- REGLA DE NEGOCIO
+    -- Solo los niveles activos se ofrecen para crear cursos.
     RAISE EXCEPTION 'El nivel está desactivado y no se ofrece para cursos nuevos'; END IF;
    SELECT estado INTO estado_anio FROM anios_academicos WHERE id=NEW.anio_academico_id;
    IF TG_OP='UPDATE' AND estado_anio<>'CERRADO' THEN SELECT estado INTO estado_anio FROM anios_academicos WHERE id=OLD.anio_academico_id; END IF;
@@ -2631,6 +2953,8 @@ BEGIN
   END IF;
   -- HU-018 un año cerrado no admite cambios ordinarios en cursos ni asignaciones, una corrección exige motivo y queda auditada
   IF estado_anio='CERRADO' THEN
+   -- REGLA DE NEGOCIO
+   -- Corregir datos de un año académico cerrado requiere justificar el cambio.
    IF motivo IS NULL THEN RAISE EXCEPTION 'El año académico está cerrado, una corrección requiere motivo'; END IF;
    IF TG_OP='INSERT' THEN
     INSERT INTO eventos_auditoria(establecimiento_id,membresia_actor_id,codigo_accion,tipo_recurso,recurso_id,codigo_resultado,metadatos)
@@ -2643,12 +2967,16 @@ BEGIN
   -- HU-023 una categoría inactiva no se ofrece para nuevas situaciones
   IF NEW.categoria_id IS NOT NULL AND (TG_OP='INSERT' OR NEW.categoria_id IS DISTINCT FROM OLD.categoria_id)
    AND NOT EXISTS(SELECT 1 FROM categorias_convivencia WHERE id=NEW.categoria_id AND estado='ACTIVO') THEN
+   -- REGLA DE NEGOCIO
+   -- Solo las categorías activas se ofrecen al registrar una situación.
    RAISE EXCEPTION 'La categoría está inactiva y no se ofrece para nuevas situaciones'; END IF;
 
  ELSIF TG_TABLE_NAME='revisiones_convivencia' THEN
   IF NEW.tipo_revision='DECISION' THEN
    SELECT * INTO x FROM situaciones WHERE id=NEW.situacion_id;
    -- HU-045 una situación vinculada a un caso no se traslada a otro caso ni se desvincula
+   -- REGLA DE NEGOCIO
+   -- Una situación vinculada permanece en el caso al que se incorporó.
    IF x.estado='VINCULADA_CASO' THEN RAISE EXCEPTION 'Una situación vinculada a un caso no se traslada ni se desvincula'; END IF;
    -- HU-045 solo se vincula a un caso que comparte al menos un estudiante con la situación
    IF NEW.resultado='VINCULADA_CASO' AND NOT EXISTS(
@@ -2656,12 +2984,16 @@ BEGIN
     WHERE ps.situacion_id=NEW.situacion_id AND (
      EXISTS(SELECT 1 FROM participaciones pc WHERE pc.caso_id=NEW.caso_destino_id AND pc.persona_id=ps.persona_id)
      OR EXISTS(SELECT 1 FROM participaciones po JOIN situaciones so ON so.id=po.situacion_id WHERE so.caso_id=NEW.caso_destino_id AND po.persona_id=ps.persona_id))) THEN
+    -- REGLA DE NEGOCIO
+    -- El caso y la situación que se vincula deben tener al menos un estudiante en común.
     RAISE EXCEPTION 'El caso debe compartir al menos un estudiante con la situación'; END IF;
   END IF;
 
  ELSIF TG_TABLE_NAME='casos' THEN
   -- HU-046 y HU-065 solo un profesional de Convivencia activo abre casos
   IF TG_OP='INSERT' AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.abierto_por AND codigo_perfil='CONVIVENCIA' AND estado='ACTIVO') THEN
+   -- REGLA DE NEGOCIO
+   -- Solo una cuenta activa de Convivencia abre casos y aplica protocolos.
    RAISE EXCEPTION 'El caso lo abre un profesional de Convivencia activo'; END IF;
 
  ELSIF TG_TABLE_NAME='protocolos_caso' THEN
@@ -2671,10 +3003,14 @@ BEGIN
 
  ELSIF TG_TABLE_NAME='actuaciones' THEN
   -- HU-055 la base rechaza fechas reales futuras
+  -- REGLA DE NEGOCIO
+  -- Las fechas reales de una actuación deben ser iguales o anteriores al momento de registro.
   IF NEW.realizado_en > ahora OR NEW.fin_real_en > ahora THEN RAISE EXCEPTION 'Las fechas reales no pueden ser futuras'; END IF;
   IF TG_OP='UPDATE' THEN
    -- HU-060 un resultado ya registrado no se sobrescribe, corregirlo exige motivo
    IF OLD.estado='REALIZADA' AND (NEW.estado,NEW.resultado,NEW.realizado_en,NEW.fin_real_en,NEW.proxima_accion) IS DISTINCT FROM (OLD.estado,OLD.resultado,OLD.realizado_en,OLD.fin_real_en,OLD.proxima_accion)
+    -- REGLA DE NEGOCIO
+    -- Corregir el resultado de una actuación ya realizada requiere dejar un motivo.
     AND motivo IS NULL THEN RAISE EXCEPTION 'La actuación ya fue realizada, corregir su resultado requiere motivo'; END IF;
    IF (to_jsonb(NEW)-'actualizado_en') IS DISTINCT FROM (to_jsonb(OLD)-'actualizado_en') THEN NEW.actualizado_en:=ahora; END IF;
   END IF;
@@ -2684,6 +3020,8 @@ BEGIN
   IF NEW.completado_en > ahora THEN RAISE EXCEPTION 'La fecha de cumplimiento no puede ser futura'; END IF;
   IF TG_OP='UPDATE' AND motivo IS NULL AND ((NEW.descripcion,NEW.persona_responsable_id,NEW.vence_en) IS DISTINCT FROM (OLD.descripcion,OLD.persona_responsable_id,OLD.vence_en)
    OR (OLD.estado='COMPLETADO' AND (NEW.estado,NEW.notas,NEW.completado_en) IS DISTINCT FROM (OLD.estado,OLD.notas,OLD.completado_en))) THEN
+   -- REGLA DE NEGOCIO
+   -- Corregir el resultado de una acción de intervención requiere dejar un motivo.
    RAISE EXCEPTION 'Indicar motivo para corregir la acción'; END IF;
 
  ELSIF TG_TABLE_NAME='acciones_plan_gestion' THEN
@@ -2692,19 +3030,27 @@ BEGIN
    IF motivo IS NULL AND ((NEW.objetivo_id,NEW.titulo,NEW.descripcion,NEW.persona_responsable_id,NEW.publico_objetivo,NEW.evidencia_esperada,NEW.nombre_indicador,NEW.unidad_indicador,NEW.meta_indicador)
      IS DISTINCT FROM (OLD.objetivo_id,OLD.titulo,OLD.descripcion,OLD.persona_responsable_id,OLD.publico_objetivo,OLD.evidencia_esperada,OLD.nombre_indicador,OLD.unidad_indicador,OLD.meta_indicador)
     OR (OLD.estado='COMPLETADO' AND (NEW.estado,NEW.resumen_resultado,NEW.completado_en,NEW.valor_indicador) IS DISTINCT FROM (OLD.estado,OLD.resumen_resultado,OLD.completado_en,OLD.valor_indicador))) THEN
+    -- REGLA DE NEGOCIO
+    -- Corregir el resultado de una acción del Plan de Gestión requiere dejar un motivo.
     RAISE EXCEPTION 'Indicar motivo para corregir la acción del Plan'; END IF;
    IF (to_jsonb(NEW)-'actualizado_en') IS DISTINCT FROM (to_jsonb(OLD)-'actualizado_en') THEN NEW.actualizado_en:=ahora; END IF;
   END IF;
 
  ELSIF TG_TABLE_NAME='actividades_plan_gestion' THEN
   -- HU-085 una actividad empieza Planificada
+  -- REGLA DE NEGOCIO
+  -- Una actividad nueva del Plan de Gestión comienza planificada.
   IF TG_OP='INSERT' AND NEW.estado<>'PLANIFICADO' THEN RAISE EXCEPTION 'Una actividad nueva empieza planificada'; END IF;
   IF TG_OP='UPDATE' AND motivo IS NULL THEN
    -- HU-135 reprogramar, cambiar lugar o responsable, o cancelar exige motivo
    IF (NEW.inicio_programado,NEW.fin_programado,NEW.lugar,NEW.persona_responsable_id) IS DISTINCT FROM (OLD.inicio_programado,OLD.fin_programado,OLD.lugar,OLD.persona_responsable_id)
+    -- REGLA DE NEGOCIO
+    -- Reprogramar o cancelar una actividad del Plan de Gestión requiere indicar el motivo.
     OR (NEW.estado='CANCELADO' AND OLD.estado<>'CANCELADO') THEN RAISE EXCEPTION 'Indicar motivo para reprogramar o cancelar la actividad'; END IF;
    -- HU-090 corregir un resultado ya registrado exige motivo
    IF OLD.estado='COMPLETADO' AND (NEW.estado,NEW.resumen_resultado,NEW.completado_en,NEW.inicio_real,NEW.fin_real) IS DISTINCT FROM (OLD.estado,OLD.resumen_resultado,OLD.completado_en,OLD.inicio_real,OLD.fin_real) THEN
+    -- REGLA DE NEGOCIO
+    -- Corregir el resultado de una actividad realizada requiere indicar el motivo.
     RAISE EXCEPTION 'Indicar motivo para corregir el resultado de la actividad'; END IF;
   END IF;
 
@@ -2712,24 +3058,34 @@ BEGIN
   -- HU-099 el administrador activo otorga, renueva y revoca el acceso
   IF (TG_OP='INSERT' OR NEW.otorgado_por IS DISTINCT FROM OLD.otorgado_por)
    AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.otorgado_por AND codigo_perfil='ADMIN' AND estado='ACTIVO') THEN
+   -- REGLA DE NEGOCIO
+   -- El acceso del apoderado lo otorga o revoca un administrador activo.
    RAISE EXCEPTION 'El acceso del apoderado lo otorga un administrador activo'; END IF;
   IF NEW.revocado_por IS NOT NULL AND (TG_OP='INSERT' OR NEW.revocado_por IS DISTINCT FROM OLD.revocado_por)
    AND NOT EXISTS(SELECT 1 FROM membresias_establecimiento WHERE id=NEW.revocado_por AND codigo_perfil='ADMIN' AND estado='ACTIVO') THEN
    RAISE EXCEPTION 'El acceso del apoderado lo revoca un administrador activo'; END IF;
 
  ELSIF TG_TABLE_NAME='procesos_importacion' THEN
+  -- REGLA DE NEGOCIO
+  -- Una importación nueva comienza en estado Cargado.
   IF TG_OP='INSERT' AND NEW.estado<>'CARGADO' THEN RAISE EXCEPTION 'Una importación nueva empieza cargada'; END IF;
   IF TG_OP='UPDATE' THEN
    -- HU-020 una importación confirmada no cambia
+   -- REGLA DE NEGOCIO
+   -- La importación confirmada se conserva como registro histórico.
    IF OLD.estado='CONFIRMADO' AND (to_jsonb(NEW) IS DISTINCT FROM to_jsonb(OLD)) THEN RAISE EXCEPTION 'Una importación confirmada no cambia'; END IF;
    -- HU-019 y HU-020 una importación parcial sigue en revisión: queda Confirmada solo cuando todas sus filas fueron confirmadas u omitidas
    IF NEW.estado='CONFIRMADO' AND OLD.estado<>'CONFIRMADO'
     AND EXISTS(SELECT 1 FROM filas_importacion WHERE proceso_importacion_id=NEW.id AND estado NOT IN ('CONFIRMADO','OMITIDO')) THEN
+    -- REGLA DE NEGOCIO
+    -- Las filas con error se corrigen u omiten antes de terminar la importación.
     RAISE EXCEPTION 'Quedan filas por corregir u omitir, la importación sigue en revisión'; END IF;
    -- HU-019 un proceso cancelado no se procesa, corrige ni confirma
    IF OLD.estado='CANCELADO' AND NEW.estado='CANCELADO' AND (to_jsonb(NEW) IS DISTINCT FROM to_jsonb(OLD)) THEN RAISE EXCEPTION 'Un proceso cancelado no se modifica'; END IF;
    IF NEW.estado='CANCELADO' AND OLD.estado<>'CANCELADO' THEN
     -- HU-019 cancelar exige motivo y que no haya filas confirmadas
+    -- REGLA DE NEGOCIO
+    -- Cancelar una importación exige motivo y se permite mientras no haya filas confirmadas.
     IF motivo IS NULL THEN RAISE EXCEPTION 'Indicar motivo para cancelar la importación'; END IF;
     IF EXISTS(SELECT 1 FROM filas_importacion WHERE proceso_importacion_id=NEW.id AND estado='CONFIRMADO') THEN RAISE EXCEPTION 'No se cancela una importación con filas confirmadas'; END IF;
    END IF;
@@ -2737,6 +3093,8 @@ BEGIN
     -- HU-019 restaurar devuelve el estado anterior registrado en la auditoría e indica motivo
     SELECT e.metadatos->'antes'->>'estado' INTO anterior FROM eventos_auditoria e
     WHERE e.tipo_recurso='procesos_importacion' AND e.recurso_id=NEW.id AND e.metadatos->'despues'->>'estado'='CANCELADO' ORDER BY e.ocurrido_en DESC,e.id DESC LIMIT 1;
+    -- REGLA DE NEGOCIO
+    -- Una importación cancelada solo vuelve a su estado anterior y el cambio requiere motivo.
     IF motivo IS NULL OR NEW.estado IS DISTINCT FROM anterior THEN RAISE EXCEPTION 'Un proceso cancelado solo se restaura a su estado anterior indicando motivo'; END IF;
    END IF;
   END IF;
@@ -2744,8 +3102,12 @@ BEGIN
  ELSIF TG_TABLE_NAME='filas_importacion' THEN
   -- HU-019 y HU-020 las filas de un proceso cancelado o confirmado no cambian, el bloqueo evita confirmar mientras se cancela
   SELECT estado INTO x FROM procesos_importacion WHERE id=NEW.proceso_importacion_id FOR SHARE;
+  -- REGLA DE NEGOCIO
+  -- Las filas quedan cerradas cuando su importación está confirmada o cancelada.
   IF x.estado IN ('CANCELADO','CONFIRMADO') THEN RAISE EXCEPTION 'El proceso está cancelado o confirmado, sus filas no cambian'; END IF;
   -- HU-020 una fila confirmada no se vuelve a procesar y solo se confirman filas válidas o con advertencia
+  -- REGLA DE NEGOCIO
+  -- Cada fila válida o con advertencia se confirma una sola vez.
   IF TG_OP='UPDATE' AND OLD.estado='CONFIRMADO' THEN RAISE EXCEPTION 'Una fila confirmada no se vuelve a procesar'; END IF;
   IF NEW.estado='CONFIRMADO' AND (TG_OP='INSERT' OR OLD.estado NOT IN ('VALIDO','ADVERTENCIA')) THEN RAISE EXCEPTION 'Solo se confirman filas válidas o con advertencia'; END IF;
  END IF;
@@ -2761,6 +3123,8 @@ END $$;
 CREATE TRIGGER auditar AFTER UPDATE ON convi.procesos_importacion FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION convi.auditar_cambio();
 
 -- HU-042 al responder la última aclaración pendiente, la situación vuelve a En revisión
+-- REGLA DE NEGOCIO
+-- Responder la última aclaración pendiente devuelve la situación a En revisión.
 CREATE FUNCTION convi.reanudar_revision_situacion() RETURNS trigger LANGUAGE plpgsql SET search_path=convi,pg_temp AS $$
 BEGIN
  IF NEW.estado='RESPONDIDA' AND OLD.estado='PENDIENTE'
@@ -2776,6 +3140,8 @@ CREATE TRIGGER reanudar_revision AFTER UPDATE ON convi.aclaraciones_situacion FO
 -- HU-035 y HU-046 la situación y el caso reciben un código legible y correlativo por escuela y año, por ejemplo SIT-2026-00001 y CASO-2026-00001
 -- HU-030 y HU-105 una regla o un protocolo sin código (guía inicial o propuesta de la IA) recibe REGLA-001 o PROT-001
 -- Si el backend envía un código, por ejemplo el folio de un caso antiguo, se conserva; el identificador interno sigue siendo el uuid
+-- REGLA DE NEGOCIO
+-- Las situaciones y los casos reciben un código legible correlativo por escuela y año al registrarlos.
 CREATE FUNCTION convi.asignar_codigo_legible() RETURNS trigger LANGUAGE plpgsql SET search_path=convi,pg_temp AS $$
 DECLARE prefijo text; anio text; siguiente integer; zona text;
 BEGIN

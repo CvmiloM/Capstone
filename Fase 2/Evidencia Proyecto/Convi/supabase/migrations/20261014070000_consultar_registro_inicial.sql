@@ -1,5 +1,7 @@
 -- Distingue un registro sin escuela de una cuenta bloqueada o invitada.
 -- Solo devuelve un permiso para la identidad comprobada por la API.
+-- REGLA DE NEGOCIO
+-- Una cuenta que ya pertenece a una escuela no puede iniciar el registro de otra.
 CREATE FUNCTION convi.puede_registrar_escuela() RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = convi, pg_temp AS $$
   SELECT EXISTS (

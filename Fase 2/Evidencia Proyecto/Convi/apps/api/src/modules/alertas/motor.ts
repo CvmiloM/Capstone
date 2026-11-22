@@ -77,6 +77,8 @@ export type RecurrenciaCumplida = {
  * mientras siga la misma racha no se genera otra alerta, y si se cortó y
  * vuelve a cumplirse, la racha es nueva.
  */
+// REGLA DE NEGOCIO
+// La regla cuenta situaciones del ámbito y período configurados y detecta cuándo se cruza el umbral.
 export function evaluarRecurrencia(
   datos: Recurrencia,
 ): RecurrenciaCumplida | null {
@@ -209,6 +211,8 @@ function tituloAviso(prioridad: string, nombre: string) {
 // ===== PB-092 (HU-079 CA4): variación entre dos períodos, una vez al día =====
 
 /** Variación porcentual con dos decimales, o null si el período anterior tiene cero. */
+// REGLA DE NEGOCIO
+// Si el período anterior tuvo cero situaciones, no hay un porcentaje de cambio que comparar.
 export function variacionPorcentual(
   actual: number,
   anterior: number,
@@ -246,6 +250,8 @@ export type VariacionCumplida = {
  * no se cumple. Si se cumple, también el día en que empezó la racha, para no
  * repetir la alerta mientras siga cumpliéndose (HU-079 CA6).
  */
+// REGLA DE NEGOCIO
+// La regla de variación compara dos períodos consecutivos de la misma duración.
 export function evaluarVariacion(datos: Variacion): VariacionCumplida | null {
   const ayer = numeroDeDia(datos.ayer);
   const inicio = numeroDeDia(datos.inicio);

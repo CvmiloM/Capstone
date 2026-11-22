@@ -6,6 +6,8 @@
 
 GRANT DELETE ON convi.comunicaciones TO convi_backend;
 
+-- REGLA DE NEGOCIO
+-- Solo se puede descartar un borrador de correo que nadie haya confirmado. El descarte queda en auditoría.
 CREATE FUNCTION convi.descartar_borrador_correo() RETURNS trigger
 LANGUAGE plpgsql SET search_path = convi, pg_temp AS $$
 BEGIN

@@ -13,7 +13,11 @@ export function BotonCerrarSesion() {
   );
 
   return (
-    <FormularioConCarga action={accion} className="flex flex-col items-start gap-2">
+    <FormularioConCarga
+      action={accion}
+      data-cerrar-sesion
+      className="flex flex-col items-start gap-2"
+    >
       <button
         type="submit"
         disabled={pendiente}

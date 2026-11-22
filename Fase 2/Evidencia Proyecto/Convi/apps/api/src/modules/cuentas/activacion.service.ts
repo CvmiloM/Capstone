@@ -62,6 +62,8 @@ function traducirError(error: unknown) {
   )
     return new ConflictException(ENLACE_INVALIDO);
   // CA2: una identidad ya activada no se vincula a otra cuenta.
+  // REGLA DE NEGOCIO
+  // Un correo que ya tiene una cuenta no se puede usar para activar otra invitación.
   if (message.startsWith('Esta identidad ya tiene'))
     return new ConflictException(
       'Este correo ya tiene una cuenta en CONVI. Pide al administrador una invitación con otro correo.',

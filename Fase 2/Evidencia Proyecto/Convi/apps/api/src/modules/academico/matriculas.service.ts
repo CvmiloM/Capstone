@@ -92,6 +92,8 @@ export class MatriculasService {
           `El estudiante está ${NOMBRE_ESTADO[estadoEstudiante] ?? estadoEstudiante.toLowerCase()}: no se puede matricular.`,
         );
 
+      // REGLA DE NEGOCIO
+      // La fecha de la matrícula permite comprobar que el curso corresponde al año y que no se cruza con otra matrícula.
       const fecha = datos.matriculado_en;
       const elegido = await cursoDisponible(db, datos.curso_id, fecha, {
         campoFecha: 'matriculado_en',
@@ -142,6 +144,8 @@ export class MatriculasService {
     });
   }
 
+  // REGLA DE NEGOCIO
+  // Al trasladarse, egresar o retirarse, el estudiante conserva su historial. Si cambia de curso o de año, la matrícula nueva se abre junto con el cierre de la anterior.
   // PB-022 y PB-031 (HU-017 y HU-024): termina la matrícula vigente y, si el
   // estudiante cambia de curso o pasa de año, abre la nueva en la misma
   // operación (CA1). Al egresar o retirarse deja de estar Activo, sin borrar

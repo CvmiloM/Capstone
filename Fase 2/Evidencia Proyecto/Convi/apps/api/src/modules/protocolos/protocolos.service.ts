@@ -260,6 +260,8 @@ export class ProtocolosService {
   // HU-070 CA5: una versión nueva parte con los pasos y el documento de
   // origen de la última, en filas propias; la versión ya aplicada no cambia.
   // Decisión del PO (por defecto): hay a lo más un Borrador por protocolo.
+  // REGLA DE NEGOCIO
+  // Cada protocolo admite un solo borrador a la vez. Crear otro borrador conserva las versiones publicadas.
   nuevaVersion(sesion: Sesion, protocoloId: string): Promise<{ id: string }> {
     return this.operar(sesion, async (db) => {
       const protocolo = await db.query(
@@ -353,6 +355,8 @@ export class ProtocolosService {
   }
 
   // HU-070 CA1 y CA4: el documento de origen y las notas se cambian solo en Borrador.
+  // REGLA DE NEGOCIO
+  // Los pasos y el documento de origen solo se pueden cambiar mientras la versión sea borrador.
   actualizarVersion(sesion: Sesion, id: string, cuerpo: unknown) {
     const datos = validarVersion(cuerpo);
     return this.operar(sesion, async (db) => {
@@ -432,6 +436,8 @@ export class ProtocolosService {
   // quién la revisó y cuándo (CA1). La versión publicada antes queda
   // Archivada desde el día anterior, para que rija una sola a la vez; los
   // casos que ya la aplicaron la conservan (HU-071 CA4).
+  // REGLA DE NEGOCIO
+  // Para publicar un protocolo se revisa su versión y se exige un documento de origen y al menos un paso.
   publicar(sesion: Sesion, id: string, cuerpo: unknown) {
     const datos = validarPublicacion(cuerpo);
     return this.operar(sesion, async (db) => {

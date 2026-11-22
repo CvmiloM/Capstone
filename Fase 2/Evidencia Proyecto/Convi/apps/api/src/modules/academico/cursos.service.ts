@@ -234,6 +234,8 @@ export class CursosService {
           if (curso.matriculas > 0)
             throw errorDeCampos({
               nivel_id:
+                // REGLA DE NEGOCIO
+                // Si un curso ya tiene estudiantes, se protege su relación con el año, el nivel y la letra del curso.
                 'No se puede cambiar porque el curso ya tiene estudiantes.',
             });
           await revisarNivel(db, datos.nivel_id);

@@ -1,5 +1,6 @@
 "use client";
 
+import { AvisoRespuestaIA } from "@/app/components/normativa/aviso-respuesta-ia";
 import { EtiquetaAccion } from "./etiqueta-accion";
 import { FormularioConCarga } from "@/app/components/actividad";
 
@@ -97,7 +98,13 @@ function Referencias({
             : "bg-accent text-accent-foreground"
         }`;
         return r.enlace ? (
-          <Link key={id} href={r.enlace} className={`${clase} hover:underline`}>
+          <Link
+            key={id}
+            href={r.enlace}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${clase} hover:underline`}
+          >
             {r.etiqueta}
           </Link>
         ) : (
@@ -286,6 +293,7 @@ function OrientacionIA({
 
   return (
     <div className="space-y-4">
+      <AvisoRespuestaIA activo={Boolean(resultado && !resultado.fuera_de_limite)} />
       <MascotaIA fase={fase} mensajes={mensajes} />
 
       <FormularioConCarga action={accion} onSubmit={() => setPaso(0)} className="space-y-3">
@@ -510,6 +518,8 @@ function OrientacionIA({
                         {f.enlace && (
                           <Link
                             href={f.enlace}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className={`mt-2 inline-block ${claseEnlace}`}
                           >
                             Abrir en esa página

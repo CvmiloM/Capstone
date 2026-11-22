@@ -103,6 +103,8 @@ export class NivelesService {
         for (const campo of FIJOS_CON_CURSOS) {
           if (datos[campo] !== actual[campo])
             errores[campo] =
+              // REGLA DE NEGOCIO
+              // Si un nivel ya tiene cursos, los datos que identifican el nivel se protegen para conservar esa relación.
               'No se puede cambiar porque el nivel ya tiene cursos.';
         }
         if (Object.keys(errores).length > 0) throw errorDeCampos(errores);
