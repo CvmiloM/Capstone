@@ -3,6 +3,8 @@ ALTER TABLE convi.categorias_convivencia
   ADD CONSTRAINT categoria_predeterminada_activa
     CHECK (NOT predeterminada OR (nombre = 'Ninguna calza' AND estado = 'ACTIVO'));
 
+-- REGLA DE NEGOCIO
+-- Cada establecimiento tiene una sola categoría predeterminada llamada «Ninguna calza».
 CREATE UNIQUE INDEX una_categoria_predeterminada_por_escuela
   ON convi.categorias_convivencia (establecimiento_id)
   WHERE predeterminada;
@@ -27,6 +29,8 @@ WHERE NOT EXISTS (
   WHERE c.establecimiento_id = e.id AND c.predeterminada
 );
 
+-- REGLA DE NEGOCIO
+-- Cada escuela nueva recibe automáticamente su categoría predeterminada.
 CREATE FUNCTION convi.crear_categoria_predeterminada() RETURNS trigger
 LANGUAGE plpgsql SET search_path = '' AS $$
 BEGIN
@@ -40,6 +44,8 @@ CREATE TRIGGER crear_categoria_predeterminada
 AFTER INSERT ON convi.establecimientos
 FOR EACH ROW EXECUTE FUNCTION convi.crear_categoria_predeterminada();
 
+-- REGLA DE NEGOCIO
+-- La categoría «Ninguna calza» permanece disponible para registrar casos o situaciones cuando ninguna otra sirve.
 CREATE FUNCTION convi.proteger_categoria_predeterminada() RETURNS trigger
 LANGUAGE plpgsql SET search_path = '' AS $$
 BEGIN

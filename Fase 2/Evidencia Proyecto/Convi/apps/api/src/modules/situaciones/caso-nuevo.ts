@@ -71,6 +71,8 @@ export function validarNuevoCaso(cuerpo: unknown): NuevoCaso {
     errores.responsable_id =
       'Elige a la persona de Convivencia responsable del caso.';
 
+  // REGLA DE NEGOCIO
+  // Todo caso nuevo debe llevar una categoría principal.
   const categoria = uuidOpcional(datos.categoria_principal_id);
   if (!categoria || categoria === 'invalido')
     errores.categoria_principal_id = 'Elige una categoría de la lista.';

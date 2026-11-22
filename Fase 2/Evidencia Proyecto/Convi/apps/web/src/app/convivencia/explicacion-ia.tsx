@@ -1,5 +1,6 @@
 "use client";
 
+import { AvisoRespuestaIA } from "@/app/components/normativa/aviso-respuesta-ia";
 import { useActionState, useEffect, useState } from "react";
 import { FormularioConCarga } from "@/app/components/actividad";
 import { AvisoError, BotonEnviar } from "@/app/components/formulario";
@@ -65,6 +66,7 @@ export function ExplicacionIA({
 
   return (
     <div className="space-y-4">
+      <AvisoRespuestaIA activo={resultado?.generado_por_ia === true} />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="shrink-0">
           <MascotaIA fase={fase} mensajes={mensajes} />

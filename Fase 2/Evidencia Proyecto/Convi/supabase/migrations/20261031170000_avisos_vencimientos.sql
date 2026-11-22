@@ -10,6 +10,8 @@ GRANT SELECT (codigo) ON convi.casos TO convi_motor_reglas;
 
 -- Como motor_escuelas_con_reglas_diarias: el motor solo ve la escuela de cada transacción, así que no puede listarlas.
 -- Propietario de esta función debe ser el propietario de instalación, como motor_contexto_valido.
+-- REGLA DE NEGOCIO
+-- Los avisos diarios de vencimiento se generan para las escuelas activas, aunque no hayan creado reglas propias.
 CREATE FUNCTION convi.motor_escuelas_activas() RETURNS SETOF uuid
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = convi, pg_temp AS $$
   SELECT e.id FROM establecimientos e WHERE e.estado = 'ACTIVO' ORDER BY e.id

@@ -103,6 +103,8 @@ export type AclaracionRespondida = {
   estado_situacion: string;
 };
 
+// REGLA DE NEGOCIO
+// Una aclaración ya respondida conserva su respuesta original.
 const YA_RESPONDIDA =
   'Esta aclaración ya fue respondida. La respuesta enviada se conserva y no se puede cambiar.';
 
@@ -221,6 +223,8 @@ export class ProfesorService {
 
   // CA1: curso_reporte usa convi.puede_reportar_curso, que exige la asignación
   // vigente; el trigger de convi.situaciones lo vuelve a comprobar al insertar.
+  // REGLA DE NEGOCIO
+  // El profesor registra situaciones desde cursos que tiene asignados y vigentes.
   private guardarSituacion(
     sesion: Sesion,
     datos: NuevaSituacion,

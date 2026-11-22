@@ -161,6 +161,8 @@ export function validarRegla(cuerpo: unknown): DatosRegla {
 
   // CA3 y CA4: la cantidad es un entero (positivo en recurrencia) y la
   // variación es un porcentaje, que puede ser negativo para una baja.
+  // REGLA DE NEGOCIO
+  // La regla usa un número entero para contar situaciones y un porcentaje para comparar dos períodos.
   const umbralTexto = texto(datos.valor_umbral).replace(',', '.');
   let valor_umbral: number | null = null;
   if (umbralTexto) {

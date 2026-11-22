@@ -51,6 +51,8 @@ export class NormativaService {
   ): Promise<ResultadoConsulta & { solicitud_id: string }> {
     const pregunta = validarPregunta(cuerpo);
     const inicio = Date.now();
+    // REGLA DE NEGOCIO
+    // La consulta registra que se pidió ayuda a la IA, sin guardar el texto de la pregunta.
     // CA4: la solicitud queda registrada antes de llamar a la IA, sin la pregunta.
     const solicitudId = await this.operar(
       sesion,
@@ -80,6 +82,8 @@ export class NormativaService {
       fragmentos = await this.operar(sesion, (db) =>
         buscarFragmentosNormativa(db, vector),
       );
+      // REGLA DE NEGOCIO
+      // Si la búsqueda no encuentra fragmentos de los documentos vigentes de la escuela, el modelo no redacta una respuesta.
       // HU-102: sin fragmentos no hay nada que citar y no se le pregunta al modelo.
       const resultado = fragmentos.length
         ? interpretarRespuesta(

@@ -15,6 +15,8 @@ BEGIN
     RAISE EXCEPTION 'No tienes permiso para esta operación' USING ERRCODE = '42501';
   END IF;
 
+  -- REGLA DE NEGOCIO
+  -- Un correo de una cuenta activa del personal no se puede usar para invitar a un apoderado.
   RETURN EXISTS (
     SELECT 1 FROM convi.membresias_establecimiento m
     JOIN convi.personas p ON p.id = m.persona_id

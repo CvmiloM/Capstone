@@ -291,6 +291,8 @@ export class BorradoresService {
 
   // Revisar o descartar conserva quién y cuándo (la base pone la fecha y la
   // auditoría guarda el cambio). Pasa una sola vez y solo en la última edición.
+  // REGLA DE NEGOCIO
+  // El equipo de Convivencia revisa la versión vigente del borrador antes de aprobarlo o rechazarlo.
   revisar(
     sesion: Sesion,
     borradorId: string,
@@ -329,6 +331,8 @@ export class BorradoresService {
 }
 
 /** La última edición, pendiente y sin cambios desde que se vio (PB-139). */
+// REGLA DE NEGOCIO
+// Solo se puede revisar o editar un borrador pendiente si sigue siendo la versión que se abrió en pantalla.
 async function bloquear(db: PoolClient, id: string, version: string) {
   // Una edición agrega una fila: actualizar el padre invalida instantáneas que no la ven.
   await db.query(

@@ -205,6 +205,8 @@ export class EncuentrosService {
 
   // PB-064 (CA2, CA3, CA4 y CA6): queda Realizado con inicio y término reales,
   // que no pueden ser futuros, su resultado y la asistencia de cada persona.
+  // REGLA DE NEGOCIO
+  // Un encuentro realizado guarda sus horas reales, su resultado y quién asistió. Sus horas reales no pueden estar en el futuro.
   registrarRealizacion(
     sesion: Sesion,
     encuentroId: string,
@@ -278,6 +280,8 @@ export class EncuentrosService {
 
   // Decisión del PO (por defecto): cancelar exige motivo, que queda en la
   // auditoría; el encuentro cancelado se conserva.
+  // REGLA DE NEGOCIO
+  // Cancelar un encuentro exige indicar el motivo y conserva el registro.
   cancelar(
     sesion: Sesion,
     encuentroId: string,

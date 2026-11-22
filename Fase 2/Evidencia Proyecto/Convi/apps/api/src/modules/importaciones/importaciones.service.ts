@@ -776,6 +776,8 @@ export class ImportacionesService {
       );
       if (confirmadas.rows.length > 0)
         throw new ConflictException(
+          // REGLA DE NEGOCIO
+          // Una importación que ya guardó filas en las fichas no se puede cancelar.
           'La importación ya tiene filas confirmadas en las fichas: no se puede cancelar.',
         );
       await db.query("SELECT set_config('app.motivo_cambio', $1, true)", [

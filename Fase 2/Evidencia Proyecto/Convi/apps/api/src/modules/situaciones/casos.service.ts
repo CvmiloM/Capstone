@@ -570,6 +570,10 @@ export class CasosService {
   // quién, cuándo y el fundamento, y crea sus pasos para el caso. Decisión
   // del PO (por defecto): un caso cerrado no recibe protocolos y un mismo
   // protocolo no se aplica dos veces mientras siga activo en el caso.
+  // REGLA DE NEGOCIO
+  // Un mismo protocolo puede estar activo una sola vez por caso.
+  // REGLA DE NEGOCIO
+  // Un caso cerrado no admite nuevos protocolos y solo se puede aplicar una versión publicada y vigente.
   aplicarProtocolo(
     sesion: Sesion,
     casoId: string,
@@ -671,6 +675,8 @@ export class CasosService {
           datos.movimiento_anterior_id,
         );
         // CA5: solo los cambios del flujo; el cierre tiene su propio formulario.
+        // REGLA DE NEGOCIO
+        // Los pasos disponibles dependen del estado en que se encuentra el caso.
         const permitidos = await estadosPermitidos(db, actual);
         if (!permitidos.intermedios.includes(datos.estado_nuevo))
           throw new BadRequestException({
@@ -993,6 +999,8 @@ export class CasosService {
           [nuevo.id, situacionId],
         );
 
+        // REGLA DE NEGOCIO
+        // Vincular una situación exige al menos un estudiante en común y la última revisión normativa disponible.
         // La decisión deja la situación Vinculada a caso; la base exige que
         // el caso comparta un estudiante con ella y la última revisión vista.
         await db.query(

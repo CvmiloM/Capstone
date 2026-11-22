@@ -1,3 +1,5 @@
+-- REGLA DE NEGOCIO
+-- Administración y Convivencia deben usar segundo factor para entrar a su portal.
 CREATE FUNCTION convi.resolver_membresia()
 RETURNS TABLE (
   membresia_id uuid,
