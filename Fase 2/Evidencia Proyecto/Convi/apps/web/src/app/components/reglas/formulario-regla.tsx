@@ -3,7 +3,7 @@
 import { FormularioConCarga } from "@/app/components/actividad";
 
 import { useActionState, useState, type ReactNode } from "react";
-import { AvisoError, BotonEnviar, Campo } from "@/app/components/formulario";
+import { AvisoError, BotonEnviar, Campo, claseBotonSecundario } from "@/app/components/formulario";
 import { crearRegla, editarRegla, type EstadoFormulario } from "./acciones";
 import type { Regla } from "./datos";
 import {
@@ -115,6 +115,10 @@ export function FormularioRegla({
   const [operador, setOperador] = useState(regla?.codigo_operador ?? "GE");
   const [umbral, setUmbral] = useState(regla?.valor_umbral?.toString() ?? "3");
   const [ventana, setVentana] = useState(regla?.ventana_dias?.toString() ?? "30");
+  const [anteriores, setAnteriores] = useState(regla?.dias_anteriores?.toString() ?? "0");
+  const [ventanaMovil, setVentanaMovil] = useState(
+    regla?.tipo_regla === "RECURRENCIA" && regla.dias_anteriores == null,
+  );
   const [categoria, setCategoria] = useState(regla?.categoria_id ?? "");
   const [accionRegla, setAccionRegla] = useState(regla?.codigo_accion ?? "ALERTA_Y_NOTIFICACION");
   const [prioridad, setPrioridad] = useState(regla?.codigo_prioridad ?? "MEDIA");
@@ -132,6 +136,14 @@ export function FormularioRegla({
   }
 
   const ayudaTipo = TIPOS.find((t) => t.valor === tipo)?.ayuda;
+  const esRecurrencia = tipo === "RECURRENCIA";
+  const acumulada = esRecurrencia && !ventanaMovil;
+  const diaInicio = desde ? new Date(`${desde}T00:00:00Z`) : null;
+  if (diaInicio && Number.isFinite(diaInicio.getTime()))
+    diaInicio.setUTCDate(diaInicio.getUTCDate() + 29);
+  const termino30 = diaInicio && Number.isFinite(diaInicio.getTime())
+    ? diaInicio.toISOString().slice(0, 10)
+    : null;
   const calcula = tipo !== "OTRO";
   // La categoría elegida puede estar inactiva en un borrador antiguo: se muestra para cambiarla.
   const opcionesCategoria =
@@ -149,6 +161,7 @@ export function FormularioRegla({
     codigo_operador: calcula ? operador : null,
     valor_umbral: numero(umbral),
     ventana_dias: numero(ventana),
+    dias_anteriores: acumulada ? numero(anteriores) : null,
     categoria: cuentaVencidos(tipo) ? null : nombreCategoria,
   });
   const resumen = resumirRegla({
@@ -157,6 +170,7 @@ export function FormularioRegla({
     categoria: cuentaVencidos(tipo) ? null : nombreCategoria,
     codigo_accion: accionRegla,
     codigo_prioridad: prioridad,
+    dias_anteriores: acumulada ? numero(anteriores) : null,
   });
   // Refinamientos de Convivencia, sección 13.4: queda claro si se guarda como
   // borrador o se activa.
@@ -238,20 +252,40 @@ export function FormularioRegla({
         </div>
       )}
 
-      {usaVentana(tipo) && (
+      {acumulada && (
+        <Campo
+          name="dias_anteriores"
+          etiqueta="¿Cuántos días anteriores quieres incluir?"
+          type="number"
+          min={0}
+          max={VENTANA_MAXIMA_DIAS}
+          value={anteriores}
+          onChange={(evento) => setAnteriores(evento.target.value)}
+          ayuda="Escribe 0 para contar desde el inicio del primer día de vigencia. Si la regla empieza hoy, también cuentan las situaciones ocurridas hoy antes de activarla."
+          error={errores.dias_anteriores}
+          required
+        />
+      )}
+
+      {usaVentana(tipo) && !acumulada && (
         <Campo
           name="ventana_dias"
-          etiqueta={tipo === "VARIACION_PERIODO" ? "Días de cada período" : "En cuántos días"}
+          etiqueta={tipo === "VARIACION_PERIODO" ? "Días de cada período" : "Cuántos días mirar hacia atrás"}
           inputMode="numeric"
           value={ventana}
           onChange={(evento) => setVentana(evento.target.value)}
           ayuda={
             tipo === "VARIACION_PERIODO"
               ? "Se comparan los últimos días con el mismo período anterior."
-              : `Entre 1 y ${VENTANA_MAXIMA_DIAS} días hacia atrás.`
+              : "Incluye el día de evaluación y los días anteriores, desde el inicio de la regla."
           }
           error={errores.ventana_dias}
         />
+      )}
+      {esRecurrencia && ventanaMovil && (
+        <button type="button" onClick={() => setVentanaMovil(false)} className={claseBotonSecundario}>
+          Cambiar a conteo desde el inicio
+        </button>
       )}
 
       {!cuentaVencidos(tipo) && (
@@ -293,14 +327,29 @@ export function FormularioRegla({
             ayuda="Si lo dejas en blanco, empieza el día en que la actives."
             error={errores.vigente_desde}
           />
-          <Campo
-            name="vigente_hasta"
-            etiqueta="Vigente hasta (opcional)"
-            type="date"
-            value={hasta}
-            onChange={(evento) => setHasta(evento.target.value)}
-            error={errores.vigente_hasta}
-          />
+          <div>
+            <Campo
+              name="vigente_hasta"
+              etiqueta="Vigente hasta (opcional)"
+              type="date"
+              min={desde || undefined}
+              value={hasta}
+              onChange={(evento) => setHasta(evento.target.value)}
+              ayuda={acumulada ? "El último día se cuenta completo." : undefined}
+              error={errores.vigente_hasta}
+            />
+            {acumulada && (
+              termino30 ? (
+                <button type="button" onClick={() => setHasta(termino30)} className={`${claseBotonSecundario} mt-2`}>
+                  Duración de 30 días
+                </button>
+              ) : (
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  Elige una fecha de inicio para usar el atajo de 30 días.
+                </p>
+              )
+            )}
+          </div>
         </div>
       )}
 
@@ -316,6 +365,10 @@ export function FormularioRegla({
           <dl className="mt-3 grid gap-3 sm:grid-cols-2">
             {[
               ...resumen,
+              ...(acumulada ? [{
+                titulo: "Al terminar",
+                texto: "Si la regla tiene fecha de término y vence sin haberse cumplido, Convi enviará un aviso con el resultado.",
+              }] : []),
               ...(volverAGuia
                 ? []
                 : [{ titulo: "Vigencia", texto: describirVigencia(desde || null, hasta || null) }]),

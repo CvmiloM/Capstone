@@ -19,7 +19,7 @@ export const TIPOS: { valor: Tipo; texto: string; ayuda: string }[] = [
   {
     valor: "RECURRENCIA",
     texto: "Recurrencia",
-    ayuda: "Avisa cuando se juntan varias situaciones en pocos días.",
+    ayuda: "Avisa cuando las situaciones registradas alcanzan la condición de la regla.",
   },
   {
     valor: "VARIACION_PERIODO",
@@ -132,6 +132,7 @@ export function resumirRegla(regla: {
   categoria: string | null;
   codigo_accion: string;
   codigo_prioridad: string;
+  dias_anteriores?: number | null;
 }): { titulo: string; texto: string }[] {
   if (regla.tipo_regla === "OTRO") return [];
   const prioridad = (
@@ -156,7 +157,9 @@ export function resumirRegla(regla: {
       titulo: "Cuándo revisa",
       texto:
         regla.tipo_regla === "RECURRENCIA"
-          ? "Cada vez que se registra una situación."
+          ? regla.dias_anteriores == null
+            ? "Cada vez que se registra una situación."
+            : "Al registrar una situación y cada mañana."
           : "Una vez al día, cada mañana.",
     },
     {
@@ -188,6 +191,7 @@ export function describirRegla(regla: {
   codigo_operador: string | null;
   valor_umbral: number | null;
   ventana_dias: number | null;
+  dias_anteriores?: number | null;
   categoria?: string | null;
 }): string {
   const operador = regla.codigo_operador ? NOMBRE_OPERADOR[regla.codigo_operador] : null;
@@ -200,7 +204,13 @@ export function describirRegla(regla: {
   const dias = regla.ventana_dias ?? 0;
   switch (regla.tipo_regla) {
     case "RECURRENCIA":
-      return `${operador} ${n} ${plural(n, "situación", "situaciones")}${de} ${DONDE[regla.codigo_ambito]} en ${dias} ${plural(dias, "día", "días")}`;
+      return `${operador} ${n} ${plural(n, "situación", "situaciones")}${de} ${DONDE[regla.codigo_ambito]}${
+        regla.dias_anteriores == null
+          ? ` en los últimos ${dias} ${plural(dias, "día", "días")} desde que rige`
+          : regla.dias_anteriores === 0
+            ? " desde que empieza la regla"
+            : ` desde ${regla.dias_anteriores} ${plural(regla.dias_anteriores, "día anterior", "días anteriores")} al inicio de la regla`
+      }`;
     case "VARIACION_PERIODO":
       return `Variación de ${operador.toLowerCase()} ${n} % en las situaciones${de} ${DONDE[regla.codigo_ambito]}, comparando dos períodos seguidos de ${dias} ${plural(dias, "día", "días")}`;
     case "FECHA_LIMITE":

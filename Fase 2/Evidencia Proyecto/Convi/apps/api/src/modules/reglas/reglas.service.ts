@@ -43,7 +43,7 @@ export type DetalleRegla = {
 const COLUMNAS = `
   r.id, r.codigo_regla, r.numero_version, r.nombre, r.tipo_regla,
   r.codigo_metrica, r.codigo_operador, r.valor_umbral::float8 AS valor_umbral,
-  r.ventana_dias, r.ventana_comparacion_dias, r.categoria_id,
+  r.ventana_dias, r.ventana_comparacion_dias, r.categoria_id, r.dias_anteriores,
   c.nombre AS categoria, c.estado = 'ACTIVO' AS categoria_activa,
   r.codigo_ambito, r.codigo_accion, r.codigo_prioridad,
   r.vigente_desde::text AS vigente_desde, r.vigente_hasta::text AS vigente_hasta,
@@ -109,9 +109,9 @@ export class ReglasService {
            (establecimiento_id, codigo_regla, numero_version, nombre, tipo_regla,
             codigo_metrica, codigo_operador, valor_umbral, ventana_dias,
             ventana_comparacion_dias, categoria_id, codigo_ambito, codigo_accion,
-            codigo_prioridad, vigente_desde, vigente_hasta)
+            codigo_prioridad, vigente_desde, vigente_hasta, dias_anteriores)
          VALUES (convi.establecimiento_actual(), '', 1, $1, $2, $3, $4, $5, $6,
-                 $7, $8, $9, $10, $11, $12, $13)
+                 $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING id, codigo_regla`,
         valores(datos),
       );
@@ -138,8 +138,8 @@ export class ReglasService {
              codigo_operador = $4, valor_umbral = $5, ventana_dias = $6,
              ventana_comparacion_dias = $7, categoria_id = $8, codigo_ambito = $9,
              codigo_accion = $10, codigo_prioridad = $11, vigente_desde = $12,
-             vigente_hasta = $13
-         WHERE id = $14`,
+             vigente_hasta = $13, dias_anteriores = $14
+         WHERE id = $15`,
         [...valores(datos), id],
       );
       return { id };
@@ -170,14 +170,14 @@ export class ReglasService {
            (establecimiento_id, codigo_regla, numero_version, nombre, tipo_regla,
             codigo_metrica, codigo_operador, valor_umbral, ventana_dias,
             ventana_comparacion_dias, categoria_id, codigo_ambito, codigo_accion,
-            codigo_prioridad)
+            codigo_prioridad, dias_anteriores)
          SELECT r.establecimiento_id, r.codigo_regla,
                 (SELECT max(v.numero_version) + 1 FROM convi.reglas v
                  WHERE v.codigo_regla = r.codigo_regla),
                 r.nombre, r.tipo_regla, r.codigo_metrica, r.codigo_operador,
                 r.valor_umbral, r.ventana_dias, r.ventana_comparacion_dias,
                 CASE WHEN c.estado = 'ACTIVO' THEN r.categoria_id END,
-                r.codigo_ambito, r.codigo_accion, r.codigo_prioridad
+                r.codigo_ambito, r.codigo_accion, r.codigo_prioridad, r.dias_anteriores
          FROM convi.reglas r
          LEFT JOIN convi.categorias_convivencia c ON c.id = r.categoria_id
          WHERE r.id = $1
@@ -248,6 +248,7 @@ function valores(datos: DatosRegla) {
     datos.codigo_prioridad,
     datos.vigente_desde,
     datos.vigente_hasta,
+    datos.dias_anteriores,
   ];
 }
 

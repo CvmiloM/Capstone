@@ -62,6 +62,7 @@ export type DatosRegla = {
   codigo_operador: string | null;
   valor_umbral: number | null;
   ventana_dias: number | null;
+  dias_anteriores: number | null;
   ventana_comparacion_dias: number | null;
   categoria_id: string | null;
   codigo_ambito: Ambito;
@@ -189,11 +190,27 @@ export function validarRegla(cuerpo: unknown): DatosRegla {
         ? 'Escribe el porcentaje de variación.'
         : 'Escribe la cantidad.';
 
-  // CA3 y CA4: recurrencia y variación cuentan dentro de una ventana de días.
-  const usaVentana = de === 'RECURRENCIA' || de === 'VARIACION_PERIODO';
+  const anteriores = texto(datos.dias_anteriores);
+  const usaDiasAnteriores =
+    de === 'RECURRENCIA' && Object.hasOwn(datos, 'dias_anteriores');
+  let dias_anteriores: number | null = null;
+  if (usaDiasAnteriores || anteriores) {
+    const numero = Number(anteriores);
+    if (
+      !usaDiasAnteriores ||
+      !/^\d+$/.test(anteriores) ||
+      numero > VENTANA_MAXIMA_DIAS
+    )
+      errores.dias_anteriores = `Escribe un número entero entre 0 y ${VENTANA_MAXIMA_DIAS}.`;
+    else dias_anteriores = numero;
+  }
+
+  // Las reglas anteriores conservan su ventana móvil y las nuevas de cantidad acumulan desde el inicio.
+  const usaVentana =
+    (de === 'RECURRENCIA' && !usaDiasAnteriores) || de === 'VARIACION_PERIODO';
   const ventanaTexto = texto(datos.ventana_dias);
   let ventana_dias: number | null = null;
-  if (ventanaTexto && !cuentaVencidos) {
+  if (ventanaTexto && !cuentaVencidos && !usaDiasAnteriores) {
     const numero = Number(ventanaTexto);
     if (
       !/^\d+$/.test(ventanaTexto) ||
@@ -240,6 +257,7 @@ export function validarRegla(cuerpo: unknown): DatosRegla {
     codigo_operador,
     valor_umbral,
     ventana_dias,
+    dias_anteriores,
     // CA4: los dos períodos que se comparan duran lo mismo.
     ventana_comparacion_dias: de === 'VARIACION_PERIODO' ? ventana_dias : null,
     categoria_id,

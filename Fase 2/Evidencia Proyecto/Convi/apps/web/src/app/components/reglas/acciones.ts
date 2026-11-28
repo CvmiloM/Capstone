@@ -38,7 +38,10 @@ function rutaDelPortal(formData: FormData) {
 }
 
 function leerRegla(formData: FormData) {
-  return Object.fromEntries(CAMPOS.map((c) => [c, leerTexto(formData, c)]));
+  const datos = Object.fromEntries(CAMPOS.map((c) => [c, leerTexto(formData, c)]));
+  if (formData.has("dias_anteriores"))
+    datos.dias_anteriores = leerTexto(formData, "dias_anteriores");
+  return datos;
 }
 
 // Un cambio se ve en los dos portales y en el paso de la guía inicial (PB-037).

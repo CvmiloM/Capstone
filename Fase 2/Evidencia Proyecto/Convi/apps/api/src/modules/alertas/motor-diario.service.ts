@@ -8,6 +8,7 @@ import {
   cumple,
   DIAS_HACIA_ATRAS,
   diaDeNumero,
+  evaluarRecurrencia,
   evaluarVariacion,
   explicacionVariacion,
   explicacionVencidos,
@@ -15,9 +16,15 @@ import {
   type Operador,
   textoAvisoVariacion,
   textoAvisoVencidos,
+  textoCierreRecurrencia,
   type Vencido,
   yaAvisado,
 } from './motor.js';
+import {
+  guardarRecurrencia,
+  periodoRecurrencia,
+  type ReglaRecurrencia,
+} from './motor.service.js';
 
 // PB-091 y PB-092 (HU-079 CA4): una vez al día se evalúan las reglas de
 // vencimientos de cada caso y las de variación entre dos períodos. Corre con
@@ -38,6 +45,11 @@ type ReglaDiaria = {
   codigo_accion: 'ALERTA' | 'ALERTA_Y_NOTIFICACION';
   codigo_prioridad: string;
   vigente_desde: string | null;
+};
+
+type RecurrenciaDiaria = ReglaRecurrencia & {
+  vigente_hasta: string | null;
+  categoria: string | null;
 };
 
 export type ResultadoDiario = {
@@ -214,6 +226,55 @@ export class MotorDiarioService {
       }
     }
 
+    for (const regla of await this.recurrenciasAcumuladas(db)) {
+      resultado.reglas_evaluadas++;
+      const vence = regla.vigente_hasta;
+      const cierre = vence !== null && vence < hoy;
+      const hasta = cierre ? vence : ayer;
+      if (regla.vigente_desde && regla.vigente_desde > hasta) continue;
+
+      const { inicio, primerDia } = periodoRecurrencia(regla, hasta);
+      const registros = await this.conteosPorDia(
+        db,
+        regla.codigo_ambito,
+        regla.categoria_id,
+        primerDia,
+        hasta,
+      );
+      if (regla.codigo_ambito === 'ESTABLECIMIENTO' && registros.size === 0)
+        registros.set(null, new Map());
+      let cumplida = false;
+      let maximo = 0;
+      for (const [registroId, porDia] of registros) {
+        resultado.evaluaciones++;
+        const conteo = [...porDia.values()].reduce((suma, n) => suma + n, 0);
+        maximo = Math.max(maximo, conteo);
+        const racha = evaluarRecurrencia(
+          {
+            porDia,
+            hoy: hasta,
+            ventanaDias: null,
+            inicio,
+            primerDia,
+            operador: regla.codigo_operador,
+            umbral: regla.umbral,
+          },
+          cierre,
+        );
+        if (!racha) continue;
+        cumplida = true;
+        sumar(await guardarRecurrencia(db, regla, registroId, racha, null));
+      }
+      if (cierre && !cumplida)
+        resultado.avisos_creados += await this.avisarCierre(
+          db,
+          regla,
+          primerDia,
+          hasta,
+          maximo,
+        );
+    }
+
     await registrarEjecucion(
       db,
       { tipo: 'establecimientos', id: establecimientoId },
@@ -240,6 +301,60 @@ export class MotorDiarioService {
        ORDER BY codigo_regla, numero_version`,
     );
     return filas.rows;
+  }
+
+  private async recurrenciasAcumuladas(
+    db: PoolClient,
+  ): Promise<RecurrenciaDiaria[]> {
+    const filas = await db.query<RecurrenciaDiaria>(
+      `SELECT r.id, r.codigo_regla, r.numero_version, r.nombre, r.codigo_ambito,
+              r.codigo_operador, r.valor_umbral::float8 AS umbral,
+              r.ventana_dias, r.dias_anteriores, r.categoria_id, c.nombre AS categoria,
+              r.codigo_accion, r.codigo_prioridad,
+              r.vigente_desde::text AS vigente_desde, r.vigente_hasta::text AS vigente_hasta
+       FROM convi.reglas r
+       LEFT JOIN convi.categorias_convivencia c ON c.id = r.categoria_id
+       WHERE r.estado = 'ACTIVO' AND r.tipo_regla = 'RECURRENCIA'
+         AND r.dias_anteriores IS NOT NULL
+         AND (r.vigente_desde IS NULL OR r.vigente_desde < current_date)
+         AND (r.vigente_hasta IS NULL OR r.vigente_hasta >= current_date OR (
+           NOT EXISTS (SELECT 1 FROM convi.alertas a WHERE a.regla_id = r.id)
+           AND NOT EXISTS (SELECT 1 FROM convi.notificaciones n
+             WHERE n.clave_evento = 'CIERRE_REGLA:' || r.id)
+         ))
+       ORDER BY r.codigo_regla, r.numero_version`,
+    );
+    return filas.rows;
+  }
+
+  private async avisarCierre(
+    db: PoolClient,
+    regla: RecurrenciaDiaria,
+    desde: string,
+    hasta: string,
+    maximo: number,
+  ) {
+    const aviso = textoCierreRecurrencia({
+      nombre: regla.nombre,
+      categoria: regla.categoria,
+      ambito: regla.codigo_ambito,
+      operador: regla.codigo_operador,
+      umbral: regla.umbral,
+      desde,
+      hasta,
+      maximo,
+    });
+    const filas = await db.query(
+      `INSERT INTO convi.notificaciones
+         (establecimiento_id, membresia_destinatario_id, tipo_notificacion, titulo, cuerpo, clave_evento)
+       SELECT convi.establecimiento_actual(), m.id, 'VENCIMIENTO', $2, $3, 'CIERRE_REGLA:' || $1::uuid
+       FROM convi.membresias_establecimiento m
+       WHERE m.codigo_perfil = 'CONVIVENCIA' AND m.estado = 'ACTIVO'
+       ON CONFLICT (membresia_destinatario_id, clave_evento)
+         WHERE clave_evento IS NOT NULL DO NOTHING`,
+      [regla.id, aviso.titulo, aviso.cuerpo],
+    );
+    return filas.rowCount ?? 0;
   }
 
   /** Lo vencido de cada caso abierto, solo los casos que tienen algo vencido. */
@@ -345,20 +460,13 @@ export class MotorDiarioService {
     if (inicio > ayer) return [];
     const primerDia = diaDeNumero(numeroDeDia(inicio) - 2 * ventana + 1);
 
-    const filas = await db.query<{
-      registro: string | null;
-      dia: string;
-      n: number;
-    }>(POR_DIA[ambito].replaceAll('CONDICIONES', CONDICIONES), [
+    const porRegistro = await this.conteosPorDia(
+      db,
+      ambito,
       regla.categoria_id,
       primerDia,
       ayer,
-    ]);
-    const porRegistro = new Map<string | null, Map<string, number>>();
-    for (const { registro, dia, n } of filas.rows) {
-      if (!porRegistro.has(registro)) porRegistro.set(registro, new Map());
-      porRegistro.get(registro)!.set(dia, n);
-    }
+    );
 
     const resultados: (number | null)[] = [];
     for (const [registroId, porDia] of porRegistro) {
@@ -431,5 +539,29 @@ export class MotorDiarioService {
       );
     }
     return resultados;
+  }
+
+  private async conteosPorDia(
+    db: PoolClient,
+    ambito: AmbitoConteo,
+    categoria: string | null,
+    desde: string,
+    hasta: string,
+  ) {
+    const filas = await db.query<{
+      registro: string | null;
+      dia: string;
+      n: number;
+    }>(POR_DIA[ambito].replaceAll('CONDICIONES', CONDICIONES), [
+      categoria,
+      desde,
+      hasta,
+    ]);
+    const porRegistro = new Map<string | null, Map<string, number>>();
+    for (const { registro, dia, n } of filas.rows) {
+      if (!porRegistro.has(registro)) porRegistro.set(registro, new Map());
+      porRegistro.get(registro)!.set(dia, n);
+    }
+    return porRegistro;
   }
 }
