@@ -11,16 +11,24 @@ import { generarEmbeddings } from '../documentos/embeddings.js';
 import { ErrorPreparacion } from '../documentos/preparacion.js';
 import {
   construirMensajes,
+  construirMensajesReformulacion,
+  construirMensajesSeleccion,
   ErrorIA,
+  ESQUEMA_REFORMULACION,
   esquemaRespuesta,
+  esquemaSeleccion,
+  fusionarBusquedas,
+  interpretarReformulacion,
   interpretarRespuesta,
+  interpretarSeleccion,
   MODELO_GENERACION,
+  seleccionarFragmentos,
   sinDisposicion,
   validarPregunta,
   type FragmentoEncontrado,
   type ResultadoConsulta,
 } from './consulta.js';
-import { buscarFragmentosNormativa } from './busqueda.js';
+import { buscarFragmentosCrudos } from './busqueda.js';
 import { configuracionGeneracion, generar } from './generacion.js';
 
 const NO_DISPONIBLE =
@@ -29,8 +37,10 @@ const NO_DISPONIBLE =
 /**
  * PB-117 a PB-119 (HU-101 y HU-102): consulta del reglamento con IA. Busca con
  * bge-m3 en los fragmentos publicados, vigentes y preparados de la escuela (la
- * función del esquema buscar_fragmentos_normativa), redacta con qwen3.5:9b solo con
- * esos fragmentos y devuelve la respuesta con sus citas. Solo Convivencia (CA3).
+ * función del esquema buscar_fragmentos_normativa), primero con la pregunta y luego
+ * con hasta 3 versiones que redacta qwen3.5:9b con el vocabulario del reglamento.
+ * Junta las búsquedas, deja que el modelo elija los fragmentos de la misma situación,
+ * redacta solo con esos y devuelve la respuesta con sus citas. Solo Convivencia (CA3).
  */
 @Injectable()
 export class NormativaService {
@@ -68,23 +78,62 @@ export class NormativaService {
         ).rows[0].id,
     );
     let fragmentos: FragmentoEncontrado[] = [];
+    let busquedas = 1;
+    let encontrados = 0;
     try {
       configuracionGeneracion();
-      const [vector] = await generarEmbeddings([
-        {
-          indice: 0,
-          contenido: pregunta,
-          pagina_desde: null,
-          pagina_hasta: null,
-        },
-      ]);
-      // Se buscan 12 y se descartan las páginas del índice antes de quedarse con 6.
-      fragmentos = await this.operar(sesion, (db) =>
-        buscarFragmentosNormativa(db, vector),
+      const vectorizar = (textos: string[]) =>
+        generarEmbeddings(
+          textos.map((contenido, indice) => ({
+            indice,
+            contenido,
+            pagina_desde: null,
+            pagina_hasta: null,
+          })),
+        );
+      const [vector] = await vectorizar([pregunta]);
+      // Se buscan 12 y se descartan las páginas del índice.
+      const original = await this.operar(sesion, (db) =>
+        buscarFragmentosCrudos(db, vector),
       );
       // REGLA DE NEGOCIO
       // Si la búsqueda no encuentra fragmentos de los documentos vigentes de la escuela, el modelo no redacta una respuesta.
       // HU-102: sin fragmentos no hay nada que citar y no se le pregunta al modelo.
+      if (seleccionarFragmentos(original).length) {
+        // La pregunta se reescribe con el vocabulario del reglamento y se busca también
+        // con esas versiones. Si el modelo no responde en formato, se sigue solo con la
+        // pregunta original.
+        const consultas = interpretarReformulacion(
+          await generar(
+            construirMensajesReformulacion(pregunta),
+            ESQUEMA_REFORMULACION,
+          ),
+          pregunta,
+        ).slice(1);
+        busquedas += consultas.length;
+        const vectores = consultas.length ? await vectorizar(consultas) : [];
+        const otras = vectores.length
+          ? await this.operar(sesion, async (db) => {
+              const listas: FragmentoEncontrado[][] = [];
+              for (const v of vectores)
+                listas.push(await buscarFragmentosCrudos(db, v));
+              return listas;
+            })
+          : [];
+        fragmentos = fusionarBusquedas([original, ...otras]);
+      }
+      encontrados = fragmentos.length;
+      // El modelo deja solo los fragmentos de la misma situación, ordenados, antes de
+      // redactar. Si no elige ninguno, la redacción recibe todos y decide si hay
+      // disposición.
+      if (fragmentos.length)
+        fragmentos = interpretarSeleccion(
+          await generar(
+            construirMensajesSeleccion(fragmentos, pregunta),
+            esquemaSeleccion(fragmentos.length),
+          ),
+          fragmentos,
+        );
       const resultado = fragmentos.length
         ? interpretarRespuesta(
             await generar(
@@ -96,7 +145,7 @@ export class NormativaService {
         : sinDisposicion();
       await this.cerrar(sesion, solicitudId, 'COMPLETADO', inicio, {
         fuentes: resultado.citas.length,
-        resumen: `Consulta del reglamento con ${fragmentos.length} fragmentos encontrados y ${resultado.citas.length} citados${resultado.sin_disposicion ? ', sin disposición aplicable' : ''}`,
+        resumen: `Consulta del reglamento con ${busquedas} búsquedas, ${encontrados} fragmentos encontrados, ${fragmentos.length} elegidos y ${resultado.citas.length} citados${resultado.sin_disposicion ? ', sin disposición aplicable' : ''}`,
       });
       return { ...resultado, solicitud_id: solicitudId };
     } catch (error) {
