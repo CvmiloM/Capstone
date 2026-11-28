@@ -107,14 +107,52 @@ describe('evaluarRecurrencia', () => {
     expect(r?.cumpleDesde).toBe('2026-03-03');
   });
 
-  it('la racha no empieza antes de la vigencia de la regla', () => {
+  it('la regla no cuenta hechos anteriores a su vigencia', () => {
     const r = evaluarRecurrencia({
       ...regla,
       inicio: '2026-03-08',
       porDia: porDia('2026-03-01', '2026-03-02', '2026-03-03', '2026-03-10'),
       hoy: '2026-03-10',
     });
-    expect(r?.cumpleDesde).toBe('2026-03-08');
+    expect(r).toBeNull();
+  });
+
+  it('con cero días anteriores cuenta desde hoy y se acumula en los siguientes días', () => {
+    const datos = {
+      ...regla,
+      inicio: '2026-11-27',
+      primerDia: '2026-11-27',
+      porDia: porDia('2026-11-25', '2026-11-27', '2026-11-28'),
+      ventanaDias: null,
+      operador: 'GE' as const,
+      umbral: 1,
+    };
+    expect(evaluarRecurrencia({ ...datos, hoy: '2026-11-27' })).toMatchObject({
+      conteo: 1,
+      desde: '2026-11-27',
+      cumpleDesde: '2026-11-27',
+    });
+    expect(evaluarRecurrencia({ ...datos, hoy: '2026-11-28' })?.conteo).toBe(2);
+  });
+
+  it('incluye solo los días anteriores elegidos y reconoce una coincidencia anterior al cierre', () => {
+    const datos = {
+      ...regla,
+      inicio: '2026-11-27',
+      primerDia: '2026-11-25',
+      hoy: '2026-11-30',
+      porDia: porDia('2026-11-24', '2026-11-25', '2026-11-27', '2026-11-29'),
+      ventanaDias: null,
+      operador: 'EQ' as const,
+      umbral: 2,
+    };
+    expect(evaluarRecurrencia(datos)).toBeNull();
+    expect(evaluarRecurrencia(datos, true)).toEqual({
+      conteo: 2,
+      desde: '2026-11-25',
+      hasta: '2026-11-27',
+      cumpleDesde: '2026-11-27',
+    });
   });
 
   it('con «exactamente», una situación de más corta la racha', () => {

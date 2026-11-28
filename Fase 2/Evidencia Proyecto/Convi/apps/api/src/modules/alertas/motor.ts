@@ -54,16 +54,19 @@ export type Recurrencia = {
   porDia: ReadonlyMap<string, number>;
   /** Hoy en la escuela. */
   hoy: string;
-  ventanaDias: number;
+  /** null acumula desde el primer día de conteo sin sacar días anteriores. */
+  ventanaDias: number | null;
   operador: Operador;
   umbral: number;
   /** Primer día en que se busca la racha: la vigencia de la regla o un año atrás. */
   inicio: string;
+  /** Primer día cuyos hechos pueden contar. */
+  primerDia?: string;
 };
 
 export type RecurrenciaCumplida = {
   conteo: number;
-  /** Ventana de hoy: desde hoy menos la ventana más un día, hasta hoy. */
+  /** Primer día que cuenta para el resultado de hoy. */
   desde: string;
   hasta: string;
   /** Primer día de la racha de días seguidos en que la regla se cumple hasta hoy. */
@@ -81,36 +84,42 @@ export type RecurrenciaCumplida = {
 // La regla cuenta situaciones del ámbito y período configurados y detecta cuándo se cruza el umbral.
 export function evaluarRecurrencia(
   datos: Recurrencia,
+  primeraCoincidencia = false,
 ): RecurrenciaCumplida | null {
   const hoy = numeroDeDia(datos.hoy);
-  const inicio = Math.min(numeroDeDia(datos.inicio), hoy);
+  const inicio = numeroDeDia(datos.inicio);
+  if (inicio > hoy) return null;
   const ventana = datos.ventanaDias;
-  const primero = inicio - ventana + 1;
-
-  // Situaciones de cada día, desde el primero que entra en la ventana de inicio.
-  const delDia: number[] = [];
-  for (let dia = primero; dia <= hoy; dia++)
-    delDia.push(datos.porDia.get(diaDeNumero(dia)) ?? 0);
-
-  // Conteo de la ventana que termina cada día, de inicio a hoy.
-  const cumplidos: boolean[] = [];
+  const limite = numeroDeDia(datos.primerDia ?? datos.inicio);
+  const primero =
+    ventana === null ? limite : Math.max(limite, inicio - ventana + 1);
+  const cantidad = (dia: number) => datos.porDia.get(diaDeNumero(dia)) ?? 0;
   let conteo = 0;
-  for (let i = 0; i < delDia.length; i++) {
-    conteo += delDia[i];
-    if (i >= ventana) conteo -= delDia[i - ventana];
-    if (i >= ventana - 1)
-      cumplidos.push(cumple(conteo, datos.operador, datos.umbral));
+  let racha: number | null = null;
+  let hasta = hoy;
+  for (let dia = primero; dia <= hoy; dia++) {
+    conteo += cantidad(dia);
+    if (ventana !== null && dia - ventana >= primero)
+      conteo -= cantidad(dia - ventana);
+    if (dia >= inicio) {
+      racha = cumple(conteo, datos.operador, datos.umbral)
+        ? (racha ?? dia)
+        : null;
+      if (primeraCoincidencia && racha !== null) {
+        hasta = dia;
+        break;
+      }
+    }
   }
-  if (!cumplidos[cumplidos.length - 1]) return null;
-
-  let racha = cumplidos.length - 1;
-  while (racha > 0 && cumplidos[racha - 1]) racha--;
+  if (racha === null) return null;
 
   return {
     conteo,
-    desde: diaDeNumero(hoy - ventana + 1),
-    hasta: datos.hoy,
-    cumpleDesde: diaDeNumero(inicio + racha),
+    desde: diaDeNumero(
+      ventana === null ? primero : Math.max(primero, hasta - ventana + 1),
+    ),
+    hasta: diaDeNumero(hasta),
+    cumpleDesde: diaDeNumero(racha),
   };
 }
 
@@ -165,7 +174,7 @@ export function explicacion(datos: {
   operador: Operador;
   umbral: number;
   resultado: RecurrenciaCumplida;
-  situacionId: string;
+  situacionId: string | null;
 }) {
   const { resultado: r } = datos;
   return {
@@ -193,11 +202,37 @@ export function textoAviso(datos: {
   operador: Operador;
   umbral: number;
   conteo: number;
+  periodo?: Pick<RecurrenciaCumplida, 'desde' | 'hasta'>;
 }) {
   const situaciones = datos.conteo === 1 ? 'situación' : 'situaciones';
+  const periodo = datos.periodo
+    ? `del ${fechaDeAviso(datos.periodo.desde)} al ${fechaDeAviso(datos.periodo.hasta)}`
+    : `en los últimos ${datos.ventanaDias} días`;
   return {
     titulo: tituloAviso(datos.prioridad, datos.nombre),
-    cuerpo: `Se cumplió la regla ${datos.codigoRegla} con ${datos.conteo} ${situaciones} ${SUJETO[datos.ambito]} en los últimos ${datos.ventanaDias} días, y la regla pide ${CONDICION[datos.operador]} ${datos.umbral}`,
+    cuerpo: `Se cumplió la regla ${datos.codigoRegla} con ${datos.conteo} ${situaciones} ${SUJETO[datos.ambito]} ${periodo}, y la regla pide ${CONDICION[datos.operador]} ${datos.umbral}`,
+  };
+}
+
+function fechaDeAviso(dia: string) {
+  return dia.split('-').reverse().join('/');
+}
+
+export function textoCierreRecurrencia(datos: {
+  nombre: string;
+  categoria: string | null;
+  ambito: AmbitoConteo;
+  operador: Operador;
+  umbral: number;
+  desde: string;
+  hasta: string;
+  maximo: number;
+}) {
+  const categoria = datos.categoria ? ` de ${datos.categoria}` : '';
+  const cantidad = datos.umbral === 1 ? 'situación' : 'situaciones';
+  return {
+    titulo: 'Terminó una regla sin cumplirse',
+    cuerpo: `Terminó «${datos.nombre}». Del ${fechaDeAviso(datos.desde)} al ${fechaDeAviso(datos.hasta)} se contaron situaciones${categoria} ${SUJETO[datos.ambito]}. La regla pedía ${CONDICION[datos.operador]} ${datos.umbral} ${cantidad}. El mayor conteo al cierre fue ${datos.maximo}.`,
   };
 }
 

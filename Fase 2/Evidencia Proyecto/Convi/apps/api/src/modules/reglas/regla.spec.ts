@@ -33,6 +33,19 @@ function camposConError(cuerpo: Record<string, unknown>): string[] | null {
 }
 
 describe('validarRegla', () => {
+  it('cero días anteriores empieza el conteo en la vigencia y prescinde de la ventana móvil', () => {
+    expect(
+      validarRegla({ ...recurrencia, dias_anteriores: '0' }),
+    ).toMatchObject({
+      dias_anteriores: 0,
+      ventana_dias: null,
+    });
+    for (const dias_anteriores of ['', '-1', '1.5', '3651'])
+      expect(camposConError({ ...recurrencia, dias_anteriores })).toEqual([
+        'dias_anteriores',
+      ]);
+  });
+
   it('CA1 y CA3: una regla de recurrencia completa', () => {
     expect(validarRegla(recurrencia)).toEqual({
       nombre: 'Tres situaciones en un mes',
@@ -41,6 +54,7 @@ describe('validarRegla', () => {
       codigo_operador: 'GE',
       valor_umbral: 3,
       ventana_dias: 30,
+      dias_anteriores: null,
       ventana_comparacion_dias: null,
       categoria_id: CATEGORIA,
       codigo_ambito: 'ESTUDIANTE',

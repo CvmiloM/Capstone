@@ -25,6 +25,7 @@ export type Regla = {
   codigo_operador: string | null;
   valor_umbral: number | null;
   ventana_dias: number | null;
+  dias_anteriores?: number | null;
   ventana_comparacion_dias: number | null;
   categoria_id: string | null;
   categoria: string | null;

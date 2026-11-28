@@ -26,7 +26,7 @@ import {
 // categorías, cursos y estados, y solo crea alertas, avisos y el registro de
 // su ejecución. Las situaciones descartadas no cuentan (decisión del PO).
 
-type Regla = {
+export type ReglaRecurrencia = {
   id: string;
   codigo_regla: string;
   numero_version: number;
@@ -34,7 +34,8 @@ type Regla = {
   codigo_ambito: AmbitoConteo;
   codigo_operador: Operador;
   umbral: number;
-  ventana_dias: number;
+  ventana_dias: number | null;
+  dias_anteriores: number | null;
   categoria_id: string | null;
   codigo_accion: 'ALERTA' | 'ALERTA_Y_NOTIFICACION';
   codigo_prioridad: string;
@@ -152,17 +153,18 @@ export class MotorReglasService {
   private async reglasActivas(
     db: PoolClient,
     categoriaId: string | null,
-  ): Promise<Regla[]> {
-    const filas = await db.query<Regla>(
+  ): Promise<ReglaRecurrencia[]> {
+    const filas = await db.query<ReglaRecurrencia>(
       `SELECT id, codigo_regla, numero_version, nombre, codigo_ambito,
-              codigo_operador, valor_umbral::float8 AS umbral, ventana_dias,
+              codigo_operador, valor_umbral::float8 AS umbral, ventana_dias, dias_anteriores,
               categoria_id, codigo_accion, codigo_prioridad,
               vigente_desde::text AS vigente_desde
        FROM convi.reglas
        WHERE estado = 'ACTIVO' AND tipo_regla = 'RECURRENCIA'
          AND codigo_ambito IN ('ESTUDIANTE', 'CURSO', 'ESTABLECIMIENTO')
-         AND codigo_operador = ANY($1::text[])
-         AND ventana_dias >= 1 AND valor_umbral IS NOT NULL
+         AND (dias_anteriores IS NOT NULL
+           OR (codigo_operador = ANY($1::text[]) AND ventana_dias >= 1))
+         AND valor_umbral IS NOT NULL
          AND (vigente_desde IS NULL OR vigente_desde <= current_date)
          AND (vigente_hasta IS NULL OR vigente_hasta >= current_date)
          AND (categoria_id IS NULL OR categoria_id IS NOT DISTINCT FROM $2::uuid)
@@ -179,7 +181,7 @@ export class MotorReglasService {
   private async evaluarRegla(
     db: PoolClient,
     datos: {
-      regla: Regla;
+      regla: ReglaRecurrencia;
       registroId: string | null;
       hoy: string;
       situacionId: string;
@@ -187,15 +189,7 @@ export class MotorReglasService {
   ): Promise<number | null> {
     const { regla, registroId, hoy } = datos;
     const ambito = regla.codigo_ambito;
-    // La racha se busca desde la vigencia de la regla, como máximo un año atrás.
-    const haceUnAnio = diaDeNumero(numeroDeDia(hoy) - DIAS_HACIA_ATRAS);
-    const inicio =
-      regla.vigente_desde && regla.vigente_desde > haceUnAnio
-        ? regla.vigente_desde
-        : haceUnAnio;
-    const primerDia = diaDeNumero(
-      Math.min(numeroDeDia(inicio), numeroDeDia(hoy)) - regla.ventana_dias + 1,
-    );
+    const { inicio, primerDia } = periodoRecurrencia(regla, hoy);
 
     // CA6: todas las situaciones del período, aunque estén en otra alerta.
     const condiciones = situacionesQueCuentan(ambito);
@@ -213,60 +207,97 @@ export class MotorReglasService {
       operador: regla.codigo_operador,
       umbral: regla.umbral,
       inicio,
+      primerDia,
     });
     if (!cumplida) return null;
+    return guardarRecurrencia(
+      db,
+      regla,
+      registroId,
+      cumplida,
+      datos.situacionId,
+    );
+  }
+}
 
-    // CA6: mientras siga la misma racha no se genera otra alerta.
-    const columna = COLUMNA_AMBITO[ambito];
-    const anterior = await db.query(
-      `SELECT 1 FROM convi.alertas
+export function periodoRecurrencia(regla: ReglaRecurrencia, hasta: string) {
+  const haceUnAnio = numeroDeDia(hasta) - DIAS_HACIA_ATRAS;
+  if (regla.dias_anteriores !== null) {
+    const inicio = regla.vigente_desde ?? hasta;
+    return {
+      inicio,
+      primerDia: diaDeNumero(numeroDeDia(inicio) - regla.dias_anteriores),
+    };
+  }
+  const vigencia = regla.vigente_desde
+    ? numeroDeDia(regla.vigente_desde)
+    : haceUnAnio;
+  const inicio = Math.max(haceUnAnio, vigencia);
+  const desde = Math.max(vigencia, inicio - (regla.ventana_dias ?? 1) + 1);
+  return { inicio: diaDeNumero(inicio), primerDia: diaDeNumero(desde) };
+}
+
+export async function guardarRecurrencia(
+  db: PoolClient,
+  regla: ReglaRecurrencia,
+  registroId: string | null,
+  cumplida: NonNullable<ReturnType<typeof evaluarRecurrencia>>,
+  situacionId: string | null,
+) {
+  const ambito = regla.codigo_ambito;
+  const diasContados =
+    numeroDeDia(cumplida.hasta) - numeroDeDia(cumplida.desde) + 1;
+  // CA6: mientras siga la misma racha no se genera otra alerta.
+  const columna = COLUMNA_AMBITO[ambito];
+  const anterior = await db.query(
+    `SELECT 1 FROM convi.alertas
        WHERE regla_id = $1
          AND ${columna ? `${columna} = $2` : '$2::uuid IS NULL'}
          AND generada_en >= $3::date::timestamptz
        LIMIT 1`,
-      [regla.id, registroId, cumplida.cumpleDesde],
-    );
-    if (anterior.rows.length > 0) return null;
+    [regla.id, registroId, cumplida.cumpleDesde],
+  );
+  if (anterior.rows.length > 0) return null;
 
-    // CA2 y CA3: la alerta apunta al registro de su ámbito y guarda la explicación.
-    const clave = claveEvento({
+  // CA2 y CA3: la alerta apunta al registro de su ámbito y guarda la explicación.
+  const clave = claveEvento({
+    codigoRegla: regla.codigo_regla,
+    version: regla.numero_version,
+    ambito,
+    registroId,
+    cumpleDesde: cumplida.cumpleDesde,
+  });
+  // CA3 y CA7: la explicación, las situaciones de la ventana de hoy y, con
+  // «registrar y avisar», un aviso para cada cuenta activa de Convivencia.
+  return guardarAlerta(db, {
+    regla,
+    ambito,
+    registroId,
+    clave,
+    explicacion: explicacion({
+      ambito,
+      categoriaId: regla.categoria_id,
+      ventanaDias: diasContados,
+      operador: regla.codigo_operador,
+      umbral: regla.umbral,
+      resultado: cumplida,
+      situacionId,
+    }),
+    situaciones: {
+      categoriaId: regla.categoria_id,
+      desde: cumplida.desde,
+      hasta: cumplida.hasta,
+    },
+    aviso: textoAviso({
       codigoRegla: regla.codigo_regla,
-      version: regla.numero_version,
+      nombre: regla.nombre,
+      prioridad: regla.codigo_prioridad,
       ambito,
-      registroId,
-      cumpleDesde: cumplida.cumpleDesde,
-    });
-    // CA3 y CA7: la explicación, las situaciones de la ventana de hoy y, con
-    // «registrar y avisar», un aviso para cada cuenta activa de Convivencia.
-    return guardarAlerta(db, {
-      regla,
-      ambito,
-      registroId,
-      clave,
-      explicacion: explicacion({
-        ambito,
-        categoriaId: regla.categoria_id,
-        ventanaDias: regla.ventana_dias,
-        operador: regla.codigo_operador,
-        umbral: regla.umbral,
-        resultado: cumplida,
-        situacionId: datos.situacionId,
-      }),
-      situaciones: {
-        categoriaId: regla.categoria_id,
-        desde: cumplida.desde,
-        hasta: hoy,
-      },
-      aviso: textoAviso({
-        codigoRegla: regla.codigo_regla,
-        nombre: regla.nombre,
-        prioridad: regla.codigo_prioridad,
-        ambito,
-        ventanaDias: regla.ventana_dias,
-        operador: regla.codigo_operador,
-        umbral: regla.umbral,
-        conteo: cumplida.conteo,
-      }),
-    });
-  }
+      ventanaDias: diasContados,
+      periodo: cumplida,
+      operador: regla.codigo_operador,
+      umbral: regla.umbral,
+      conteo: cumplida.conteo,
+    }),
+  });
 }
