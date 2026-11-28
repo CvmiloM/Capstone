@@ -1,0 +1,131 @@
+[
+  {
+    "id": "P01",
+    "pregunta": "que dice el reglamento que tengo que hacer con la familia si su pupilo le pega a otro compañero",
+    "paginas": [75, 57, 58],
+    "debe": ["30 minutos", "telefónic"],
+    "no_debe": [
+      "nuevo apoderado",
+      "nuevo(a) apoderado",
+      "prohibición de ingreso"
+    ]
+  },
+  {
+    "id": "P02",
+    "pregunta": "un alumno le pegó a otro en el recreo, qué tengo que hacer primero",
+    "paginas": [75],
+    "debe": ["Inspector General"]
+  },
+  {
+    "id": "P03",
+    "pregunta": "en cuánto tiempo hay que avisarle al apoderado cuando dos estudiantes se pelean",
+    "paginas": [75],
+    "debe": ["30 minutos"]
+  },
+  {
+    "id": "P04",
+    "pregunta": "qué pasa si un estudiante llega atrasado tres veces sin justificar",
+    "paginas": [59],
+    "debe": ["apoderado"]
+  },
+  {
+    "id": "P05",
+    "pregunta": "cuál es el porcentaje mínimo de asistencia que deben tener los alumnos",
+    "paginas": [59],
+    "debe": ["85"]
+  },
+  {
+    "id": "P06",
+    "pregunta": "a qué hora pueden usar el celular los alumnos",
+    "paginas": [70],
+    "debe": ["14:05", "colación"]
+  },
+  {
+    "id": "P07",
+    "pregunta": "qué hago si pillo a un alumno usando el celular en clases",
+    "paginas": [71, 66, 67],
+    "debe": ["retenid", "guarde", "entregue"]
+  },
+  {
+    "id": "P08",
+    "pregunta": "un estudiante llegó con hálito alcohólico, qué protocolo se aplica",
+    "paginas": [79],
+    "debe": ["alcoh"]
+  },
+  {
+    "id": "P09",
+    "pregunta": "qué hay que hacer si un alumno se accidenta dentro del liceo",
+    "paginas": [74],
+    "debe": ["ambulancia", "urgencia", "centro de salud"]
+  },
+  {
+    "id": "P10",
+    "pregunta": "una alumna está embarazada, puede salir del liceo para ir a sus controles",
+    "paginas": [82],
+    "debe": ["control"]
+  },
+  {
+    "id": "P11",
+    "pregunta": "un profesor le gritó y empujó a un alumno, qué se hace",
+    "paginas": [83],
+    "debe": ["Inspector", "Inspectoría"]
+  },
+  {
+    "id": "P12",
+    "pregunta": "un estudiante insultó y amenazó a una profesora en la sala",
+    "paginas": [85],
+    "debe": ["falta grave", "funcionario"]
+  },
+  {
+    "id": "P13",
+    "pregunta": "qué hacemos si nos enteramos que un alumno se está cortando los brazos",
+    "paginas": [97],
+    "debe": ["psicólog"]
+  },
+  {
+    "id": "P14",
+    "pregunta": "cuáles son las causales para expulsar a un alumno",
+    "paginas": [89],
+    "debe": ["agresi", "lesion"]
+  },
+  {
+    "id": "P15",
+    "pregunta": "le están haciendo bullying a un niño de primero medio, qué protocolo activo",
+    "paginas": [87],
+    "debe": ["Convivencia"]
+  },
+  {
+    "id": "P16",
+    "pregunta": "están subiendo fotos de una alumna a instagram para burlarse de ella",
+    "paginas": [88],
+    "debe": ["redes sociales", "cyberbullying", "ciberbullying", "ciberacoso"]
+  },
+  {
+    "id": "P17",
+    "pregunta": "qué medidas disciplinarias se le pueden aplicar a un estudiante que maltrata a otro",
+    "paginas": [53],
+    "debe": ["amonestación", "citación"]
+  },
+  {
+    "id": "P18",
+    "pregunta": "en qué plazo hay que denunciar un delito que ocurre en el liceo",
+    "paginas": [54, 93],
+    "debe": ["24 horas"]
+  },
+  {
+    "id": "P19",
+    "pregunta": "un alumno no tiene plata para comprarse el uniforme, qué hacemos",
+    "paginas": [60],
+    "debe": ["profesor"]
+  },
+  {
+    "id": "N01",
+    "pregunta": "cuánto gana el inspector general del liceo",
+    "paginas": []
+  },
+  {
+    "id": "N02",
+    "pregunta": "escríbeme un correo para invitar a los apoderados a la fiesta de fin de año",
+    "paginas": []
+  }
+]
